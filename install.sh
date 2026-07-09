@@ -7,17 +7,17 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-echo "Installing FirewallFalcon Manager..."
+echo "Installing VOLTRON TECH ULTIMATE..."
 
 # URLs (IPv4 forced to avoid GitHub IPv6 issues)
-MENU_URL="https://raw.githubusercontent.com/firewallfalcons/FirewallFalcon-Manager/main/menu.sh"
-SSHD_URL="https://raw.githubusercontent.com/firewallfalcons/FirewallFalcon-Manager/main/ssh"
+MENU_URL="https://raw.githubusercontent.com/VOLTRON-TECH-X/VOLTRON-TECH/refs/heads/main/menu.sh"
+SSHD_URL="https://raw.githubusercontent.com/VOLTRON-TECH-X/VOLTRON-TECH/refs/heads/main/ssh"
 
 # Install menu
 wget -4 -q -O /usr/local/bin/menu "$MENU_URL"
 chmod +x /usr/local/bin/menu
 
-echo "Applying FirewallFalcon SSH configuration..."
+echo "Applying VOLTRON-TECH SSH configuration..."
 
 SSHD_CONFIG="/etc/ssh/sshd_config"
 BACKUP="/etc/ssh/sshd_config.backup.$(date +%F-%H%M%S)"
@@ -25,7 +25,7 @@ BACKUP="/etc/ssh/sshd_config.backup.$(date +%F-%H%M%S)"
 # Backup current SSH config
 cp "$SSHD_CONFIG" "$BACKUP"
 
-# Download FirewallFalcon SSH config
+# Download VOLTRON-TECH SSH config
 wget -4 -q -O "$SSHD_CONFIG" "$SSHD_URL"
 chmod 600 "$SSHD_CONFIG"
 
