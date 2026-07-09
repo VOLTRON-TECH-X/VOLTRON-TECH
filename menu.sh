@@ -1,14 +1,14 @@
 #!/bin/bash
 # ================================================================
-# VOLTRON TECH ULTIMATE v7.0 - COMPLETE
+# VOLTRON TECH ULTIMATE v8.0 - COMPLETE
 # ================================================================
 # Inajumuisha:
 #   1. User Management - Create, Delete, Edit, Lock, Unlock, List, Renew, Cleanup
-#   2. DNSTT - 7 Speed Boosters (10-100 Mbps) + MTU Settings
+#   2. DNSTT - 7 Speed Boosters (10-100 Mbps) + MTU Settings + Firewall Fix
 #   3. Protocols - badvpn, udp-custom, SSL Tunnel, Falcon Proxy, ZiVPN, X-UI
 #   4. Dynamic Banner - Per-user account info (VOLTRON TECH ULTIMATE)
-#   5. VPS Dashboard - Real-time system info
-#   6. VPN Data Usage - Per user connection data
+#   5. VPS Dashboard - Real-time system info (Compact)
+#   6. VPN Data Usage - Per user connection data (Table format)
 #   7. UDP Booster - KCP/smux optimization
 #   8. Trial Account - Auto-delete
 #   9. Orphan Detection
@@ -238,7 +238,7 @@ show_banner() {
     refresh_banner_cache
     [[ -t 1 ]] && clear
     echo
-    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v7.0 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
+    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v8.0 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
     echo -e "${C_BLUE}   ─────────────────────────────────────────────────────────${C_RESET}"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "OS" "$BANNER_CACHE_OS_NAME" "Uptime: $BANNER_CACHE_UP_TIME"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "Memory" "${BANNER_CACHE_RAM_USAGE}% Used" "Online: ${C_WHITE}${BANNER_CACHE_ONLINE_USERS}${C_RESET}"
@@ -749,17 +749,21 @@ list_users() {
         press_enter
         return
     fi
-    echo -e "${C_BOLD}${C_PURPLE}--- 📋 Managed Users ---${C_RESET}"
-    echo -e "${C_CYAN}=========================================================================================${C_RESET}"
-    printf "${C_BOLD}${C_WHITE}%-18s | %-12s | %-10s | %-15s | %-20s${C_RESET}\n" "USERNAME" "EXPIRES" "CONNS" "BANDWIDTH" "STATUS"
-    echo -e "${C_CYAN}-----------------------------------------------------------------------------------------${C_RESET}"
+    
+    echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_BOLD}${C_PURPLE}                      📋 MANAGED USERS${C_RESET}"
+    echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    echo ""
+    echo -e "${C_BOLD}${C_WHITE}┌────────────┬────────────┬──────────┬───────────────┬──────────────┐${C_RESET}"
+    printf "${C_BOLD}${C_WHITE}│ %-10s │ %-10s │ %-8s │ %-13s │ %-12s │${C_RESET}\n" "USERNAME" "EXPIRES" "CONNS" "BANDWIDTH" "STATUS"
+    echo -e "${C_BOLD}${C_WHITE}├────────────┼────────────┼──────────┼───────────────┼──────────────┤${C_RESET}"
     
     while IFS=: read -r user pass expiry limit bandwidth_gb _extra; do
         [[ -z "$user" ]] && continue
         bandwidth_gb=${bandwidth_gb:-0}
         
         local online_count=$(pgrep -c -u "$user" sshd 2>/dev/null || echo 0)
-        local connection_string="$online_count / $limit"
+        local connection_string="$online_count/$limit"
         
         local bw_string="Unlimited"
         if [[ "$bandwidth_gb" != "0" ]]; then
@@ -769,23 +773,28 @@ list_users() {
                 [[ -z "$used_bytes" ]] && used_bytes=0
             fi
             local used_gb=$(awk "BEGIN {printf \"%.1f\", $used_bytes / 1073741824}")
-            bw_string="${used_gb}/${bandwidth_gb}GB"
+            bw_string="${used_gb}/${bandwidth_gb}G"
         fi
         
         local status_text=$(get_user_status "$user")
         local plain_status=$(echo -e "$status_text" | sed 's/\x1b\[[0-9;]*m//g')
         
-        local line_color="$C_WHITE"
+        local status_short=""
         case $plain_status in
-            *"Active"*) line_color="$C_GREEN" ;;
-            *"Locked"*) line_color="$C_YELLOW" ;;
-            *"Expired"*) line_color="$C_RED" ;;
-            *"Not Found"*) line_color="$C_DIM" ;;
+            *"Active"*) status_short="${C_GREEN}Active${C_RESET}" ;;
+            *"Locked"*) status_short="${C_YELLOW}Locked${C_RESET}" ;;
+            *"Expired"*) status_short="${C_RED}Expired${C_RESET}" ;;
+            *"Not Found"*) status_short="${C_GRAY}Not Found${C_RESET}" ;;
         esac
-
-        printf "${line_color}%-18s ${C_RESET}| ${C_YELLOW}%-12s ${C_RESET}| ${C_CYAN}%-10s ${C_RESET}| ${C_ORANGE}%-15s ${C_RESET}| %-20s\n" "$user" "$expiry" "$connection_string" "$bw_string" "$status_text"
+        
+        printf "${C_WHITE}│${C_RESET} %-10s ${C_WHITE}│${C_RESET} %-10s ${C_WHITE}│${C_RESET} %-8s ${C_WHITE}│${C_RESET} %-13s ${C_WHITE}│${C_RESET} %-12s ${C_WHITE}│${C_RESET}\n" \
+            "$user" "$expiry" "$connection_string" "$bw_string" "$status_short"
     done < <(sort "$DB_FILE")
-    echo -e "${C_CYAN}=========================================================================================${C_RESET}\n"
+    
+    echo -e "${C_BOLD}${C_WHITE}└────────────┴────────────┴──────────┴───────────────┴──────────────┘${C_RESET}"
+    echo ""
+    echo -e "${C_DIM}Total Users: ${C_WHITE}$(grep -c . "$DB_FILE")${C_RESET}"
+    echo -e "${C_DIM}Online: ${C_WHITE}$(count_managed_online_sessions)${C_RESET}"
     press_enter
 }
 
@@ -1411,6 +1420,47 @@ dnstt_mtu_menu() {
 }
 
 # ================================================================
+# ========== DNSTT FIREWALL FIX ==========
+# ================================================================
+
+configure_dnstt_firewall() {
+    echo -e "\n${C_BLUE}🔥 Configuring firewall for DNSTT...${C_RESET}"
+    
+    # Check if iptables is installed
+    if ! command -v iptables &>/dev/null; then
+        echo -e "${C_YELLOW}⚠️ iptables not found. Installing...${C_RESET}"
+        ff_apt_install iptables iptables-persistent
+    fi
+    
+    # Flush existing rules
+    iptables -t nat -F 2>/dev/null || true
+    iptables -F 2>/dev/null || true
+    
+    # Allow port 53 (DNS)
+    iptables -A INPUT -p udp --dport 53 -j ACCEPT
+    iptables -A OUTPUT -p udp --sport 53 -j ACCEPT
+    
+    # Allow port 5300 (DNSTT internal)
+    iptables -A INPUT -p udp --dport 5300 -j ACCEPT
+    iptables -A OUTPUT -p udp --sport 5300 -j ACCEPT
+    
+    # Redirect port 53 → 5300
+    iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
+    
+    # Save rules
+    if command -v netfilter-persistent &>/dev/null; then
+        netfilter-persistent save >/dev/null 2>&1
+    fi
+    
+    # Save to /etc/iptables/rules.v4
+    mkdir -p /etc/iptables
+    iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
+    
+    echo -e "${C_GREEN}✅ Firewall configured for DNSTT${C_RESET}"
+    echo -e "${C_CYAN}📌 Port 53 → 5300 redirect active${C_RESET}"
+}
+
+# ================================================================
 # ========== DNSTT FUNCTIONS ==========
 # ================================================================
 
@@ -1583,7 +1633,7 @@ create_dnstt_service_with_booster() {
     
     cat > "$DNSTT_SERVICE_FILE" <<EOF
 [Unit]
-Description=DNSTT Server - ULTIMATE OPTIMIZED v7.0
+Description=DNSTT Server - ULTIMATE OPTIMIZED v8.0
 After=network.target
 Wants=network-online.target
 
@@ -1729,13 +1779,13 @@ install_dnstt() {
         systemctl stop dnstt.service 2>/dev/null
     fi
     
-    echo -e "\n${C_BLUE}[1/8] Installing dependencies...${C_RESET}"
+    echo -e "\n${C_BLUE}[1/9] Installing dependencies...${C_RESET}"
     ff_apt_install wget curl openssl bc
     
-    echo -e "\n${C_BLUE}[2/8] Downloading DNSTT binary...${C_RESET}"
+    echo -e "\n${C_BLUE}[2/9] Downloading DNSTT binary...${C_RESET}"
     download_dnstt_binary
     
-    echo -e "\n${C_BLUE}[3/8] Configuring resolvers...${C_RESET}"
+    echo -e "\n${C_BLUE}[3/9] Configuring resolvers...${C_RESET}"
     mkdir -p "$DB_DIR"
     cat > "$DB_DIR/resolvers.txt" << 'EOF'
 8.8.8.8:53
@@ -1747,7 +1797,7 @@ install_dnstt() {
 EOF
     echo -e "${C_GREEN}✅ 6 resolvers configured${C_RESET}"
     
-    echo -e "\n${C_BLUE}[4/8] MTU Configuration...${C_RESET}"
+    echo -e "\n${C_BLUE}[4/9] MTU Configuration...${C_RESET}"
     local current_mtu=$(get_current_mtu)
     echo -e "${C_CYAN}Current MTU: ${C_YELLOW}$current_mtu${C_RESET}"
     echo ""
@@ -1780,21 +1830,24 @@ EOF
     echo "$MTU" > "$MTU_CONFIG"
     echo -e "${C_GREEN}✅ MTU set to $MTU${C_RESET}"
     
-    echo -e "\n${C_BLUE}[5/8] Domain configuration...${C_RESET}"
+    echo -e "\n${C_BLUE}[5/9] Domain configuration...${C_RESET}"
     setup_domain
     
-    echo -e "\n${C_BLUE}[6/8] Generating keys...${C_RESET}"
+    echo -e "\n${C_BLUE}[6/9] Generating keys...${C_RESET}"
     generate_keys
     
-    echo -e "\n${C_BLUE}[7/8] Speed booster...${C_RESET}"
+    echo -e "\n${C_BLUE}[7/9] Speed booster...${C_RESET}"
     select_speed_booster
     
-    echo -e "\n${C_BLUE}[8/8] Creating DNSTT service...${C_RESET}"
+    echo -e "\n${C_BLUE}[8/9] Creating DNSTT service...${C_RESET}"
     SSH_PORT=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1)
     SSH_PORT=${SSH_PORT:-22}
     
     create_dnstt_service_with_booster "$DOMAIN" "$MTU" "$SSH_PORT" "127.0.0.1:$SSH_PORT"
     save_dnstt_info "$DOMAIN" "$PUBLIC_KEY" "$MTU" "$SSH_PORT"
+    
+    echo -e "\n${C_BLUE}[9/9] Configuring firewall...${C_RESET}"
+    configure_dnstt_firewall
     
     echo -e "\n${C_BLUE}🚀 Starting DNSTT...${C_RESET}"
     systemctl start dnstt.service
@@ -2215,75 +2268,67 @@ protocol_menu() {
 }
 
 # ================================================================
-# ========== VPS DASHBOARD ==========
+# ========== VPS DASHBOARD (COMPACT) ==========
 # ================================================================
 
 show_vps_dashboard() {
     clear; show_banner
     
+    # Get VPS info
     local VPS_IP=$(curl -s -4 icanhazip.com 2>/dev/null || echo "Unknown")
+    local VPS_LOCATION=$(curl -s "http://ip-api.com/json/$VPS_IP" 2>/dev/null | grep -o '"city":"[^"]*"' | cut -d'"' -f4 2>/dev/null || echo "Unknown")
+    local VPS_COUNTRY=$(curl -s "http://ip-api.com/json/$VPS_IP" 2>/dev/null | grep -o '"country":"[^"]*"' | cut -d'"' -f4 2>/dev/null || echo "Unknown")
+    local VPS_ISP=$(curl -s "http://ip-api.com/json/$VPS_IP" 2>/dev/null | grep -o '"isp":"[^"]*"' | cut -d'"' -f4 2>/dev/null || echo "Unknown")
     local VPS_OS=$(grep -oP 'PRETTY_NAME="\K[^"]+' /etc/os-release 2>/dev/null || echo "Unknown")
     local VPS_KERNEL=$(uname -r 2>/dev/null || echo "Unknown")
     local VPS_ARCH=$(uname -m 2>/dev/null || echo "Unknown")
+    local VPS_CPU_MODEL=$(grep -m1 "model name" /proc/cpuinfo | cut -d: -f2 | sed 's/^[ \t]*//' 2>/dev/null | cut -c1-30)
     local VPS_CPU_CORES=$(grep -c "processor" /proc/cpuinfo 2>/dev/null || echo "0")
     local VPS_CPU_USAGE=$(top -bn1 | head -5 | awk '/Cpu/ {print $2}' 2>/dev/null || echo "0")
     local VPS_RAM_TOTAL=$(free -h | awk '/^Mem:/ {print $2}' 2>/dev/null || echo "0")
     local VPS_RAM_USED=$(free -h | awk '/^Mem:/ {print $3}' 2>/dev/null || echo "0")
-    local VPS_RAM_PERCENT=$(free -m | awk '/^Mem:/{if($2>0){printf "%.2f", $3*100/$2}else{print "0"}}' 2>/dev/null || echo "0")
+    local VPS_RAM_PERCENT=$(free -m | awk '/^Mem:/{if($2>0){printf "%.1f", $3*100/$2}else{print "0"}}' 2>/dev/null || echo "0")
     local VPS_DISK_TOTAL=$(df -h / | awk 'NR==2 {print $2}' 2>/dev/null || echo "0")
     local VPS_DISK_USED=$(df -h / | awk 'NR==2 {print $3}' 2>/dev/null || echo "0")
     local VPS_DISK_PERCENT=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//' 2>/dev/null || echo "0")
     local VPS_UPTIME=$(uptime -p 2>/dev/null | sed 's/up //' || echo "unknown")
     local VPS_LOAD=$(awk '{print $1}' /proc/loadavg 2>/dev/null || echo "0")
+    local VPS_TRAFFIC_RX=$(ip -s link | grep -A1 "eth0\|ens3" | grep "RX" | awk '{print $2}' 2>/dev/null | head -1 | numfmt --to=iec 2>/dev/null || echo "0")
+    local VPS_TRAFFIC_TX=$(ip -s link | grep -A1 "eth0\|ens3" | grep "TX" | awk '{print $2}' 2>/dev/null | head -1 | numfmt --to=iec 2>/dev/null || echo "0")
     
     echo -e "${C_BOLD}${C_PURPLE}╔═══════════════════════════════════════════════════════════════════════════════╗${C_RESET}"
-    echo -e "${C_BOLD}${C_PURPLE}║                    🖥️  VPS DASHBOARD - REAL TIME INFO                        ║${C_RESET}"
+    echo -e "${C_BOLD}${C_PURPLE}║                         🖥️  VPS DASHBOARD                                  ║${C_RESET}"
     echo -e "${C_BOLD}${C_PURPLE}╚═══════════════════════════════════════════════════════════════════════════════╝${C_RESET}"
     echo ""
     
     echo -e "${C_BOLD}${C_CYAN}┌─────────────────────────────────────────────────────────────────────────────────┐${C_RESET}"
-    echo -e "${C_BOLD}${C_CYAN}│                        📋 VPS BASIC INFORMATION                            │${C_RESET}"
+    printf "${C_BOLD}${C_WHITE}│${C_RESET} ${C_YELLOW}IP:${C_RESET} ${C_GREEN}%-15s${C_RESET} ${C_YELLOW}Location:${C_RESET} ${C_GREEN}%-25s${C_RESET} ${C_YELLOW}ISP:${C_RESET} ${C_GREEN}%-15s${C_RESET} ${C_BOLD}${C_WHITE}│${C_RESET}\n" "$VPS_IP" "$VPS_LOCATION, $VPS_COUNTRY" "$VPS_ISP"
     echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "IP Address:" "$VPS_IP"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "OS:" "$VPS_OS"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "Kernel:" "$VPS_KERNEL"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "Architecture:" "$VPS_ARCH"
+    
+    printf "${C_BOLD}${C_WHITE}│${C_RESET} ${C_YELLOW}OS:${C_RESET} ${C_GREEN}%-15s${C_RESET} ${C_YELLOW}Kernel:${C_RESET} ${C_GREEN}%-20s${C_RESET} ${C_YELLOW}Arch:${C_RESET} ${C_GREEN}%-10s${C_RESET} ${C_BOLD}${C_WHITE}│${C_RESET}\n" "$VPS_OS" "$VPS_KERNEL" "$VPS_ARCH"
+    echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
+    
+    printf "${C_BOLD}${C_WHITE}│${C_RESET} ${C_YELLOW}CPU:${C_RESET} ${C_GREEN}%-20s${C_RESET} ${C_YELLOW}Cores:${C_RESET} ${C_GREEN}%-4s${C_RESET} ${C_YELLOW}Usage:${C_RESET} ${C_GREEN}%-6s${C_RESET} ${C_BOLD}${C_WHITE}│${C_RESET}\n" "$VPS_CPU_MODEL" "$VPS_CPU_CORES" "${VPS_CPU_USAGE}%"
+    echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
+    
+    printf "${C_BOLD}${C_WHITE}│${C_RESET} ${C_YELLOW}RAM:${C_RESET} ${C_GREEN}%-6s${C_RESET} ${C_YELLOW}Used:${C_RESET} ${C_GREEN}%-6s${C_RESET} ${C_YELLOW}Usage:${C_RESET} ${C_GREEN}%-6s${C_RESET} ${C_BOLD}${C_WHITE}│${C_RESET}\n" "$VPS_RAM_TOTAL" "$VPS_RAM_USED" "${VPS_RAM_PERCENT}%"
+    echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
+    
+    printf "${C_BOLD}${C_WHITE}│${C_RESET} ${C_YELLOW}Disk:${C_RESET} ${C_GREEN}%-6s${C_RESET} ${C_YELLOW}Used:${C_RESET} ${C_GREEN}%-6s${C_RESET} ${C_YELLOW}Usage:${C_RESET} ${C_GREEN}%-6s${C_RESET} ${C_BOLD}${C_WHITE}│${C_RESET}\n" "$VPS_DISK_TOTAL" "$VPS_DISK_USED" "${VPS_DISK_PERCENT}%"
+    echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
+    
+    printf "${C_BOLD}${C_WHITE}│${C_RESET} ${C_YELLOW}Uptime:${C_RESET} ${C_GREEN}%-18s${C_RESET} ${C_YELLOW}Load:${C_RESET} ${C_GREEN}%-6s${C_RESET} ${C_YELLOW}Online:${C_RESET} ${C_GREEN}%-4s${C_RESET} ${C_BOLD}${C_WHITE}│${C_RESET}\n" "$VPS_UPTIME" "$VPS_LOAD" "${BANNER_CACHE_ONLINE_USERS}"
+    echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
+    
+    printf "${C_BOLD}${C_WHITE}│${C_RESET} ${C_YELLOW}↓:${C_RESET} ${C_GREEN}%-10s${C_RESET} ${C_YELLOW}↑:${C_RESET} ${C_GREEN}%-10s${C_RESET} ${C_YELLOW}Users:${C_RESET} ${C_GREEN}%-6s${C_RESET} ${C_BOLD}${C_WHITE}│${C_RESET}\n" "$VPS_TRAFFIC_RX" "$VPS_TRAFFIC_TX" "${BANNER_CACHE_TOTAL_USERS}"
     echo -e "${C_BOLD}${C_CYAN}└─────────────────────────────────────────────────────────────────────────────────┘${C_RESET}"
-    echo ""
     
-    echo -e "${C_BOLD}${C_YELLOW}┌─────────────────────────────────────────────────────────────────────────────────┐${C_RESET}"
-    echo -e "${C_BOLD}${C_YELLOW}│                           ⚡ CPU & LOAD INFO                              │${C_RESET}"
-    echo -e "${C_BOLD}${C_YELLOW}├─────────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "CPU Cores:" "$VPS_CPU_CORES"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "CPU Usage:" "${VPS_CPU_USAGE}%"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "Load:" "$VPS_LOAD"
-    echo -e "${C_BOLD}${C_YELLOW}└─────────────────────────────────────────────────────────────────────────────────┘${C_RESET}"
     echo ""
-    
-    echo -e "${C_BOLD}${C_GREEN}┌─────────────────────────────────────────────────────────────────────────────────┐${C_RESET}"
-    echo -e "${C_BOLD}${C_GREEN}│                         💾 RAM & DISK INFO                               │${C_RESET}"
-    echo -e "${C_BOLD}${C_GREEN}├─────────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "RAM Total:" "$VPS_RAM_TOTAL"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "RAM Used:" "$VPS_RAM_USED"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "RAM Usage:" "${VPS_RAM_PERCENT}%"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "Disk Total:" "$VPS_DISK_TOTAL"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "Disk Used:" "$VPS_DISK_USED"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "Disk Usage:" "${VPS_DISK_PERCENT}%"
-    echo -e "${C_BOLD}${C_GREEN}└─────────────────────────────────────────────────────────────────────────────────┘${C_RESET}"
-    echo ""
-    
-    echo -e "${C_BOLD}${C_BLUE}┌─────────────────────────────────────────────────────────────────────────────────┐${C_RESET}"
-    echo -e "${C_BOLD}${C_BLUE}│                          ⏱️  UPTIME & STATUS                               │${C_RESET}"
-    echo -e "${C_BOLD}${C_BLUE}├─────────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
-    printf "${C_BOLD}${C_WHITE}│ %-18s${C_RESET} ${C_GREEN}%-50s${C_RESET}${C_BOLD}${C_WHITE}│${C_RESET}\n" "Uptime:" "$VPS_UPTIME"
-    echo -e "${C_BOLD}${C_BLUE}└─────────────────────────────────────────────────────────────────────────────────┘${C_RESET}"
-    echo ""
-    
     echo -e "${C_BOLD}${C_DIM}┌─────────────────────────────────────────────────────────────────────────────────┐${C_RESET}"
-    echo -e "${C_BOLD}${C_DIM}│  ${C_GREEN}●${C_RESET} System: ${C_GREEN}Running${C_RESET}  │  ${C_GREEN}●${C_RESET} Network: ${C_GREEN}Connected${C_RESET}  │${C_RESET}"
+    echo -e "${C_BOLD}${C_DIM}│  ${C_GREEN}●${C_RESET} System: ${C_GREEN}Running${C_RESET}  │  ${C_GREEN}●${C_RESET} Network: ${C_GREEN}Connected${C_RESET}  │  ${C_GREEN}●${C_RESET} DNSTT: ${C_GREEN}$(systemctl is-active dnstt 2>/dev/null || echo "Stopped")${C_RESET}  │${C_RESET}"
     echo -e "${C_BOLD}${C_DIM}└─────────────────────────────────────────────────────────────────────────────────┘${C_RESET}"
-    echo ""
     
+    echo ""
     echo -e "${C_YELLOW}⚠️ Press ${C_BOLD}[Enter]${C_RESET}${C_YELLOW} to refresh or ${C_BOLD}[0]${C_RESET}${C_YELLOW} to return${C_RESET}"
     read -p "👉 " refresh_choice
     if [[ "$refresh_choice" != "0" ]]; then
@@ -2292,13 +2337,13 @@ show_vps_dashboard() {
 }
 
 # ================================================================
-# ========== VPN DATA USAGE ==========
+# ========== VPN DATA USAGE (TABLE) ==========
 # ================================================================
 
 show_vpn_data_usage() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_BOLD}${C_PURPLE}           📊 VPN CONNECTION DATA USAGE${C_RESET}"
+    echo -e "${C_BOLD}${C_PURPLE}                 📊 VPN CONNECTION DATA USAGE${C_RESET}"
     echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
     echo ""
     
@@ -2308,12 +2353,9 @@ show_vpn_data_usage() {
         return
     fi
     
-    echo -e "${C_CYAN}=========================================================================================${C_RESET}"
-    printf "${C_BOLD}${C_WHITE}%-18s | %-15s | %-15s | %-15s | %-12s${C_RESET}\n" "USERNAME" "TRAFFIC USED" "LIMIT" "REMAINING" "STATUS"
-    echo -e "${C_CYAN}-----------------------------------------------------------------------------------------${C_RESET}"
-    
-    local total_used=0
-    local total_limit=0
+    echo -e "${C_BOLD}${C_WHITE}┌────────────┬──────────────┬──────────────┬──────────────┬────────────┐${C_RESET}"
+    printf "${C_BOLD}${C_WHITE}│ %-10s │ %-12s │ %-12s │ %-12s │ %-10s │${C_RESET}\n" "USERNAME" "TRAFFIC" "LIMIT" "REMAINING" "STATUS"
+    echo -e "${C_BOLD}${C_WHITE}├────────────┼──────────────┼──────────────┼──────────────┼────────────┤${C_RESET}"
     
     while IFS=: read -r user pass expiry limit bandwidth_gb _extra; do
         [[ -z "$user" ]] && continue
@@ -2327,30 +2369,28 @@ show_vpn_data_usage() {
         local used_gb=$(awk "BEGIN {printf \"%.2f\", $used_bytes / 1073741824}" 2>/dev/null || echo "0")
         
         if [[ "$bandwidth_gb" == "0" ]]; then
-            local bw_string="Unlimited"
-            local remain_string="∞"
             local status="${C_GREEN}Active${C_RESET}"
+            printf "${C_WHITE}│${C_RESET} %-10s ${C_WHITE}│${C_RESET} %-12s ${C_WHITE}│${C_RESET} %-12s ${C_WHITE}│${C_RESET} %-12s ${C_WHITE}│${C_RESET} %-10s ${C_WHITE}│${C_RESET}\n" \
+                "$user" "${used_gb} GB" "Unlimited" "∞" "$status"
         else
             local remain_gb=$(awk "BEGIN {r=$bandwidth_gb - $used_gb; if(r<0) r=0; printf \"%.2f\", r}" 2>/dev/null || echo "0")
-            local bw_string="${used_gb} GB"
-            local remain_string="${remain_gb} GB"
             
             if (( $(awk "BEGIN {print ($used_gb >= $bandwidth_gb)}" 2>/dev/null) )); then
                 status="${C_RED}Exceeded${C_RESET}"
             else
                 status="${C_GREEN}Active${C_RESET}"
             fi
-            total_limit=$(awk "BEGIN {print $total_limit + $bandwidth_gb}" 2>/dev/null || echo "0")
+            
+            printf "${C_WHITE}│${C_RESET} %-10s ${C_WHITE}│${C_RESET} %-12s ${C_WHITE}│${C_RESET} %-12s ${C_WHITE}│${C_RESET} %-12s ${C_WHITE}│${C_RESET} %-10s ${C_WHITE}│${C_RESET}\n" \
+                "$user" "${used_gb} GB" "${bandwidth_gb} GB" "${remain_gb} GB" "$status"
         fi
-        
-        total_used=$(awk "BEGIN {print $total_used + $used_gb}" 2>/dev/null || echo "0")
-        
-        printf "%-18s | %-15s | %-15s | %-15s | %-12s\n" "$user" "$bw_string" "$bandwidth_gb GB" "$remain_string" "$status"
     done < "$DB_FILE"
     
-    echo -e "${C_CYAN}-----------------------------------------------------------------------------------------${C_RESET}"
-    printf "${C_BOLD}${C_WHITE}%-18s | %-15s | %-15s | %-15s | %-12s${C_RESET}\n" "TOTAL" "${total_used} GB" "${total_limit} GB" "-" "-"
-    echo -e "${C_CYAN}=========================================================================================${C_RESET}"
+    echo -e "${C_BOLD}${C_WHITE}└────────────┴──────────────┴──────────────┴──────────────┴────────────┘${C_RESET}"
+    echo ""
+    
+    local total_users=$(grep -c . "$DB_FILE")
+    echo -e "${C_DIM}Total Users: ${C_WHITE}$total_users${C_RESET}"
     echo ""
     press_enter
 }
@@ -2705,7 +2745,7 @@ uninstall_script() {
 create_limiter_service() {
     cat > "$LIMITER_SCRIPT" << 'EOF'
 #!/bin/bash
-# Voltron Tech Limiter v7.0
+# Voltron Tech Limiter v8.0
 DB_FILE="/etc/voltrontech/users.db"
 BW_DIR="/etc/voltrontech/bandwidth"
 PID_DIR="$BW_DIR/pidtrack"
@@ -2992,7 +3032,7 @@ initial_setup() {
     echo -e "\n${C_BLUE}🔧 Running initial system setup...${C_RESET}"
     
     ff_apt_update
-    ff_apt_install bc jq curl wget
+    ff_apt_install bc jq curl wget iptables iptables-persistent
     mkdir -p "$DB_DIR" "$SSL_CERT_DIR" "$BANDWIDTH_DIR" "$BANNER_DIR" "$DNSTT_KEYS_DIR" "$LOGS_DIR" "$CONFIG_DIR"
     touch "$DB_FILE"
     
