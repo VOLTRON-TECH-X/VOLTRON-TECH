@@ -1,15 +1,18 @@
 #!/bin/bash
 # ================================================================
-# FALCON + VOLTRON ULTIMATE v5.0
+# VOLTRON TECH ULTIMATE v5.0
 # ================================================================
 # Inajumuisha:
-#   1. FirewallFalcon v4.0 - 100% features
-#   2. Voltron Tech v10.8 - DNSTT Boosters, Speed Methods
-#   3. VPS Dashboard - Real-time system info
-#   4. VPN Data Usage - Per user connection data
-#   5. Dynamic Banner - Falcon style (VOLTRON TECH ULTIMATE)
+#   1. User Management - Create, Delete, Lock, Unlock, Renew
+#   2. DNSTT - 7 Speed Boosters (10-100 Mbps) na Log Fix
+#   3. Protocols - badvpn, udp-custom, SSL Tunnel, Falcon Proxy, ZiVPN
+#   4. Dynamic Banner - Per-user account info (VOLTRON TECH ULTIMATE)
+#   5. VPS Dashboard - Real-time system info
+#   6. VPN Data Usage - Per user connection data
+#   7. StormDNS/dnstm Speed Methods
 # ================================================================
 
+# ========== COLOR CODES ==========
 C_RESET=$'\033[0m'
 C_BOLD=$'\033[1m'
 C_DIM=$'\033[2m'
@@ -53,7 +56,7 @@ DESEC_DOMAIN="voltrontechtx.shop"
 # ========== DIRECTORIES ==========
 # ================================================================
 
-DB_DIR="/etc/firewallfalcon"
+DB_DIR="/etc/voltrontech"
 DB_FILE="$DB_DIR/users.db"
 INSTALL_FLAG_FILE="$DB_DIR/.install"
 BADVPN_SERVICE_FILE="/etc/systemd/system/badvpn.service"
@@ -61,9 +64,9 @@ BADVPN_BUILD_DIR="/root/badvpn-build"
 HAPROXY_CONFIG="/etc/haproxy/haproxy.cfg"
 NGINX_CONFIG_FILE="/etc/nginx/sites-available/default"
 SSL_CERT_DIR="$DB_DIR/ssl"
-SSL_CERT_FILE="$SSL_CERT_DIR/firewallfalcon.pem"
-SSL_CERT_CHAIN_FILE="$SSL_CERT_DIR/firewallfalcon.crt"
-SSL_CERT_KEY_FILE="$SSL_CERT_DIR/firewallfalcon.key"
+SSL_CERT_FILE="$SSL_CERT_DIR/voltrontech.pem"
+SSL_CERT_CHAIN_FILE="$SSL_CERT_DIR/voltrontech.crt"
+SSL_CERT_KEY_FILE="$SSL_CERT_DIR/voltrontech.key"
 EDGE_CERT_INFO_FILE="$DB_DIR/edge_cert.conf"
 NGINX_PORTS_FILE="$DB_DIR/nginx_ports.conf"
 EDGE_PUBLIC_HTTP_PORT="80"
@@ -83,17 +86,17 @@ SSH_BANNER_FILE="/etc/bannerssh"
 FALCONPROXY_SERVICE_FILE="/etc/systemd/system/falconproxy.service"
 FALCONPROXY_BINARY="/usr/local/bin/falconproxy"
 FALCONPROXY_CONFIG_FILE="$DB_DIR/falconproxy_config.conf"
-LIMITER_SCRIPT="/usr/local/bin/firewallfalcon-limiter.sh"
-LIMITER_SERVICE="/etc/systemd/system/firewallfalcon-limiter.service"
+LIMITER_SCRIPT="/usr/local/bin/voltrontech-limiter.sh"
+LIMITER_SERVICE="/etc/systemd/system/voltrontech-limiter.service"
 BANDWIDTH_DIR="$DB_DIR/bandwidth"
-BANDWIDTH_SCRIPT="/usr/local/bin/firewallfalcon-bandwidth.sh"
-BANDWIDTH_SERVICE="/etc/systemd/system/firewallfalcon-bandwidth.service"
-LEGACY_BANDWIDTH_DIR="/usr/local/bin/firewallfalcon-bandwidth"
-TRIAL_CLEANUP_SCRIPT="/usr/local/bin/firewallfalcon-trial-cleanup.sh"
-LOGIN_INFO_SCRIPT="/usr/local/bin/firewallfalcon-login-info.sh"
-SSHD_FF_CONFIG="/etc/ssh/sshd_config.d/firewallfalcon.conf"
+BANDWIDTH_SCRIPT="/usr/local/bin/voltrontech-bandwidth.sh"
+BANDWIDTH_SERVICE="/etc/systemd/system/voltrontech-bandwidth.service"
+LEGACY_BANDWIDTH_DIR="/usr/local/bin/voltrontech-bandwidth"
+TRIAL_CLEANUP_SCRIPT="/usr/local/bin/voltrontech-trial-cleanup.sh"
+SSHD_FF_CONFIG="/etc/ssh/sshd_config.d/voltrontech.conf"
 BANNER_DIR="$DB_DIR/banners"
 BANNER_ENABLED_FILE="$DB_DIR/banners_enabled"
+LOGS_DIR="$DB_DIR/logs"
 
 # --- ZiVPN Variables ---
 ZIVPN_DIR="/etc/zivpn"
@@ -137,7 +140,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # ================================================================
-# ========== APT FUNCTIONS (Falcon) ==========
+# ========== APT FUNCTIONS ==========
 # ================================================================
 
 get_ubuntu_codename() {
@@ -194,7 +197,7 @@ rewrite_ubuntu_apt_sources() {
     for file in "${source_files[@]}"; do
         [[ -f "$file" ]] || continue
         if grep -Eq "$from_archive|$from_security|$from_ports" "$file" 2>/dev/null; then
-            backup_file="${file}.bak.firewallfalcon"
+            backup_file="${file}.bak.voltrontech"
             [[ -f "$backup_file" ]] || cp "$file" "$backup_file" 2>/dev/null || true
             sed -i -E \
                 -e "s|$from_archive|$to_archive|g" \
@@ -526,8 +529,8 @@ update_ssh_banners_config() {
     fi
 
     mkdir -p "$BANNER_DIR" /etc/ssh/sshd_config.d
-    tmp_conf="/tmp/firewallfalcon_banners_new.conf"
-    echo "# FirewallFalcon - Dynamic per-user SSH banners" > "$tmp_conf"
+    tmp_conf="/tmp/voltrontech_banners_new.conf"
+    echo "# Voltron Tech - Dynamic per-user SSH banners" > "$tmp_conf"
 
     if [[ -f "$DB_FILE" ]]; then
         while IFS=: read -r user _rest; do
@@ -595,7 +598,7 @@ preview_dynamic_ssh_banner() {
         sleep 5
         if ! cat "$BANNER_DIR/${u}.txt" 2>/dev/null; then
             echo -e "\n${C_RED}Still not generated. Check limiter logs:${C_RESET}"
-            journalctl -u firewallfalcon-limiter -n 15 --no-pager
+            journalctl -u voltrontech-limiter -n 15 --no-pager
         fi
     fi
     press_enter
@@ -604,7 +607,7 @@ preview_dynamic_ssh_banner() {
 enable_dynamic_banner() {
     echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
     echo -e "${C_BLUE}           🎨 ENABLING DYNAMIC ACCOUNT BANNER${C_RESET}"
-    echo -e "${C_BLUE}           📱 Falcon Style - Per-User Account Info${C_RESET}"
+    echo -e "${C_BLUE}           📱 Per-User Account Info${C_RESET}"
     echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
     
     mkdir -p "$BANNER_DIR"
@@ -613,7 +616,7 @@ enable_dynamic_banner() {
     disable_static_ssh_banner_in_sshd_config
     update_ssh_banners_config
     
-    systemctl restart firewallfalcon-limiter 2>/dev/null
+    systemctl restart voltrontech-limiter 2>/dev/null
     
     echo -e "\n${C_GREEN}✅ Dynamic account banner enabled!${C_RESET}"
     echo -e "${C_CYAN}📌 Users will see their account status when connecting via SSH${C_RESET}"
@@ -636,7 +639,7 @@ disable_dynamic_banner() {
 # ========== ORPHAN USER FUNCTIONS ==========
 # ================================================================
 
-is_firewallfalcon_orphan_user() {
+is_voltrontech_orphan_user() {
     local username="$1"
     local passwd_line system_user _ uid _ home shell
     
@@ -660,17 +663,17 @@ is_firewallfalcon_orphan_user() {
     return 1
 }
 
-get_firewallfalcon_orphan_users() {
+get_voltrontech_orphan_users() {
     local username
     while IFS=: read -r username _rest; do
         [[ -n "$username" ]] || continue
-        if is_firewallfalcon_orphan_user "$username"; then
+        if is_voltrontech_orphan_user "$username"; then
             echo "$username"
         fi
     done < /etc/passwd
 }
 
-get_firewallfalcon_known_users() {
+get_voltrontech_known_users() {
     local username
     local -A seen_users=()
 
@@ -683,13 +686,13 @@ get_firewallfalcon_known_users() {
 
     while IFS= read -r username; do
         [[ -n "$username" ]] && seen_users["$username"]=1
-    done < <(get_firewallfalcon_orphan_users)
+    done < <(get_voltrontech_orphan_users)
 
     (( ${#seen_users[@]} > 0 )) || return 0
     printf "%s\n" "${!seen_users[@]}" | sort
 }
 
-delete_firewallfalcon_user_accounts() {
+delete_voltrontech_user_accounts() {
     local -a users_to_delete=("$@")
     local username
 
@@ -826,7 +829,7 @@ show_banner() {
     refresh_banner_cache
     [[ -t 1 ]] && clear
     echo
-    echo -e "${C_TITLE}   FIREWALLFALCON MANAGER v5.0 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
+    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v5.0 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
     echo -e "${C_BLUE}   ─────────────────────────────────────────────────────────${C_RESET}"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "OS" "$BANNER_CACHE_OS_NAME" "Uptime: $BANNER_CACHE_UP_TIME"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "Memory" "${BANNER_CACHE_RAM_USAGE}% Used" "Online: ${C_WHITE}${BANNER_CACHE_ONLINE_USERS}${C_RESET}"
@@ -1097,7 +1100,7 @@ delete_user() {
     if [[ "$confirm" != "y" ]]; then echo -e "\n${C_YELLOW}❌ Deletion cancelled.${C_RESET}"; return; fi
     
     echo -e "\n${C_BLUE}🗑️ Deleting selected users...${C_RESET}"
-    delete_firewallfalcon_user_accounts "${SELECTED_USERS[@]}"
+    delete_voltrontech_user_accounts "${SELECTED_USERS[@]}"
 }
 
 edit_user() {
@@ -1521,9 +1524,9 @@ username="$1"
 if [[ -z "$username" ]]; then exit 1; fi
 killall -u "$username" -9 &>/dev/null
 userdel -r "$username" &>/dev/null
-sed -i "/^${username}:/d" /etc/firewallfalcon/users.db
-rm -f /etc/firewallfalcon/bandwidth/${username}.usage
-rm -rf /etc/firewallfalcon/bandwidth/pidtrack/${username}
+sed -i "/^${username}:/d" /etc/voltrontech/users.db
+rm -f /etc/voltrontech/bandwidth/${username}.usage
+rm -rf /etc/voltrontech/bandwidth/pidtrack/${username}
 TREOF
     chmod +x "$TRIAL_CLEANUP_SCRIPT"
 }
@@ -2386,6 +2389,13 @@ create_dnstt_service() {
         mtu=512
     fi
     
+    # Create log directory
+    mkdir -p "$LOGS_DIR"
+    touch "$LOGS_DIR/dnstt-server.log" 2>/dev/null || true
+    touch "$LOGS_DIR/dnstt-error.log" 2>/dev/null || true
+    chmod 644 "$LOGS_DIR/dnstt-server.log" 2>/dev/null || true
+    chmod 644 "$LOGS_DIR/dnstt-error.log" 2>/dev/null || true
+    
     cat > "$DNSTT_SERVICE_FILE" <<EOF
 [Unit]
 Description=DNSTT Server - ULTIMATE OPTIMIZED
@@ -2406,8 +2416,8 @@ StartLimitBurst=5
 LimitNOFILE=2097152
 LimitNPROC=infinity
 LimitCORE=infinity
-StandardOutput=append:$DB_DIR/logs/dnstt-server.log
-StandardError=append:$DB_DIR/logs/dnstt-error.log
+StandardOutput=append:$LOGS_DIR/dnstt-server.log
+StandardError=append:$LOGS_DIR/dnstt-error.log
 
 [Install]
 WantedBy=multi-user.target
@@ -2421,6 +2431,7 @@ EOF
     echo -e "  • Resolvers: ${C_YELLOW}8.8.8.8:53, 1.1.1.1:53, 169.255.187.58:53${C_RESET}"
     echo -e "  • Workers: ${C_YELLOW}4${C_RESET}"
     echo -e "  • Cache Size: ${C_YELLOW}16384${C_RESET}"
+    echo -e "  • Logs: ${C_YELLOW}$LOGS_DIR/dnstt-server.log${C_RESET}"
 }
 
 save_dnstt_info() {
@@ -2635,7 +2646,7 @@ show_dnstt_details() {
     fi
     
     DOMAIN=$(cat "$DB_DIR/domain.txt" 2>/dev/null || echo "unknown")
-    MTU=$(cat "$DB_DIR/mtu" 2>/dev/null || echo "512")
+    MTU=$(cat "$CONFIG_DIR/mtu" 2>/dev/null || echo "512")
     SSH_PORT=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1)
     SSH_PORT=${SSH_PORT:-22}
     PUBKEY=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null || echo "unknown")
@@ -2669,8 +2680,8 @@ uninstall_dnstt() {
     rm -f "$DNSTT_KEYS_DIR/server.key" "$DNSTT_KEYS_DIR/server.pub"
     rm -f "$DB_DIR/domain.txt"
     rm -f "$DNSTT_CONFIG_FILE"
-    rm -f "$DB_DIR/mtu"
-    rm -f "$DB_DIR/resolvers.txt"
+    rm -f "$CONFIG_DIR/mtu"
+    rm -f "$RESOLVERS_FILE"
     systemctl daemon-reload
     echo -e "${C_GREEN}✅ DNSTT uninstalled${C_RESET}"
     press_enter
@@ -2769,564 +2780,55 @@ uninstall_udp_custom() {
 }
 
 # ================================================================
-# ========== SSL TUNNEL (HAProxy Edge Stack) ==========
+# ========== SSL TUNNEL (HAProxy) ==========
 # ================================================================
 
-load_edge_cert_info() {
-    EDGE_CERT_MODE=""
-    EDGE_DOMAIN=""
-    EDGE_EMAIL=""
-    if [ -f "$EDGE_CERT_INFO_FILE" ]; then
-        source "$EDGE_CERT_INFO_FILE"
-    fi
-}
-
-save_edge_cert_info() {
-    local cert_mode="$1"
-    local cert_domain="$2"
-    local cert_email="$3"
-    mkdir -p "$DB_DIR"
-    cat > "$EDGE_CERT_INFO_FILE" <<EOF
-EDGE_CERT_MODE="$cert_mode"
-EDGE_DOMAIN="$cert_domain"
-EDGE_EMAIL="$cert_email"
-EOF
-}
-
-detect_preferred_host() {
-    local host_domain=""
-    load_edge_cert_info
-    if [[ -n "$EDGE_DOMAIN" ]]; then
-        host_domain="$EDGE_DOMAIN"
-    fi
-    if [[ -z "$host_domain" && -f "$DNS_INFO_FILE" ]]; then
-        host_domain=$(grep 'FULL_DOMAIN' "$DNS_INFO_FILE" | cut -d'"' -f2)
-    fi
-    if [[ -z "$host_domain" && -f "$DB_DIR/domain.txt" ]]; then
-        host_domain=$(cat "$DB_DIR/domain.txt" 2>/dev/null)
-    fi
-    if [[ -z "$host_domain" ]]; then
-        host_domain=$(curl -s -4 icanhazip.com)
-    fi
-    echo "$host_domain"
-}
-
-backup_edge_configs() {
-    if [ -f "$NGINX_CONFIG_FILE" ] && [ ! -f "${NGINX_CONFIG_FILE}.bak.firewallfalcon" ]; then
-        cp "$NGINX_CONFIG_FILE" "${NGINX_CONFIG_FILE}.bak.firewallfalcon" 2>/dev/null
-    fi
-    if [ -f "$HAPROXY_CONFIG" ] && [ ! -f "${HAPROXY_CONFIG}.bak.firewallfalcon" ]; then
-        cp "$HAPROXY_CONFIG" "${HAPROXY_CONFIG}.bak.firewallfalcon" 2>/dev/null
-    fi
-}
-
-ensure_edge_stack_packages() {
-    local missing_packages=()
-    command -v haproxy &> /dev/null || missing_packages+=("haproxy")
-    command -v nginx &> /dev/null || missing_packages+=("nginx")
-    command -v openssl &> /dev/null || missing_packages+=("openssl")
-
-    if (( ${#missing_packages[@]} > 0 )); then
-        echo -e "\n${C_BLUE}📦 Installing required packages: ${missing_packages[*]}${C_RESET}"
-        ff_apt_install "${missing_packages[@]}" || {
-            echo -e "${C_RED}❌ Failed to install the required packages.${C_RESET}"
-            return 1
-        }
-    fi
-    return 0
-}
-
-build_shared_tls_bundle() {
-    if [ ! -s "$SSL_CERT_CHAIN_FILE" ] || [ ! -s "$SSL_CERT_KEY_FILE" ]; then
-        echo -e "${C_RED}❌ Certificate chain or key is missing.${C_RESET}"
-        return 1
-    fi
-    cat "$SSL_CERT_CHAIN_FILE" "$SSL_CERT_KEY_FILE" > "$SSL_CERT_FILE" || return 1
-    chmod 644 "$SSL_CERT_CHAIN_FILE"
-    chmod 600 "$SSL_CERT_KEY_FILE" "$SSL_CERT_FILE"
-    return 0
-}
-
-generate_self_signed_edge_cert() {
-    local common_name="$1"
+install_ssl_tunnel() {
+    clear; show_banner
+    echo -e "${C_BOLD}${C_PURPLE}--- 🔒 Installing SSL Tunnel ---${C_RESET}"
+    
+    ff_apt_install haproxy openssl
+    
     mkdir -p "$SSL_CERT_DIR"
-    echo -e "\n${C_GREEN}🔐 Generating a shared self-signed certificate...${C_RESET}"
-    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
-        -keyout "$SSL_CERT_KEY_FILE" \
-        -out "$SSL_CERT_CHAIN_FILE" \
-        -subj "/CN=$common_name" \
-        >/dev/null 2>&1 || {
-            echo -e "${C_RED}❌ Failed to generate the self-signed certificate.${C_RESET}"
-            return 1
-        }
-    build_shared_tls_bundle || return 1
-    save_edge_cert_info "self-signed" "$common_name" ""
-    echo -e "${C_GREEN}✅ Shared certificate created for ${C_YELLOW}$common_name${C_RESET}"
-    return 0
-}
-
-_install_certbot() {
-    if command -v certbot &> /dev/null; then
-        echo -e "${C_GREEN}✅ Certbot is already installed.${C_RESET}"
-        return 0
-    fi
-    echo -e "${C_BLUE}📦 Installing Certbot...${C_RESET}"
-    ff_apt_install certbot || {
-        echo -e "${C_RED}❌ Failed to install Certbot.${C_RESET}"
-        return 1
-    }
-    echo -e "${C_GREEN}✅ Certbot installed successfully.${C_RESET}"
-    return 0
-}
-
-obtain_certbot_edge_cert() {
-    local domain_name="$1"
-    local email="$2"
-
-    mkdir -p "$SSL_CERT_DIR"
-    _install_certbot || return 1
-
-    echo -e "\n${C_BLUE}🛑 Stopping HAProxy and Nginx for Certbot validation...${C_RESET}"
-    systemctl stop haproxy >/dev/null 2>&1
-    systemctl stop nginx >/dev/null 2>&1
-    sleep 2
-
-    echo -e "\n${C_BLUE}🚀 Requesting a Certbot certificate for ${C_YELLOW}$domain_name${C_RESET}"
-    certbot certonly --standalone -d "$domain_name" --non-interactive --agree-tos -m "$email"
-    if [ $? -ne 0 ]; then
-        echo -e "\n${C_RED}❌ Certbot failed to obtain a certificate.${C_RESET}"
-        return 1
-    fi
-
-    local certbot_chain="/etc/letsencrypt/live/$domain_name/fullchain.pem"
-    local certbot_key="/etc/letsencrypt/live/$domain_name/privkey.pem"
-    if [ ! -f "$certbot_chain" ] || [ ! -f "$certbot_key" ]; then
-        echo -e "\n${C_RED}❌ Certbot completed, but the certificate files were not found.${C_RESET}"
-        return 1
-    fi
-
-    cp "$certbot_chain" "$SSL_CERT_CHAIN_FILE"
-    cp "$certbot_key" "$SSL_CERT_KEY_FILE"
-    build_shared_tls_bundle || return 1
-    save_edge_cert_info "certbot" "$domain_name" "$email"
-    echo -e "${C_GREEN}✅ Certbot certificate copied into ${C_YELLOW}$SSL_CERT_DIR${C_RESET}"
-    return 0
-}
-
-select_edge_certificate() {
-    local preferred_host=$(detect_preferred_host)
-    if [[ -z "$preferred_host" ]]; then
-        preferred_host="firewallfalcon.local"
-    fi
-
-    local has_existing_cert=false
-    if [ -s "$SSL_CERT_FILE" ] && [ -s "$SSL_CERT_CHAIN_FILE" ] && [ -s "$SSL_CERT_KEY_FILE" ]; then
-        has_existing_cert=true
-    fi
-
-    load_edge_cert_info
-
-    echo -e "\n${C_BOLD}${C_PURPLE}--- 🔐 Shared TLS Certificate ---${C_RESET}"
-    echo -e "${C_DIM}The same certificate will be used by HAProxy and the internal Nginx proxy.${C_RESET}"
-
-    if $has_existing_cert; then
-        local existing_label="${EDGE_CERT_MODE:-existing}"
-        if [[ -n "$EDGE_DOMAIN" ]]; then
-            existing_label="$existing_label - $EDGE_DOMAIN"
-        fi
-        printf "  ${C_CHOICE}[ 1]${C_RESET} %-52s\n" "Reuse existing certificate (${existing_label})"
-        printf "  ${C_CHOICE}[ 2]${C_RESET} %-52s\n" "Replace with a new self-signed certificate"
-        printf "  ${C_CHOICE}[ 3]${C_RESET} %-52s\n" "Replace with a Certbot certificate"
-        echo
-        read -p "👉 Enter choice [1]: " cert_choice
-        cert_choice=${cert_choice:-1}
-    else
-        printf "  ${C_CHOICE}[ 1]${C_RESET} %-52s\n" "Generate a self-signed certificate"
-        printf "  ${C_CHOICE}[ 2]${C_RESET} %-52s\n" "Use a Certbot certificate"
-        echo
-        read -p "👉 Enter choice [1]: " cert_choice
-        cert_choice=${cert_choice:-1}
-    fi
-
-    case "$cert_choice" in
-        1)
-            if $has_existing_cert; then
-                echo -e "${C_GREEN}✅ Reusing the existing shared certificate.${C_RESET}"
-                return 0
-            fi
-            local common_name
-            read -p "👉 Enter the certificate Common Name / SNI label [$preferred_host]: " common_name
-            common_name=${common_name:-$preferred_host}
-            generate_self_signed_edge_cert "$common_name"
-            ;;
-        2)
-            if $has_existing_cert; then
-                local common_name
-                read -p "👉 Enter the certificate Common Name / SNI label [$preferred_host]: " common_name
-                common_name=${common_name:-$preferred_host}
-                generate_self_signed_edge_cert "$common_name"
-            else
-                local default_domain=""
-                local domain_name
-                local email
-                if ! [[ "$preferred_host" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-                    default_domain="$preferred_host"
-                fi
-                if [[ -n "$default_domain" ]]; then
-                    read -p "👉 Enter your domain name [$default_domain]: " domain_name
-                    domain_name=${domain_name:-$default_domain}
-                else
-                    read -p "👉 Enter your domain name (e.g. vpn.example.com): " domain_name
-                fi
-                if [[ -z "$domain_name" ]]; then
-                    echo -e "${C_RED}❌ Domain name cannot be empty.${C_RESET}"
-                    return 1
-                fi
-                if [[ "$domain_name" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-                    echo -e "${C_RED}❌ Certbot requires a real domain name, not a raw IP address.${C_RESET}"
-                    return 1
-                fi
-                read -p "👉 Enter your email for Let's Encrypt: " email
-                if [[ -z "$email" ]]; then
-                    echo -e "${C_RED}❌ Email cannot be empty.${C_RESET}"
-                    return 1
-                fi
-                obtain_certbot_edge_cert "$domain_name" "$email"
-            fi
-            ;;
-        3)
-            if ! $has_existing_cert; then
-                echo -e "${C_RED}❌ Invalid option.${C_RESET}"
-                return 1
-            fi
-            local default_domain=""
-            local domain_name
-            local email
-            if [[ -n "$EDGE_DOMAIN" ]] && ! [[ "$EDGE_DOMAIN" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-                default_domain="$EDGE_DOMAIN"
-            fi
-            if [[ -z "$default_domain" ]] && ! [[ "$preferred_host" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-                default_domain="$preferred_host"
-            fi
-            if [[ -n "$default_domain" ]]; then
-                read -p "👉 Enter your domain name [$default_domain]: " domain_name
-                domain_name=${domain_name:-$default_domain}
-            else
-                read -p "👉 Enter your domain name (e.g. vpn.example.com): " domain_name
-            fi
-            if [[ -z "$domain_name" ]]; then
-                echo -e "${C_RED}❌ Domain name cannot be empty.${C_RESET}"
-                return 1
-            fi
-            if [[ "$domain_name" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-                echo -e "${C_RED}❌ Certbot requires a real domain name, not a raw IP address.${C_RESET}"
-                return 1
-            fi
-            read -p "👉 Enter your email for Let's Encrypt [${EDGE_EMAIL}]: " email
-            email=${email:-$EDGE_EMAIL}
-            if [[ -z "$email" ]]; then
-                echo -e "${C_RED}❌ Email cannot be empty.${C_RESET}"
-                return 1
-            fi
-            obtain_certbot_edge_cert "$domain_name" "$email"
-            ;;
-        *)
-            echo -e "${C_RED}❌ Invalid option.${C_RESET}"
-            return 1
-            ;;
-    esac
-}
-
-write_internal_nginx_config() {
-    local server_name="$1"
-    [[ -z "$server_name" ]] && server_name="_"
-    mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
-    cat > "$NGINX_CONFIG_FILE" <<EOF
-server {
-    listen 127.0.0.1:${NGINX_INTERNAL_HTTP_PORT} default_server;
-    listen 127.0.0.1:${NGINX_INTERNAL_TLS_PORT} ssl http2 default_server;
-    server_tokens off;
-    server_name ${server_name};
-
-    ssl_certificate ${SSL_CERT_CHAIN_FILE};
-    ssl_certificate_key ${SSL_CERT_KEY_FILE};
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!eNULL:!MD5:!DES:!RC4:!ADH:!SSLv3:!EXP:!PSK:!DSS;
-    resolver 1.1.1.1 8.8.8.8 ipv6=off valid=300s;
-
-    location ~ ^/(?<fwdport>\d+)/(?<fwdpath>.*)$ {
-        client_max_body_size 0;
-        client_body_timeout 1d;
-        grpc_read_timeout 1d;
-        grpc_socket_keepalive on;
-        proxy_read_timeout 1d;
-        proxy_http_version 1.1;
-        proxy_buffering off;
-        proxy_request_buffering off;
-        proxy_socket_keepalive on;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        if (\$content_type ~* "GRPC") { grpc_pass grpc://127.0.0.1:\$fwdport\$is_args\$args; break; }
-        proxy_pass http://127.0.0.1:\$fwdport\$is_args\$args;
-        break;
-    }
-
-    location / {
-        proxy_read_timeout 3600s;
-        proxy_buffering off;
-        proxy_request_buffering off;
-        proxy_http_version 1.1;
-        proxy_socket_keepalive on;
-        tcp_nodelay on;
-        tcp_nopush off;
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    }
-}
-EOF
-    ln -sf "$NGINX_CONFIG_FILE" /etc/nginx/sites-enabled/default
-}
-
-write_haproxy_edge_config() {
-    mkdir -p /etc/haproxy
-    cat > "$HAPROXY_CONFIG" <<EOF
+    
+    openssl req -x509 -newkey rsa:2048 -nodes -days 365 -keyout "$SSL_CERT_KEY_FILE" -out "$SSL_CERT_CHAIN_FILE" -subj "/CN=VOLTRON TECH" 2>/dev/null
+    
+    cat "$SSL_CERT_CHAIN_FILE" "$SSL_CERT_KEY_FILE" > "$SSL_CERT_FILE" 2>/dev/null
+    
+    cat > "$HAPROXY_CONFIG" << EOF
 global
     log /dev/log local0
-    log /dev/log local1 notice
     chroot /var/lib/haproxy
-    stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
-    stats timeout 30s
     user haproxy
     group haproxy
     daemon
 
 defaults
-    log     global
-    mode    tcp
-    option  tcplog
-    option  dontlognull
-    timeout connect 5s
-    timeout client  24h
-    timeout server  24h
-
-frontend port_80_edge
-    bind *:${EDGE_PUBLIC_HTTP_PORT}
+    log global
     mode tcp
-    tcp-request inspect-delay 2s
+    timeout connect 5000
+    timeout client 50000
+    timeout server 50000
 
-    acl is_ssh payload(0,7) -m bin 5353482d322e30
+frontend ssh_ssl_in
+    bind *:444 ssl crt $SSL_CERT_FILE
+    default_backend ssh_backend
 
-    tcp-request content accept if is_ssh
-    tcp-request content accept if HTTP
-
-    use_backend direct_ssh if is_ssh
-    default_backend nginx_cleartext
-
-frontend port_443_edge
-    bind *:${EDGE_PUBLIC_TLS_PORT}
-    mode tcp
-    tcp-request inspect-delay 2s
-
-    acl is_ssh payload(0,7) -m bin 5353482d322e30
-    acl is_tls req.ssl_hello_type 1
-    acl has_web_alpn req.ssl_alpn -m sub h2 http/1.1
-
-    tcp-request content accept if is_ssh
-    tcp-request content accept if HTTP
-    tcp-request content accept if is_tls
-
-    use_backend direct_ssh if is_ssh
-    use_backend nginx_cleartext if HTTP
-    use_backend nginx_tls if is_tls has_web_alpn
-    default_backend loopback_ssl_terminator
-
-frontend internal_decryptor
-    bind 127.0.0.1:${HAPROXY_INTERNAL_DECRYPT_PORT} ssl crt ${SSL_CERT_FILE}
-    mode tcp
-    tcp-request inspect-delay 2s
-
-    acl is_ssh payload(0,7) -m bin 5353482d322e30
-    tcp-request content accept if is_ssh
-    tcp-request content accept if HTTP
-
-    use_backend direct_ssh if is_ssh
-    default_backend nginx_cleartext
-
-backend direct_ssh
-    mode tcp
+backend ssh_backend
     server ssh_server 127.0.0.1:22
-
-backend nginx_cleartext
-    mode tcp
-    server nginx_8880 127.0.0.1:${NGINX_INTERNAL_HTTP_PORT}
-
-backend nginx_tls
-    mode tcp
-    server nginx_8443 127.0.0.1:${NGINX_INTERNAL_TLS_PORT}
-
-backend loopback_ssl_terminator
-    mode tcp
-    server haproxy_ssl 127.0.0.1:${HAPROXY_INTERNAL_DECRYPT_PORT}
 EOF
-}
 
-save_edge_ports_info() {
-    cat > "$NGINX_PORTS_FILE" <<EOF
-EDGE_HTTP_PORT="${EDGE_PUBLIC_HTTP_PORT}"
-EDGE_TLS_PORT="${EDGE_PUBLIC_TLS_PORT}"
-HTTP_PORTS="${NGINX_INTERNAL_HTTP_PORT}"
-TLS_PORTS="${NGINX_INTERNAL_TLS_PORT}"
-EOF
-}
-
-configure_edge_stack() {
-    local server_name="$1"
-    [[ -z "$server_name" ]] && server_name="_"
-
-    backup_edge_configs
-
-    echo -e "\n${C_BLUE}📝 Writing internal Nginx config (127.0.0.1:${NGINX_INTERNAL_HTTP_PORT}/${NGINX_INTERNAL_TLS_PORT})...${C_RESET}"
-    write_internal_nginx_config "$server_name"
-
-    echo -e "${C_BLUE}📝 Writing HAProxy edge config (${EDGE_PUBLIC_HTTP_PORT}/${EDGE_PUBLIC_TLS_PORT})...${C_RESET}"
-    write_haproxy_edge_config
-
-    echo -e "\n${C_BLUE}🧪 Validating Nginx configuration...${C_RESET}"
-    if ! nginx -t >/dev/null 2>&1; then
-        echo -e "${C_RED}❌ Nginx configuration validation failed.${C_RESET}"
-        nginx -t
-        return 1
-    fi
-
-    echo -e "${C_BLUE}🧪 Validating HAProxy configuration...${C_RESET}"
-    if ! haproxy -c -f "$HAPROXY_CONFIG" >/dev/null 2>&1; then
-        echo -e "${C_RED}❌ HAProxy configuration validation failed.${C_RESET}"
-        haproxy -c -f "$HAPROXY_CONFIG"
-        return 1
-    fi
-
-    systemctl daemon-reload
-    systemctl enable nginx >/dev/null 2>&1
-    systemctl enable haproxy >/dev/null 2>&1
-
-    echo -e "\n${C_BLUE}▶️ Restarting internal Nginx...${C_RESET}"
-    systemctl restart nginx || {
-        echo -e "${C_RED}❌ Nginx failed to restart.${C_RESET}"
-        return 1
-    }
-
-    echo -e "${C_BLUE}▶️ Restarting HAProxy edge...${C_RESET}"
-    systemctl restart haproxy || {
-        echo -e "${C_RED}❌ HAProxy failed to restart.${C_RESET}"
-        return 1
-    }
-
-    sleep 2
-    if ! systemctl is-active --quiet nginx; then
-        echo -e "${C_RED}❌ Nginx is not active after restart.${C_RESET}"
-        return 1
-    fi
-    if ! systemctl is-active --quiet haproxy; then
-        echo -e "${C_RED}❌ HAProxy is not active after restart.${C_RESET}"
-        return 1
-    fi
-
-    save_edge_ports_info
-    return 0
-}
-
-install_ssl_tunnel() {
-    clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🚀 Installing HAProxy Edge Stack (80/443 -> 8880/8443) ---${C_RESET}"
-    echo -e "\n${C_CYAN}This installer will configure:${C_RESET}"
-    echo -e "   • HAProxy on ${C_WHITE}${EDGE_PUBLIC_HTTP_PORT}/${EDGE_PUBLIC_TLS_PORT}${C_RESET}"
-    echo -e "   • Internal Nginx on ${C_WHITE}${NGINX_INTERNAL_HTTP_PORT}/${NGINX_INTERNAL_TLS_PORT}${C_RESET}"
-    echo -e "   • Loopback SSL decryptor on ${C_WHITE}${HAPROXY_INTERNAL_DECRYPT_PORT}${C_RESET}"
-
-    if [ -f "$HAPROXY_CONFIG" ] || [ -f "$NGINX_CONFIG_FILE" ]; then
-        echo -e "\n${C_YELLOW}⚠️ Existing HAProxy/Nginx configs will be replaced.${C_RESET}"
-        read -p "👉 Continue with replacement? (y/n): " confirm_replace
-        if [[ "$confirm_replace" != "y" && "$confirm_replace" != "Y" ]]; then
-            echo -e "${C_RED}❌ Installation cancelled.${C_RESET}"
-            return
-        fi
-    fi
-
-    mkdir -p "$DB_DIR" "$SSL_CERT_DIR"
-
-    ensure_edge_stack_packages || return
-
-    systemctl stop haproxy >/dev/null 2>&1
-    systemctl stop nginx >/dev/null 2>&1
-    sleep 1
-
-    select_edge_certificate || return
-
-    load_edge_cert_info
-    local server_name="${EDGE_DOMAIN:-$(detect_preferred_host)}"
-    [[ -z "$server_name" ]] && server_name="_"
-
-    configure_edge_stack "$server_name" || return
-
-    echo -e "\n${C_GREEN}✅ SUCCESS: HAProxy edge stack is active.${C_RESET}"
-    echo -e "   • Public edge ports: ${C_YELLOW}${EDGE_PUBLIC_HTTP_PORT}/${EDGE_PUBLIC_TLS_PORT}${C_RESET}"
-    echo -e "   • Internal Nginx ports: ${C_YELLOW}${NGINX_INTERNAL_HTTP_PORT}/${NGINX_INTERNAL_TLS_PORT}${C_RESET}"
-    echo -e "   • Shared certificate: ${C_YELLOW}${EDGE_CERT_MODE:-unknown}${C_RESET}"
+    systemctl restart haproxy
+    echo -e "${C_GREEN}✅ SSL Tunnel installed on port 444${C_RESET}"
     press_enter
 }
 
 uninstall_ssl_tunnel() {
-    echo -e "\n${C_BOLD}${C_PURPLE}--- 🗑️ Uninstalling HAProxy Edge Stack ---${C_RESET}"
-    if ! command -v haproxy &>/dev/null; then
-        echo -e "${C_YELLOW}ℹ️ HAProxy is not installed.${C_RESET}"
-    else
-        echo -e "${C_GREEN}🛑 Stopping and disabling HAProxy...${C_RESET}"
-        systemctl stop haproxy >/dev/null 2>&1
-        systemctl disable haproxy >/dev/null 2>&1
-    fi
-
-    if [ -f "$HAPROXY_CONFIG" ]; then
-        cat > "$HAPROXY_CONFIG" <<EOF
-global
-    log /dev/log local0
-    log /dev/log local1 notice
-
-defaults
-    log     global
-EOF
-    fi
-
-    local delete_cert="n"
-    if [[ "$UNINSTALL_MODE" == "silent" ]]; then
-        delete_cert="y"
-    elif [ -f "$SSL_CERT_FILE" ] || [ -f "$SSL_CERT_CHAIN_FILE" ] || [ -f "$SSL_CERT_KEY_FILE" ]; then
-        if systemctl is-active --quiet nginx; then
-            echo -e "${C_YELLOW}⚠️ The shared certificate is also used by Nginx.${C_RESET}"
-        fi
-        read -p "👉 Delete the shared TLS certificate too? (y/n): " delete_cert
-    fi
-
-    if [[ "$delete_cert" == "y" || "$delete_cert" == "Y" ]]; then
-        if systemctl is-active --quiet nginx; then
-            echo -e "${C_GREEN}🛑 Stopping Nginx...${C_RESET}"
-            systemctl stop nginx >/dev/null 2>&1
-        fi
-        rm -f "$SSL_CERT_FILE" "$SSL_CERT_CHAIN_FILE" "$SSL_CERT_KEY_FILE" "$EDGE_CERT_INFO_FILE"
-        rm -f "$NGINX_PORTS_FILE"
-        echo -e "${C_GREEN}🗑️ Shared certificate files removed.${C_RESET}"
-    fi
-
-    echo -e "${C_GREEN}✅ HAProxy edge stack has been removed.${C_RESET}"
-    if systemctl is-active --quiet nginx; then
-        echo -e "${C_DIM}Internal Nginx proxy still installed on ${NGINX_INTERNAL_HTTP_PORT}/${NGINX_INTERNAL_TLS_PORT}.${C_RESET}"
-    fi
+    systemctl stop haproxy 2>/dev/null
+    ff_apt_purge haproxy
+    rm -f "$HAPROXY_CONFIG"
+    rm -f "$SSL_CERT_FILE" "$SSL_CERT_CHAIN_FILE" "$SSL_CERT_KEY_FILE"
+    echo -e "${C_GREEN}✅ SSL Tunnel uninstalled${C_RESET}"
     press_enter
 }
 
@@ -3662,206 +3164,6 @@ uninstall_xui_panel() {
 }
 
 # ================================================================
-# ========== NGINX PROXY MENU ==========
-# ================================================================
-
-nginx_proxy_menu() {
-    while true; do
-        clear; show_banner
-        echo -e "${C_BOLD}${C_PURPLE}--- 🌐 Internal Nginx Proxy Management ---${C_RESET}"
-
-        local nginx_status="${C_STATUS_I}Inactive${C_RESET}"
-        local haproxy_status="${C_STATUS_I}Inactive${C_RESET}"
-        if systemctl is-active --quiet nginx; then
-            nginx_status="${C_STATUS_A}Active${C_RESET}"
-        fi
-        if systemctl is-active --quiet haproxy; then
-            haproxy_status="${C_STATUS_A}Active${C_RESET}"
-        fi
-
-        load_edge_cert_info
-        local cert_info="${EDGE_CERT_MODE:-Not configured}"
-        if [[ -n "$EDGE_DOMAIN" ]]; then
-            cert_info="${cert_info} - ${EDGE_DOMAIN}"
-        fi
-
-        echo -e "\n${C_WHITE}Nginx:${C_RESET} ${nginx_status}"
-        echo -e "${C_WHITE}HAProxy:${C_RESET} ${haproxy_status}"
-        echo -e "${C_DIM}Public Edge: ${EDGE_PUBLIC_HTTP_PORT}/${EDGE_PUBLIC_TLS_PORT} | Internal Nginx: ${NGINX_INTERNAL_HTTP_PORT}/${NGINX_INTERNAL_TLS_PORT}${C_RESET}"
-        echo -e "${C_DIM}Shared Certificate: ${cert_info}${C_RESET}"
-
-        echo -e "\n${C_BOLD}Select an action:${C_RESET}\n"
-        
-        if systemctl is-active --quiet nginx; then
-             printf "  ${C_CHOICE}[ 1]${C_RESET} %-40s\n" "🛑 Stop Nginx Service"
-             printf "  ${C_CHOICE}[ 2]${C_RESET} %-40s\n" "🔄 Restart HAProxy + Nginx Stack"
-             printf "  ${C_CHOICE}[ 3]${C_RESET} %-40s\n" "⚙️ Re-install/Re-configure Edge Stack"
-             printf "  ${C_CHOICE}[ 4]${C_RESET} %-40s\n" "🔒 Switch/Renew Shared SSL (Certbot)"
-             printf "  ${C_CHOICE}[ 5]${C_RESET} %-40s\n" "🔥 Uninstall/Purge Nginx"
-        else
-             printf "  ${C_CHOICE}[ 1]${C_RESET} %-40s\n" "▶️ Start Nginx Service"
-             printf "  ${C_CHOICE}[ 3]${C_RESET} %-40s\n" "⚙️ Install/Configure Edge Stack"
-             printf "  ${C_CHOICE}[ 4]${C_RESET} %-40s\n" "🔒 Switch/Renew Shared SSL (Certbot)"
-             printf "  ${C_CHOICE}[ 5]${C_RESET} %-40s\n" "🔥 Uninstall/Purge Nginx"
-        fi
-
-        echo -e "\n  ${C_WARN}[ 0]${C_RESET} ↩️ Return"
-        echo
-        read -p "👉 Enter your choice: " choice
-        
-        case $choice in
-            1) 
-                if systemctl is-active --quiet nginx; then
-                    echo -e "\n${C_BLUE}🛑 Stopping Nginx...${C_RESET}"
-                    systemctl stop nginx
-                    echo -e "${C_GREEN}✅ Nginx stopped.${C_RESET}"
-                else
-                    echo -e "\n${C_BLUE}▶️ Starting Nginx...${C_RESET}"
-                    systemctl start nginx
-                    if systemctl is-active --quiet nginx; then
-                        echo -e "${C_GREEN}✅ Nginx started.${C_RESET}"
-                    else
-                        echo -e "${C_RED}❌ Failed to start Nginx.${C_RESET}"
-                    fi
-                fi
-                press_enter
-                ;;
-            2)
-                echo -e "\n${C_BLUE}🔄 Restarting Nginx and HAProxy...${C_RESET}"
-                systemctl restart nginx
-                if command -v haproxy &>/dev/null; then
-                    systemctl restart haproxy
-                fi
-                if systemctl is-active --quiet nginx && systemctl is-active --quiet haproxy; then
-                    echo -e "${C_GREEN}✅ HAProxy + Nginx stack restarted.${C_RESET}"
-                else
-                    echo -e "${C_RED}❌ One or more services failed to restart.${C_RESET}"
-                fi
-                press_enter
-                ;;
-            3) install_nginx_proxy; press_enter ;;
-            4) request_certbot_ssl; press_enter ;;
-            5) purge_nginx; press_enter ;;
-            0) return ;;
-            *) echo -e "\n${C_RED}❌ Invalid option.${C_RESET}" ;;
-        esac
-    done
-}
-
-install_nginx_proxy() {
-    clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🚀 Reconfiguring Internal Nginx Proxy (8880/8443) ---${C_RESET}"
-    echo -e "\n${C_CYAN}This keeps HAProxy on ${EDGE_PUBLIC_HTTP_PORT}/${EDGE_PUBLIC_TLS_PORT} and rewrites the internal Nginx proxy on ${NGINX_INTERNAL_HTTP_PORT}/${NGINX_INTERNAL_TLS_PORT}.${C_RESET}"
-
-    if [ ! -s "$SSL_CERT_FILE" ] || [ ! -s "$SSL_CERT_CHAIN_FILE" ] || [ ! -s "$SSL_CERT_KEY_FILE" ]; then
-        echo -e "\n${C_YELLOW}⚠️ No shared certificate was found.${C_RESET}"
-        echo -e "${C_DIM}Running the full HAProxy edge installer...${C_RESET}"
-        install_ssl_tunnel
-        return
-    fi
-
-    mkdir -p "$DB_DIR" "$SSL_CERT_DIR"
-    ensure_edge_stack_packages || return
-
-    systemctl stop haproxy >/dev/null 2>&1
-    systemctl stop nginx >/dev/null 2>&1
-    sleep 1
-
-    load_edge_cert_info
-    local server_name="${EDGE_DOMAIN:-$(detect_preferred_host)}"
-    [[ -z "$server_name" ]] && server_name="_"
-
-    configure_edge_stack "$server_name" || return
-
-    echo -e "\n${C_GREEN}✅ Internal Nginx proxy reconfigured successfully.${C_RESET}"
-    echo -e "   • Public HAProxy edge: ${C_YELLOW}${EDGE_PUBLIC_HTTP_PORT}/${EDGE_PUBLIC_TLS_PORT}${C_RESET}"
-    echo -e "   • Internal Nginx: ${C_YELLOW}${NGINX_INTERNAL_HTTP_PORT}/${NGINX_INTERNAL_TLS_PORT}${C_RESET}"
-    press_enter
-}
-
-request_certbot_ssl() {
-    clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🔒 Shared Certbot Certificate ---${C_RESET}"
-    echo -e "\n${C_DIM}This will replace the shared certificate used by HAProxy on ${EDGE_PUBLIC_TLS_PORT} and internal Nginx on ${NGINX_INTERNAL_TLS_PORT}.${C_RESET}"
-
-    mkdir -p "$DB_DIR" "$SSL_CERT_DIR"
-    ensure_edge_stack_packages || return
-    load_edge_cert_info
-
-    local preferred_host=$(detect_preferred_host)
-    local default_domain=""
-    local domain_name
-    local email
-
-    if [[ -n "$EDGE_DOMAIN" ]] && ! [[ "$EDGE_DOMAIN" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-        default_domain="$EDGE_DOMAIN"
-    elif [[ -n "$preferred_host" ]] && ! [[ "$preferred_host" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-        default_domain="$preferred_host"
-    fi
-
-    if [[ -n "$default_domain" ]]; then
-        read -p "👉 Enter your domain name [$default_domain]: " domain_name
-        domain_name=${domain_name:-$default_domain}
-    else
-        read -p "👉 Enter your domain name (e.g. vpn.example.com): " domain_name
-    fi
-    if [[ -z "$domain_name" ]]; then
-        echo -e "\n${C_RED}❌ Domain name cannot be empty.${C_RESET}"
-        return
-    fi
-    if [[ "$domain_name" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-        echo -e "\n${C_RED}❌ Certbot requires a real domain name, not a raw IP address.${C_RESET}"
-        return
-    fi
-
-    read -p "👉 Enter your email for Let's Encrypt [${EDGE_EMAIL}]: " email
-    email=${email:-$EDGE_EMAIL}
-    if [[ -z "$email" ]]; then
-        echo -e "\n${C_RED}❌ Email address cannot be empty.${C_RESET}"
-        return
-    fi
-
-    obtain_certbot_edge_cert "$domain_name" "$email" || return
-    configure_edge_stack "$domain_name" || return
-
-    echo -e "\n${C_GREEN}✅ Shared Certbot certificate applied successfully.${C_RESET}"
-    echo -e "   • Domain: ${C_YELLOW}${domain_name}${C_RESET}"
-    echo -e "   • Public edge: ${C_YELLOW}${EDGE_PUBLIC_HTTP_PORT}/${EDGE_PUBLIC_TLS_PORT}${C_RESET}"
-    press_enter
-}
-
-purge_nginx() {
-    clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🔥 Purge Internal Nginx Proxy ---${C_RESET}"
-    if ! command -v nginx &> /dev/null; then
-        rm -f "$NGINX_PORTS_FILE"
-        echo -e "\n${C_YELLOW}ℹ️ Nginx is not installed.${C_RESET}"
-        return
-    fi
-    echo -e "\n${C_YELLOW}⚠️ This removes the internal Nginx proxy on ${NGINX_INTERNAL_HTTP_PORT}/${NGINX_INTERNAL_TLS_PORT}.${C_RESET}"
-    read -p "👉 Continue and purge Nginx? (y/n): " confirm
-    if [[ "$confirm" != "y" && "$confirm" != "Y" ]]; then
-        echo -e "\n${C_YELLOW}❌ Uninstallation cancelled.${C_RESET}"
-        return
-    fi
-    echo -e "\n${C_BLUE}🛑 Stopping Nginx service...${C_RESET}"
-    systemctl stop nginx >/dev/null 2>&1
-    systemctl disable nginx >/dev/null 2>&1
-    echo -e "\n${C_BLUE}🗑️ Purging Nginx packages...${C_RESET}"
-    ff_apt_purge nginx nginx-common >/dev/null 2>&1
-    apt-get autoremove -y >/dev/null 2>&1
-    echo -e "\n${C_BLUE}🗑️ Removing leftover files...${C_RESET}"
-    rm -f /etc/ssl/certs/nginx-selfsigned.pem
-    rm -f /etc/ssl/private/nginx-selfsigned.key
-    rm -rf /etc/nginx
-    rm -f "${NGINX_CONFIG_FILE}.bak"
-    rm -f "${NGINX_CONFIG_FILE}.bak.firewallfalcon"
-    rm -f "$NGINX_PORTS_FILE"
-    echo -e "\n${C_GREEN}✅ Internal Nginx proxy purged. Shared certificates were kept.${C_RESET}"
-    press_enter
-}
-
-# ================================================================
 # ========== TRAFFIC MONITOR ==========
 # ================================================================
 
@@ -4072,8 +3374,8 @@ backup_user_data() {
     echo -e "${C_BOLD}${C_PURPLE}--- 💾 Backup User Data ---${C_RESET}"
     
     local backup_path
-    read -p "👉 Backup path [/root/firewallfalcon_users.tar.gz]: " backup_path
-    backup_path=${backup_path:-/root/firewallfalcon_users.tar.gz}
+    read -p "👉 Backup path [/root/voltrontech_backup.tar.gz]: " backup_path
+    backup_path=${backup_path:-/root/voltrontech_backup.tar.gz}
     
     if [ ! -d "$DB_DIR" ] || [ ! -s "$DB_FILE" ]; then
         echo -e "\n${C_YELLOW}ℹ️ No user data found to back up.${C_RESET}"
@@ -4110,8 +3412,8 @@ restore_user_data() {
         local temp_dir=$(mktemp -d)
         tar -xzf "$backup_path" -C "$temp_dir" 2>/dev/null
         
-        if [ -f "$temp_dir/firewallfalcon/users.db" ]; then
-            cp "$temp_dir/firewallfalcon/users.db" "$DB_FILE"
+        if [ -f "$temp_dir/voltrontech/users.db" ]; then
+            cp "$temp_dir/voltrontech/users.db" "$DB_FILE"
             
             while IFS=: read -r user pass expiry limit bandwidth_gb _extra; do
                 if ! id "$user" &>/dev/null; then
@@ -4134,107 +3436,18 @@ restore_user_data() {
 }
 
 # ================================================================
-# ========== PROTOCOL MENU ==========
-# ================================================================
-
-protocol_menu() {
-    while true; do
-        clear; show_banner
-        
-        local badvpn_status=$(systemctl is-active badvpn 2>/dev/null && echo -e "${C_GREEN}● RUNNING${C_RESET}" || echo "")
-        local udp_status=$(systemctl is-active udp-custom 2>/dev/null && echo -e "${C_GREEN}● RUNNING${C_RESET}" || echo "")
-        local haproxy_status=$(systemctl is-active haproxy 2>/dev/null && echo -e "${C_GREEN}● RUNNING${C_RESET}" || echo "")
-        local dnstt_status=$(systemctl is-active dnstt 2>/dev/null && echo -e "${C_GREEN}● RUNNING${C_RESET}" || echo "")
-        local falconproxy_status=$(systemctl is-active falconproxy 2>/dev/null && echo -e "${C_GREEN}● RUNNING${C_RESET}" || echo "")
-        local zivpn_status=$(systemctl is-active zivpn 2>/dev/null && echo -e "${C_GREEN}● RUNNING${C_RESET}" || echo "")
-        
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}              🔌 PROTOCOL MANAGEMENT${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo ""
-        echo -e "  ${C_GREEN}1)${C_RESET} badvpn (UDP 7300) $badvpn_status"
-        echo -e "  ${C_GREEN}2)${C_RESET} udp-custom $udp_status"
-        echo -e "  ${C_GREEN}3)${C_RESET} SSL Tunnel (HAProxy) $haproxy_status"
-        echo -e "  ${C_GREEN}4)${C_RESET} DNSTT (Port 53) $dnstt_status"
-        echo -e "  ${C_GREEN}5)${C_RESET} ⚡ DNSTT Speed Booster"
-        echo -e "  ${C_GREEN}6)${C_RESET} Falcon Proxy $falconproxy_status"
-        echo -e "  ${C_GREEN}7)${C_RESET} ZiVPN $zivpn_status"
-        echo -e "  ${C_GREEN}8)${C_RESET} X-UI Panel"
-        echo -e "  ${C_GREEN}9)${C_RESET} 🌐 Nginx Proxy Management"
-        echo ""
-        echo -e "  ${C_RED}0)${C_RESET} Return"
-        echo ""
-        
-        local choice
-        read -p "👉 Select protocol to manage: " choice
-        
-        case $choice in
-            1)
-                echo -e "\n  ${C_GREEN}1)${C_RESET} Install"
-                echo -e "  ${C_RED}2)${C_RESET} Uninstall"
-                read -p "👉 Choose: " sub
-                [ "$sub" == "1" ] && install_badvpn || uninstall_badvpn
-                ;;
-            2)
-                echo -e "\n  ${C_GREEN}1)${C_RESET} Install"
-                echo -e "  ${C_RED}2)${C_RESET} Uninstall"
-                read -p "👉 Choose: " sub
-                [ "$sub" == "1" ] && install_udp_custom || uninstall_udp_custom
-                ;;
-            3)
-                echo -e "\n  ${C_GREEN}1)${C_RESET} Install"
-                echo -e "  ${C_RED}2)${C_RESET} Uninstall"
-                read -p "👉 Choose: " sub
-                [ "$sub" == "1" ] && install_ssl_tunnel || uninstall_ssl_tunnel
-                ;;
-            4)
-                echo -e "\n  ${C_GREEN}1)${C_RESET} Install DNSTT"
-                echo -e "  ${C_GREEN}2)${C_RESET} View Details"
-                echo -e "  ${C_RED}3)${C_RESET} Uninstall"
-                read -p "👉 Choose: " sub
-                if [ "$sub" == "1" ]; then install_dnstt
-                elif [ "$sub" == "2" ]; then show_dnstt_details
-                elif [ "$sub" == "3" ]; then uninstall_dnstt
-                fi
-                ;;
-            5) speed_booster_menu ;;
-            6)
-                echo -e "\n  ${C_GREEN}1)${C_RESET} Install"
-                echo -e "  ${C_RED}2)${C_RESET} Uninstall"
-                read -p "👉 Choose: " sub
-                [ "$sub" == "1" ] && install_falcon_proxy || uninstall_falcon_proxy
-                ;;
-            7) 
-                echo -e "\n  ${C_GREEN}1)${C_RESET} Install"
-                echo -e "  ${C_RED}2)${C_RESET} Uninstall"
-                read -p "👉 Choose: " sub
-                [ "$sub" == "1" ] && install_zivpn || uninstall_zivpn
-                ;;
-            8)
-                echo -e "\n  ${C_GREEN}1)${C_RESET} Install"
-                echo -e "  ${C_RED}2)${C_RESET} Uninstall"
-                read -p "👉 Choose: " sub
-                [ "$sub" == "1" ] && install_xui_panel || uninstall_xui_panel
-                ;;
-            9) nginx_proxy_menu ;;
-            0) return ;;
-            *) echo -e "\n${C_RED}❌ Invalid option${C_RESET}"; sleep 2 ;;
-        esac
-    done
-}
-
-# ================================================================
 # ========== LIMITER SERVICE ==========
 # ================================================================
 
 create_limiter_service() {
     cat > "$LIMITER_SCRIPT" << 'EOF'
 #!/bin/bash
-# FirewallFalcon limiter version 2026-04-05.1
-DB_FILE="/etc/firewallfalcon/users.db"
-BW_DIR="/etc/firewallfalcon/bandwidth"
+# Voltron Tech Limiter v5.0
+DB_FILE="/etc/voltrontech/users.db"
+BW_DIR="/etc/voltrontech/bandwidth"
 PID_DIR="$BW_DIR/pidtrack"
-BANNER_DIR="/etc/firewallfalcon/banners"
+BANNER_DIR="/etc/voltrontech/banners"
+BANNER_ENABLED_FILE="/etc/voltrontech/banners_enabled"
 SCAN_INTERVAL=15
 
 mkdir -p "$BW_DIR" "$PID_DIR" "$BANNER_DIR"
@@ -4310,7 +3523,7 @@ while true; do
         [[ "$passwd_status" == "L" ]] && locked_users["$passwd_user"]=1
     done < <(passwd -Sa 2>/dev/null)
 
-    if [[ -f "/etc/firewallfalcon/banners_enabled" ]]; then
+    if [[ -f "$BANNER_ENABLED_FILE" ]]; then
         mkdir -p "$BANNER_DIR"
         dynamic_banners_enabled=true
     fi
@@ -4385,11 +3598,9 @@ while true; do
                 bw_info="${used_gb}/${bandwidth_gb} GB used | ${remain_gb} GB left"
             fi
 
-            # Get server info
             UPTIME=$(uptime -p | sed 's/up //')
             LOAD=$(awk '{print $1}' /proc/loadavg)
             
-            # Build premium banner (VOLTRON TECH ULTIMATE - No Falcon)
             banner_content=""
             banner_content+="<br><font color=\"purple\" size=\"5\"><b>🔥 VOLTRON TECH ULTIMATE 🔥</b></font><br><br>"
             banner_content+="<font color=\"cyan\"><b>═══════════════════════════════════════════</b></font><br>"
@@ -4485,7 +3696,7 @@ EOF
 
     cat > "$LIMITER_SERVICE" << EOF
 [Unit]
-Description=FirewallFalcon Active User Limiter
+Description=Voltron Tech Active User Limiter
 After=network.target
 
 [Service]
@@ -4502,15 +3713,102 @@ WantedBy=multi-user.target
 EOF
     sed -i 's/\r$//' "$LIMITER_SERVICE" 2>/dev/null
 
-    pkill -f "firewallfalcon-limiter" 2>/dev/null
+    pkill -f "voltrontech-limiter" 2>/dev/null
 
-    if ! systemctl is-active --quiet firewallfalcon-limiter; then
+    if ! systemctl is-active --quiet voltrontech-limiter; then
         systemctl daemon-reload
-        systemctl enable firewallfalcon-limiter &>/dev/null
-        systemctl start firewallfalcon-limiter --no-block &>/dev/null
+        systemctl enable voltrontech-limiter &>/dev/null
+        systemctl start voltrontech-limiter --no-block &>/dev/null
     else
-        systemctl restart firewallfalcon-limiter --no-block &>/dev/null
+        systemctl restart voltrontech-limiter --no-block &>/dev/null
     fi
+}
+
+# ================================================================
+# ========== PROTOCOL MENU ==========
+# ================================================================
+
+protocol_menu() {
+    while true; do
+        clear; show_banner
+        
+        local badvpn_status=$(systemctl is-active badvpn 2>/dev/null && echo -e "${C_GREEN}● RUNNING${C_RESET}" || echo "")
+        local udp_status=$(systemctl is-active udp-custom 2>/dev/null && echo -e "${C_GREEN}● RUNNING${C_RESET}" || echo "")
+        local haproxy_status=$(systemctl is-active haproxy 2>/dev/null && echo -e "${C_GREEN}● RUNNING${C_RESET}" || echo "")
+        local dnstt_status=$(systemctl is-active dnstt 2>/dev/null && echo -e "${C_GREEN}● RUNNING${C_RESET}" || echo "")
+        local falconproxy_status=$(systemctl is-active falconproxy 2>/dev/null && echo -e "${C_GREEN}● RUNNING${C_RESET}" || echo "")
+        
+        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_BOLD}${C_PURPLE}              🔌 PROTOCOL MANAGEMENT${C_RESET}"
+        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
+        echo ""
+        echo -e "  ${C_GREEN}1)${C_RESET} badvpn (UDP 7300) $badvpn_status"
+        echo -e "  ${C_GREEN}2)${C_RESET} udp-custom $udp_status"
+        echo -e "  ${C_GREEN}3)${C_RESET} SSL Tunnel (HAProxy) $haproxy_status"
+        echo -e "  ${C_GREEN}4)${C_RESET} DNSTT (Port 53) $dnstt_status"
+        echo -e "  ${C_GREEN}5)${C_RESET} ⚡ DNSTT Speed Booster"
+        echo -e "  ${C_GREEN}6)${C_RESET} Falcon Proxy $falconproxy_status"
+        echo -e "  ${C_GREEN}7)${C_RESET} ZiVPN"
+        echo -e "  ${C_GREEN}8)${C_RESET} X-UI Panel"
+        echo ""
+        echo -e "  ${C_RED}0)${C_RESET} Return"
+        echo ""
+        
+        local choice
+        read -p "👉 Select protocol to manage: " choice
+        
+        case $choice in
+            1)
+                echo -e "\n  ${C_GREEN}1)${C_RESET} Install"
+                echo -e "  ${C_RED}2)${C_RESET} Uninstall"
+                read -p "👉 Choose: " sub
+                [ "$sub" == "1" ] && install_badvpn || uninstall_badvpn
+                ;;
+            2)
+                echo -e "\n  ${C_GREEN}1)${C_RESET} Install"
+                echo -e "  ${C_RED}2)${C_RESET} Uninstall"
+                read -p "👉 Choose: " sub
+                [ "$sub" == "1" ] && install_udp_custom || uninstall_udp_custom
+                ;;
+            3)
+                echo -e "\n  ${C_GREEN}1)${C_RESET} Install"
+                echo -e "  ${C_RED}2)${C_RESET} Uninstall"
+                read -p "👉 Choose: " sub
+                [ "$sub" == "1" ] && install_ssl_tunnel || uninstall_ssl_tunnel
+                ;;
+            4)
+                echo -e "\n  ${C_GREEN}1)${C_RESET} Install DNSTT"
+                echo -e "  ${C_GREEN}2)${C_RESET} View Details"
+                echo -e "  ${C_RED}3)${C_RESET} Uninstall"
+                read -p "👉 Choose: " sub
+                if [ "$sub" == "1" ]; then install_dnstt
+                elif [ "$sub" == "2" ]; then show_dnstt_details
+                elif [ "$sub" == "3" ]; then uninstall_dnstt
+                fi
+                ;;
+            5) speed_booster_menu ;;
+            6)
+                echo -e "\n  ${C_GREEN}1)${C_RESET} Install"
+                echo -e "  ${C_RED}2)${C_RESET} Uninstall"
+                read -p "👉 Choose: " sub
+                [ "$sub" == "1" ] && install_falcon_proxy || uninstall_falcon_proxy
+                ;;
+            7)
+                echo -e "\n  ${C_GREEN}1)${C_RESET} Install"
+                echo -e "  ${C_RED}2)${C_RESET} Uninstall"
+                read -p "👉 Choose: " sub
+                [ "$sub" == "1" ] && install_zivpn || uninstall_zivpn
+                ;;
+            8)
+                echo -e "\n  ${C_GREEN}1)${C_RESET} Install"
+                echo -e "  ${C_RED}2)${C_RESET} Uninstall"
+                read -p "👉 Choose: " sub
+                [ "$sub" == "1" ] && install_xui_panel || uninstall_xui_panel
+                ;;
+            0) return ;;
+            *) echo -e "\n${C_RED}❌ Invalid option${C_RESET}"; sleep 2 ;;
+        esac
+    done
 }
 
 # ================================================================
@@ -4526,13 +3824,13 @@ uninstall_script() {
     echo -e "\n${C_RED}This action is irreversible.${C_RESET}"
     echo ""
     
-    # Check for users before uninstall (Falcon feature)
+    # Check for users before uninstall
     local -a removable_users=()
     local remove_users_on_uninstall=false
-    mapfile -t removable_users < <(get_firewallfalcon_known_users)
+    mapfile -t removable_users < <(get_voltrontech_known_users)
     if [[ ${#removable_users[@]} -gt 0 ]]; then
-        echo -e "\n${C_YELLOW}FirewallFalcon SSH users detected on this VPS:${C_RESET} ${removable_users[*]}"
-        read -p "👉 Do you also want to permanently delete these SSH users before uninstalling? (y/n): " remove_users_confirm
+        echo -e "\n${C_YELLOW}Voltron Tech SSH users detected: ${removable_users[*]}"
+        read -p "👉 Delete these users before uninstalling? (y/n): " remove_users_confirm
         if [[ "$remove_users_confirm" == "y" || "$remove_users_confirm" == "Y" ]]; then
             remove_users_on_uninstall=true
         fi
@@ -4548,8 +3846,8 @@ uninstall_script() {
     
     # Delete users if requested
     if [[ "$remove_users_on_uninstall" == "true" ]]; then
-        echo -e "\n${C_BLUE}🗑️ Removing FirewallFalcon SSH users before uninstall...${C_RESET}"
-        delete_firewallfalcon_user_accounts "${removable_users[@]}"
+        echo -e "\n${C_BLUE}🗑️ Removing Voltron Tech SSH users before uninstall...${C_RESET}"
+        delete_voltrontech_user_accounts "${removable_users[@]}"
     fi
     
     # Delete deSEC DNS records
@@ -4564,10 +3862,10 @@ uninstall_script() {
     (crontab -l 2>/dev/null | grep -v "reboot") | crontab - 2>/dev/null
     
     # Stop all services
-    systemctl stop dnstt.service badvpn.service udp-custom.service haproxy nginx falconproxy.service zivpn.service 2>/dev/null
+    systemctl stop dnstt.service badvpn.service udp-custom.service haproxy falconproxy.service zivpn.service 2>/dev/null
     systemctl disable dnstt.service badvpn.service udp-custom.service falconproxy.service 2>/dev/null
-    systemctl stop firewallfalcon-limiter 2>/dev/null
-    systemctl disable firewallfalcon-limiter 2>/dev/null
+    systemctl stop voltrontech-limiter 2>/dev/null
+    systemctl disable voltrontech-limiter 2>/dev/null
     
     # Remove service files
     rm -f "$DNSTT_SERVICE_FILE" "$BADVPN_SERVICE_FILE" "$UDP_CUSTOM_SERVICE_FILE" "$FALCONPROXY_SERVICE_FILE"
@@ -4576,7 +3874,7 @@ uninstall_script() {
     # Remove binaries
     rm -f "$DNSTT_BINARY" "$DNSTT_CLIENT" "$BADVPN_BIN" "$UDP_CUSTOM_BIN"
     rm -f "$FALCONPROXY_BINARY" "$ZIVPN_BIN"
-    rm -f "$LIMITER_SCRIPT" "$BANDWIDTH_SCRIPT" "$TRIAL_CLEANUP_SCRIPT"
+    rm -f "$LIMITER_SCRIPT" "$TRIAL_CLEANUP_SCRIPT"
     
     # Remove directories
     rm -rf "$DB_DIR" "$ZIVPN_DIR" "$BADVPN_BUILD_DIR" "$UDP_CUSTOM_DIR"
@@ -4601,7 +3899,7 @@ initial_setup() {
     echo -e "\n${C_BLUE}🔧 Running initial system setup...${C_RESET}"
     
     check_environment
-    mkdir -p "$DB_DIR" "$SSL_CERT_DIR" "$BANDWIDTH_DIR" "$BANNER_DIR" "$DNSTT_KEYS_DIR"
+    mkdir -p "$DB_DIR" "$SSL_CERT_DIR" "$BANDWIDTH_DIR" "$BANNER_DIR" "$DNSTT_KEYS_DIR" "$LOGS_DIR" "$CONFIG_DIR"
     touch "$DB_FILE"
     
     getent group "$FF_USERS_GROUP" >/dev/null 2>&1 || groupadd "$FF_USERS_GROUP" >/dev/null 2>&1
@@ -4708,6 +4006,9 @@ main_menu() {
 # ========== START ==========
 # ================================================================
 
-require_interactive_terminal
-sync_runtime_components_if_needed
+if [[ "$1" == "--install-setup" ]]; then
+    initial_setup
+    exit 0
+fi
+
 main_menu
