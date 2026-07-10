@@ -3323,7 +3323,7 @@ while true; do
             # SSH BANNER - VOLTRON TECH ULTIMATE NA MISTARI MIFUPI MWANZONI NA MWISHONI
             banner_content=""
             banner_content+="<br><br>"
-            banner_content+="<center><font color=\"red\">=====</font><font color=\"purple\" size=\"8\"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color=\"cyan\">======</font></center><br>"
+            banner_content+="<center><font color=\"red\">=======</font><font color=\"purple\" size=\"8\"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color=\"red\">=======</font></center><br>"
             banner_content+="<br>"
             banner_content+="<center><font color=\"blue\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
             banner_content+="<br>"
