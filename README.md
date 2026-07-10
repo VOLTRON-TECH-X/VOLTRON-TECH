@@ -104,8 +104,8 @@
 
 ```bash
 bash <(curl -sL https://raw.githubusercontent.com/VOLTRON-TECH-X/VOLTRON-TECH/refs/heads/main/install.sh)```
-
-
+---
+###
 📋 Alternative Installation
 bash
 # Download the install script
