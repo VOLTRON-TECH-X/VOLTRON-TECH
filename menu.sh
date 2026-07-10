@@ -761,7 +761,7 @@ unlock_user() {
 }
 
 # ================================================================
-# ========== LIST USERS (FALCON STYLE - REKEBISHWA) ==========
+# ========== LIST USERS (VERTICAL - REKEBISHWA) ==========
 # ================================================================
 
 list_users() {
@@ -776,12 +776,11 @@ list_users() {
     echo -e "${C_BOLD}${C_PURPLE}                      📋 MANAGED USERS${C_RESET}"
     echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
     echo ""
-    echo -e "${C_BOLD}${C_WHITE}┌────────────┬────────────┬──────────┬───────────────┬──────────────┐${C_RESET}"
-    printf "${C_BOLD}${C_WHITE}│ %-10s │ %-10s │ %-8s │ %-13s │ %-12s │${C_RESET}\n" "USERNAME" "EXPIRES" "CONNS" "BANDWIDTH" "STATUS"
-    echo -e "${C_BOLD}${C_WHITE}├────────────┼────────────┼──────────┼───────────────┼──────────────┤${C_RESET}"
     
+    local user_count=0
     while IFS=: read -r user pass expiry limit bandwidth_gb _extra; do
         [[ -z "$user" ]] && continue
+        user_count=$((user_count + 1))
         bandwidth_gb=${bandwidth_gb:-0}
         
         local online_count=$(pgrep -c -u "$user" sshd 2>/dev/null || echo 0)
@@ -794,44 +793,57 @@ list_users() {
                 used_bytes=$(cat "$BANDWIDTH_DIR/${user}.usage" 2>/dev/null)
                 [[ -z "$used_bytes" ]] && used_bytes=0
             fi
-            local used_gb=$(awk "BEGIN {printf \"%.1f\", $used_bytes / 1073741824}")
-            bw_string="${used_gb}/${bandwidth_gb}G"
+            local used_gb=$(awk "BEGIN {printf \"%.2f\", $used_bytes / 1073741824}")
+            local remain_gb=$(awk "BEGIN {r=$bandwidth_gb - $used_gb; if(r<0) r=0; printf \"%.2f\", r}")
+            bw_string="${used_gb}/${bandwidth_gb} GB used | ${remain_gb} GB left"
         fi
         
         local status_text=$(get_user_status "$user")
         local plain_status=$(echo -e "$status_text" | sed 's/\x1b\[[0-9;]*m//g')
         
-        local status_short=""
-        local line_color="$C_WHITE"
+        local status_color=""
         case $plain_status in
-            *"Active"*) 
-                status_short="${C_GREEN}Active${C_RESET}"
-                line_color="$C_GREEN"
-                ;;
-            *"Locked"*) 
-                status_short="${C_YELLOW}Locked${C_RESET}"
-                line_color="$C_YELLOW"
-                ;;
-            *"Expired"*) 
-                status_short="${C_RED}Expired${C_RESET}"
-                line_color="$C_RED"
-                ;;
-            *"Not Found"*) 
-                status_short="${C_GRAY}Not Found${C_RESET}"
-                line_color="$C_DIM"
-                ;;
-            *"Exceeded"*) 
-                status_short="${C_RED}Exceeded${C_RESET}"
-                line_color="$C_RED"
-                ;;
+            *"Active"*) status_color="$C_GREEN" ;;
+            *"Locked"*) status_color="$C_YELLOW" ;;
+            *"Expired"*) status_color="$C_RED" ;;
+            *"Not Found"*) status_color="$C_GRAY" ;;
+            *"Exceeded"*) status_color="$C_RED" ;;
+            *) status_color="$C_WHITE" ;;
         esac
         
-        printf "${line_color}│${C_RESET} ${line_color}%-10s${C_RESET} ${line_color}│${C_RESET} ${C_YELLOW}%-10s${C_RESET} ${line_color}│${C_RESET} ${C_CYAN}%-8s${C_RESET} ${line_color}│${C_RESET} ${C_ORANGE}%-13s${C_RESET} ${line_color}│${C_RESET} %-12s ${line_color}│${C_RESET}\n" \
-            "$user" "$expiry" "$connection_string" "$bw_string" "$status_short"
+        # Get expiry date with days left
+        local expiry_display="$expiry"
+        local current_ts=$(date +%s)
+        local expiry_ts=$(date -d "$expiry" +%s 2>/dev/null || echo 0)
+        if [[ "$expiry_ts" -gt 0 ]]; then
+            local diff_secs=$((expiry_ts - current_ts))
+            if (( diff_secs <= 0 )); then
+                expiry_display="$expiry (EXPIRED)"
+            else
+                local d_l=$((diff_secs / 86400))
+                local h_l=$(((diff_secs % 86400) / 3600))
+                if (( d_l == 0 )); then
+                    expiry_display="$expiry (${h_l}h left)"
+                else
+                    expiry_display="$expiry (${d_l}d ${h_l}h left)"
+                fi
+            fi
+        fi
+        
+        # Display user info vertically
+        echo -e "${C_BOLD}${C_CYAN}┌─────────────────────────────────────────────────────────────┐${C_RESET}"
+        echo -e "${C_BOLD}${C_CYAN}│ ${C_BOLD}${C_WHITE}USER #${user_count}${C_RESET}${C_BOLD}${C_CYAN}                                                   │${C_RESET}"
+        echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────┤${C_RESET}"
+        printf "${C_BOLD}${C_CYAN}│${C_RESET} ${C_YELLOW}USERNAME${C_RESET}        : ${C_WHITE}%-35s${C_BOLD}${C_CYAN}│${C_RESET}\n" "$user"
+        printf "${C_BOLD}${C_CYAN}│${C_RESET} ${C_YELLOW}EXPIRATION${C_RESET}      : ${C_WHITE}%-35s${C_BOLD}${C_CYAN}│${C_RESET}\n" "$expiry_display"
+        printf "${C_BOLD}${C_CYAN}│${C_RESET} ${C_YELLOW}BANDWIDTH${C_RESET}       : ${C_WHITE}%-35s${C_BOLD}${C_CYAN}│${C_RESET}\n" "$bw_string"
+        printf "${C_BOLD}${C_CYAN}│${C_RESET} ${C_YELLOW}CONNECTION${C_RESET}     : ${C_WHITE}%-35s${C_BOLD}${C_CYAN}│${C_RESET}\n" "$connection_string"
+        printf "${C_BOLD}${C_CYAN}│${C_RESET} ${C_YELLOW}STATUS${C_RESET}         : ${status_color}%-35s${C_BOLD}${C_CYAN}│${C_RESET}\n" "$plain_status"
+        echo -e "${C_BOLD}${C_CYAN}└─────────────────────────────────────────────────────────────┘${C_RESET}"
+        echo ""
+        
     done < <(sort "$DB_FILE")
     
-    echo -e "${C_BOLD}${C_WHITE}└────────────┴────────────┴──────────┴───────────────┴──────────────┘${C_RESET}"
-    echo ""
     echo -e "${C_DIM}Total Users: ${C_WHITE}$(grep -c . "$DB_FILE")${C_RESET}"
     echo -e "${C_DIM}Online: ${C_WHITE}$(count_managed_online_sessions)${C_RESET}"
     press_enter
@@ -3308,10 +3320,10 @@ while true; do
             UPTIME=$(uptime -p | sed 's/up //')
             LOAD=$(awk '{print $1}' /proc/loadavg)
             
-            # SSH BANNER - VOLTRON TECH ULTIMATE KUBWA ZAIDI SIZE 8, KATIKATI, NAFASI KATI YAKE NA ACCOUNT DETAILS
+            # SSH BANNER - VOLTRON TECH ULTIMATE NA MISTARI MIFUPI MWANZONI NA MWISHONI
             banner_content=""
             banner_content+="<br><br>"
-            banner_content+="<center><font color=\"purple\" size=\"8\"><b>🔥 VOLTRON TECH ULTIMATE 🔥</b></font></center><br>"
+            banner_content+="<center><font color=\"cyan\">──</font><font color=\"purple\" size=\"8\"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color=\"cyan\">──</font></center><br>"
             banner_content+="<br>"
             banner_content+="<center><font color=\"blue\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
             banner_content+="<br>"
