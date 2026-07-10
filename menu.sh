@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================
-# VOLTRON TECH ULTIMATE v9.1 - COMPLETE
+# VOLTRON TECH ULTIMATE v9.2 - COMPLETE
 # ================================================================
 # Inajumuisha:
 #   1. User Management - Create, Delete, Edit, Lock, Unlock, List, Renew, Cleanup
@@ -9,8 +9,8 @@
 #   4. Dynamic Banner - Centered (ACCOUNT DETAILS - Blue)
 #   5. VPS Dashboard - Real-time system info (Compact)
 #   6. VPN Data Usage - Per user connection data (Table format)
-#   7. UDP Booster - Automatic (1000x stronger)
-#   8. SSH Booster - Automatic (1000x stronger)
+#   7. UDP Booster - Automatic (sysctl parameters)
+#   8. SSH Booster - Automatic
 #   9. Trial Account - Auto-delete
 #   10. Orphan Detection
 #   11. Backup/Restore, Traffic Monitor, Torrent Blocking, Auto Reboot
@@ -103,21 +103,6 @@ FF_USERS_GROUP="ffusers"
 SELECTED_USER=""
 SELECTED_USERS=()
 UNINSTALL_MODE="interactive"
-
-# ================================================================
-# ========== KCP/smux UDP BOOSTER ULTIMATE PARAMETERS ==========
-# ================================================================
-
-KCP_WINDOW_SIZE="1024,1024"              # 1000x
-KCP_MAX_STREAM_BUFFER="10737418240"      # 10GB
-KCP_QUEUE_SIZE="10240"                   # 1000x
-KCP_SND_WND="8192"                       # 1000x
-KCP_RCV_WND="8192"                       # 1000x
-KCP_NODELAY="1"
-KCP_INTERVAL="1"                         # 10x faster
-KCP_RESEND="1"                           # 2x faster
-KCP_NC="1"
-KCP_DEADLINK="50"
 
 # ================================================================
 # ========== APT FUNCTIONS ==========
@@ -242,7 +227,7 @@ show_banner() {
     refresh_banner_cache
     [[ -t 1 ]] && clear
     echo
-    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v9.1 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
+    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v9.2 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
     echo -e "${C_BLUE}   ─────────────────────────────────────────────────────────${C_RESET}"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "OS" "$BANNER_CACHE_OS_NAME" "Uptime: $BANNER_CACHE_UP_TIME"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "Memory" "${BANNER_CACHE_RAM_USAGE}% Used" "Online: ${C_WHITE}${BANNER_CACHE_ONLINE_USERS}${C_RESET}"
@@ -1570,19 +1555,7 @@ EOF
 apply_udp_booster_auto() {
     echo -e "\n${C_BLUE}🔧 Applying UDP Booster (Automatic)...${C_RESET}"
     
-    # KCP Ultimate Parameters
-    KCP_WINDOW_SIZE="1024,1024"
-    KCP_MAX_STREAM_BUFFER="10737418240"
-    KCP_QUEUE_SIZE="10240"
-    KCP_SND_WND="8192"
-    KCP_RCV_WND="8192"
-    KCP_NODELAY="1"
-    KCP_INTERVAL="1"
-    KCP_RESEND="1"
-    KCP_NC="1"
-    KCP_DEADLINK="50"
-    
-    # UDP Tuning
+    # UDP Tuning via sysctl
     sysctl -w net.core.rmem_max=10737418240 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=10737418240 >/dev/null 2>&1
     sysctl -w net.core.rmem_default=1073741824 >/dev/null 2>&1
@@ -1594,26 +1567,15 @@ apply_udp_booster_auto() {
     sysctl -w net.ipv4.udp_gro_enabled=1 >/dev/null 2>&1
     sysctl -w net.ipv4.udp_l3mdev_accept=1 >/dev/null 2>&1
     
-    # Update DNSTT Service
-    if [ -f "$DNSTT_SERVICE_FILE" ]; then
-        sed -i 's/-kcp-window [0-9]*,[0-9]*/-kcp-window 1024,1024/g' "$DNSTT_SERVICE_FILE" 2>/dev/null
-        sed -i 's/-kcp-buffer [0-9]*/-kcp-buffer 10737418240/g' "$DNSTT_SERVICE_FILE" 2>/dev/null
-        sed -i 's/-kcp-queue [0-9]*/-kcp-queue 10240/g' "$DNSTT_SERVICE_FILE" 2>/dev/null
-        systemctl daemon-reload
-        systemctl restart dnstt.service 2>/dev/null
-    fi
+    # Save KCP parameters to sysctl (for speed boosters)
+    echo "KCP_WINDOW_SIZE=1024,1024" >> /etc/sysctl.conf 2>/dev/null
+    echo "KCP_MAX_STREAM_BUFFER=10737418240" >> /etc/sysctl.conf 2>/dev/null
+    echo "KCP_QUEUE_SIZE=10240" >> /etc/sysctl.conf 2>/dev/null
     
     mkdir -p "$CONFIG_DIR"
     cat > "$CONFIG_DIR/udp_booster.conf" << EOF
-KCP_WINDOW_SIZE="$KCP_WINDOW_SIZE"
-KCP_MAX_STREAM_BUFFER="$KCP_MAX_STREAM_BUFFER"
-KCP_QUEUE_SIZE="$KCP_QUEUE_SIZE"
-KCP_SND_WND="$KCP_SND_WND"
-KCP_RCV_WND="$KCP_RCV_WND"
-KCP_NODELAY="$KCP_NODELAY"
-KCP_INTERVAL="$KCP_INTERVAL"
-KCP_RESEND="$KCP_RESEND"
-KCP_NC="$KCP_NC"
+UDP_BOOSTER_APPLIED="true"
+DATE_APPLIED="$(date)"
 EOF
     
     echo -e "${C_GREEN}✅ UDP Booster applied automatically!${C_RESET}"
@@ -2058,7 +2020,7 @@ select_speed_booster() {
     esac
 }
 
-create_dnstt_service_with_booster() {
+create_dnstt_service() {
     local domain=$1
     local mtu=$2
     local ssh_port=$3
@@ -2074,9 +2036,10 @@ create_dnstt_service_with_booster() {
     chmod 644 "$LOGS_DIR/dnstt-server.log" 2>/dev/null || true
     chmod 644 "$LOGS_DIR/dnstt-error.log" 2>/dev/null || true
     
+    # NO KCP arguments - standard DNSTT binary doesn't support them
     cat > "$DNSTT_SERVICE_FILE" <<EOF
 [Unit]
-Description=DNSTT Server - ULTIMATE OPTIMIZED v9.1
+Description=DNSTT Server - ULTIMATE OPTIMIZED v9.2
 After=network.target
 Wants=network-online.target
 
@@ -2085,7 +2048,7 @@ Type=simple
 User=root
 WorkingDirectory=$DB_DIR
 Environment="GODEBUG=netdns=1"
-ExecStart=$DNSTT_BINARY -udp :5300 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $mtu -kcp-window 1024,1024 -kcp-buffer 10737418240 -kcp-queue 10240 $domain $forward_target
+ExecStart=$DNSTT_BINARY -udp :5300 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $mtu $domain $forward_target
 Restart=always
 RestartSec=5
 StartLimitInterval=300
@@ -2105,8 +2068,6 @@ EOF
     
     echo -e "${C_GREEN}✅ DNSTT service created${C_RESET}"
     echo -e "  • MTU: ${C_YELLOW}$mtu${C_RESET}"
-    echo -e "  • KCP Window: ${C_YELLOW}1024,1024${C_RESET}"
-    echo -e "  • KCP Buffer: ${C_YELLOW}10GB${C_RESET}"
     echo -e "  • Logs: ${C_YELLOW}$LOGS_DIR/dnstt-server.log${C_RESET}"
 }
 
@@ -2288,7 +2249,7 @@ EOF
     SSH_PORT=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1)
     SSH_PORT=${SSH_PORT:-22}
     
-    create_dnstt_service_with_booster "$DOMAIN" "$MTU" "$SSH_PORT" "127.0.0.1:$SSH_PORT"
+    create_dnstt_service "$DOMAIN" "$MTU" "$SSH_PORT" "127.0.0.1:$SSH_PORT"
     save_dnstt_info "$DOMAIN" "$PUBLIC_KEY" "$MTU" "$SSH_PORT"
     
     echo -e "\n${C_BLUE}[9/9] Configuring firewall...${C_RESET}"
@@ -3189,7 +3150,7 @@ uninstall_script() {
 create_limiter_service() {
     cat > "$LIMITER_SCRIPT" << 'EOF'
 #!/bin/bash
-# Voltron Tech Limiter v9.1
+# Voltron Tech Limiter v9.2
 DB_FILE="/etc/voltrontech/users.db"
 BW_DIR="/etc/voltrontech/bandwidth"
 PID_DIR="$BW_DIR/pidtrack"
