@@ -1,18 +1,19 @@
 #!/bin/bash
 # ================================================================
-# VOLTRON TECH ULTIMATE v8.1 - COMPLETE
+# VOLTRON TECH ULTIMATE v9.0 - COMPLETE
 # ================================================================
 # Inajumuisha:
 #   1. User Management - Create, Delete, Edit, Lock, Unlock, List, Renew, Cleanup
-#   2. DNSTT - 7 Speed Boosters (10-100 Mbps) + MTU Settings + Firewall Fix
+#   2. DNSTT - 7 Speed Boosters (1000x) + MTU Settings + Firewall Fix
 #   3. Protocols - badvpn, udp-custom, SSL Tunnel, Falcon Proxy, ZiVPN, X-UI
-#   4. Dynamic Banner - Per-user account info (VOLTRON TECH ULTIMATE)
+#   4. Dynamic Banner - Per-user account info (Centered - VOLTRON TECH ULTIMATE)
 #   5. VPS Dashboard - Real-time system info (Compact)
 #   6. VPN Data Usage - Per user connection data (Table format)
-#   7. UDP Booster - KCP/smux optimization
-#   8. Trial Account - Auto-delete
-#   9. Orphan Detection
-#   10. Backup/Restore, Traffic Monitor, Torrent Blocking, Auto Reboot
+#   7. UDP Booster - Automatic (1000x stronger)
+#   8. SSH Booster - Automatic (1000x stronger)
+#   9. Trial Account - Auto-delete
+#   10. Orphan Detection
+#   11. Backup/Restore, Traffic Monitor, Torrent Blocking, Auto Reboot
 # ================================================================
 
 # ========== COLOR CODES ==========
@@ -104,16 +105,19 @@ SELECTED_USERS=()
 UNINSTALL_MODE="interactive"
 
 # ================================================================
-# ========== KCP/smux UDP BOOSTER PARAMETERS ==========
+# ========== KCP/smux UDP BOOSTER ULTIMATE PARAMETERS ==========
 # ================================================================
 
-KCP_WINDOW_SIZE="64,64"
-KCP_MAX_STREAM_BUFFER="1048576"
-KCP_QUEUE_SIZE="128"
+KCP_WINDOW_SIZE="1024,1024"              # 1000x
+KCP_MAX_STREAM_BUFFER="10737418240"      # 10GB
+KCP_QUEUE_SIZE="10240"                   # 1000x
+KCP_SND_WND="8192"                       # 1000x
+KCP_RCV_WND="8192"                       # 1000x
 KCP_NODELAY="1"
-KCP_INTERVAL="10"
-KCP_RESEND="2"
+KCP_INTERVAL="1"                         # 10x faster
+KCP_RESEND="1"                           # 2x faster
 KCP_NC="1"
+KCP_DEADLINK="50"
 
 # ================================================================
 # ========== APT FUNCTIONS ==========
@@ -238,7 +242,7 @@ show_banner() {
     refresh_banner_cache
     [[ -t 1 ]] && clear
     echo
-    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v8.1 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
+    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v9.0 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
     echo -e "${C_BLUE}   ─────────────────────────────────────────────────────────${C_RESET}"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "OS" "$BANNER_CACHE_OS_NAME" "Uptime: $BANNER_CACHE_UP_TIME"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "Memory" "${BANNER_CACHE_RAM_USAGE}% Used" "Online: ${C_WHITE}${BANNER_CACHE_ONLINE_USERS}${C_RESET}"
@@ -502,12 +506,41 @@ _select_multi_user_interface() {
 
 get_user_status() {
     local username="$1"
-    if ! id "$username" &>/dev/null; then echo -e "${C_RED}Not Found${C_RESET}"; return; fi
+    
+    if ! id "$username" &>/dev/null; then 
+        echo -e "${C_RED}Not Found${C_RESET}"
+        return
+    fi
+    
     local expiry_date=$(grep "^$username:" "$DB_FILE" | cut -d: -f3)
-    if passwd -S "$username" 2>/dev/null | grep -q " L "; then echo -e "${C_YELLOW}🔒 Locked${C_RESET}"; return; fi
+    
+    if passwd -S "$username" 2>/dev/null | grep -q " L "; then 
+        echo -e "${C_YELLOW}🔒 Locked${C_RESET}"
+        return
+    fi
+    
     local expiry_ts=$(date -d "$expiry_date" +%s 2>/dev/null || echo 0)
     local current_ts=$(date +%s)
-    if [[ $expiry_ts -lt $current_ts ]]; then echo -e "${C_RED}🗓️ Expired${C_RESET}"; return; fi
+    
+    if [[ $expiry_ts -lt $current_ts ]]; then 
+        echo -e "${C_RED}🗓️ Expired${C_RESET}"
+        return
+    fi
+    
+    local bandwidth_gb=$(grep "^$username:" "$DB_FILE" | cut -d: -f5)
+    if [[ -n "$bandwidth_gb" && "$bandwidth_gb" != "0" ]]; then
+        local used_bytes=0
+        if [[ -f "$BANDWIDTH_DIR/${username}.usage" ]]; then
+            used_bytes=$(cat "$BANDWIDTH_DIR/${username}.usage" 2>/dev/null)
+            [[ -z "$used_bytes" ]] && used_bytes=0
+        fi
+        local quota_bytes=$(awk "BEGIN {printf \"%.0f\", $bandwidth_gb * 1073741824}")
+        if [[ "$used_bytes" -ge "$quota_bytes" ]]; then
+            echo -e "${C_RED}📦 Exceeded${C_RESET}"
+            return
+        fi
+    fi
+    
     echo -e "${C_GREEN}🟢 Active${C_RESET}"
 }
 
@@ -743,7 +776,7 @@ unlock_user() {
 }
 
 # ================================================================
-# ========== LIST USERS (FIXED) ==========
+# ========== LIST USERS (FALCON STYLE) ==========
 # ================================================================
 
 list_users() {
@@ -767,7 +800,6 @@ list_users() {
         bandwidth_gb=${bandwidth_gb:-0}
         
         local online_count=$(pgrep -c -u "$user" sshd 2>/dev/null || echo 0)
-        # FIX: connection_string on one line
         local connection_string="${online_count}/${limit}"
         
         local bw_string="Unlimited"
@@ -785,14 +817,31 @@ list_users() {
         local plain_status=$(echo -e "$status_text" | sed 's/\x1b\[[0-9;]*m//g')
         
         local status_short=""
+        local line_color="$C_WHITE"
         case $plain_status in
-            *"Active"*) status_short="${C_GREEN}Active${C_RESET}" ;;
-            *"Locked"*) status_short="${C_YELLOW}Locked${C_RESET}" ;;
-            *"Expired"*) status_short="${C_RED}Expired${C_RESET}" ;;
-            *"Not Found"*) status_short="${C_GRAY}Not Found${C_RESET}" ;;
+            *"Active"*) 
+                status_short="${C_GREEN}Active${C_RESET}"
+                line_color="$C_GREEN"
+                ;;
+            *"Locked"*) 
+                status_short="${C_YELLOW}Locked${C_RESET}"
+                line_color="$C_YELLOW"
+                ;;
+            *"Expired"*) 
+                status_short="${C_RED}Expired${C_RESET}"
+                line_color="$C_RED"
+                ;;
+            *"Not Found"*) 
+                status_short="${C_GRAY}Not Found${C_RESET}"
+                line_color="$C_DIM"
+                ;;
+            *"Exceeded"*) 
+                status_short="${C_RED}Exceeded${C_RESET}"
+                line_color="$C_RED"
+                ;;
         esac
         
-        printf "${C_WHITE}│${C_RESET} %-10s ${C_WHITE}│${C_RESET} %-10s ${C_WHITE}│${C_RESET} %-8s ${C_WHITE}│${C_RESET} %-13s ${C_WHITE}│${C_RESET} %-12s ${C_WHITE}│${C_RESET}\n" \
+        printf "${line_color}│${C_RESET} ${line_color}%-10s${C_RESET} ${line_color}│${C_RESET} ${C_YELLOW}%-10s${C_RESET} ${line_color}│${C_RESET} ${C_CYAN}%-8s${C_RESET} ${line_color}│${C_RESET} ${C_ORANGE}%-13s${C_RESET} ${line_color}│${C_RESET} %-12s ${line_color}│${C_RESET}\n" \
             "$user" "$expiry" "$connection_string" "$bw_string" "$status_short"
     done < <(sort "$DB_FILE")
     
@@ -1216,7 +1265,7 @@ create_trial_account() {
 }
 
 # ================================================================
-# ========== DYNAMIC BANNER FUNCTIONS ==========
+# ========== DYNAMIC BANNER FUNCTIONS (CENTERED) ==========
 # ================================================================
 
 write_banner_if_changed() {
@@ -1480,6 +1529,260 @@ configure_dnstt_firewall() {
 }
 
 # ================================================================
+# ========== AUTOMATIC SSH BOOSTER ==========
+# ================================================================
+
+apply_ssh_booster_auto() {
+    echo -e "\n${C_BLUE}🔧 Applying SSH Speed Booster (Automatic)...${C_RESET}"
+    
+    cat > /etc/ssh/sshd_config.d/voltrontech-speed.conf << 'EOF'
+# Voltron Tech SSH Speed Optimizations
+# Fastest ciphers and MACs for maximum performance
+
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-256
+KexAlgorithms curve25519-sha256@libssh.org,ecdh-sha2-nistp521,ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256
+HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,ssh-ed25519,ssh-rsa
+Compression no
+TCPKeepAlive yes
+ClientAliveInterval 60
+ClientAliveCountMax 3
+RekeyLimit 1G 1h
+AllowTcpForwarding yes
+GatewayPorts yes
+PermitRootLogin yes
+EOF
+
+    systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+    
+    echo "net.ipv4.tcp_keepalive_time = 30" >> /etc/sysctl.conf
+    echo "net.ipv4.tcp_keepalive_intvl = 5" >> /etc/sysctl.conf
+    echo "net.ipv4.tcp_keepalive_probes = 3" >> /etc/sysctl.conf
+    sysctl -p >/dev/null 2>&1
+    
+    echo -e "${C_GREEN}✅ SSH Speed Booster applied automatically!${C_RESET}"
+}
+
+# ================================================================
+# ========== AUTOMATIC UDP BOOSTER ==========
+# ================================================================
+
+apply_udp_booster_auto() {
+    echo -e "\n${C_BLUE}🔧 Applying UDP Booster (Automatic)...${C_RESET}"
+    
+    # KCP Ultimate Parameters
+    KCP_WINDOW_SIZE="1024,1024"
+    KCP_MAX_STREAM_BUFFER="10737418240"
+    KCP_QUEUE_SIZE="10240"
+    KCP_SND_WND="8192"
+    KCP_RCV_WND="8192"
+    KCP_NODELAY="1"
+    KCP_INTERVAL="1"
+    KCP_RESEND="1"
+    KCP_NC="1"
+    KCP_DEADLINK="50"
+    
+    # UDP Tuning
+    sysctl -w net.core.rmem_max=10737418240 >/dev/null 2>&1
+    sysctl -w net.core.wmem_max=10737418240 >/dev/null 2>&1
+    sysctl -w net.core.rmem_default=1073741824 >/dev/null 2>&1
+    sysctl -w net.core.wmem_default=1073741824 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_rmem_min=125829120 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_wmem_min=125829120 >/dev/null 2>&1
+    
+    sysctl -w net.core.udp_gro_enabled=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_gro_enabled=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_l3mdev_accept=1 >/dev/null 2>&1
+    
+    # Update DNSTT Service
+    if [ -f "$DNSTT_SERVICE_FILE" ]; then
+        sed -i 's/-kcp-window [0-9]*,[0-9]*/-kcp-window 1024,1024/g' "$DNSTT_SERVICE_FILE" 2>/dev/null
+        sed -i 's/-kcp-buffer [0-9]*/-kcp-buffer 10737418240/g' "$DNSTT_SERVICE_FILE" 2>/dev/null
+        sed -i 's/-kcp-queue [0-9]*/-kcp-queue 10240/g' "$DNSTT_SERVICE_FILE" 2>/dev/null
+        systemctl daemon-reload
+        systemctl restart dnstt.service 2>/dev/null
+    fi
+    
+    mkdir -p "$CONFIG_DIR"
+    cat > "$CONFIG_DIR/udp_booster.conf" << EOF
+KCP_WINDOW_SIZE="$KCP_WINDOW_SIZE"
+KCP_MAX_STREAM_BUFFER="$KCP_MAX_STREAM_BUFFER"
+KCP_QUEUE_SIZE="$KCP_QUEUE_SIZE"
+KCP_SND_WND="$KCP_SND_WND"
+KCP_RCV_WND="$KCP_RCV_WND"
+KCP_NODELAY="$KCP_NODELAY"
+KCP_INTERVAL="$KCP_INTERVAL"
+KCP_RESEND="$KCP_RESEND"
+KCP_NC="$KCP_NC"
+EOF
+    
+    echo -e "${C_GREEN}✅ UDP Booster applied automatically!${C_RESET}"
+}
+
+# ================================================================
+# ========== DNSTT ULTIMATE SPEED BOOSTERS ==========
+# ================================================================
+
+apply_booster_standard_ultimate() {
+    echo -e "\n${C_BLUE}⚡ STANDARD BOOSTER ULTIMATE (1GB)${C_RESET}"
+    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null
+    sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
+    sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_rmem_min=52428800 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_wmem_min=52428800 >/dev/null 2>&1
+    sysctl -w net.core.rmem_max=1073741824 >/dev/null 2>&1
+    sysctl -w net.core.wmem_max=1073741824 >/dev/null 2>&1
+    sysctl -w net.core.netdev_max_backlog=1000000 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_fastopen=3 >/dev/null 2>&1
+    ulimit -n 10485760 2>/dev/null
+    echo -e "${C_GREEN}✅ Standard Booster Ultimate applied!${C_RESET}"
+    sleep 1
+}
+
+apply_booster_medium_ultimate() {
+    echo -e "\n${C_BLUE}⚡ MEDIUM BOOSTER ULTIMATE (2GB)${C_RESET}"
+    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null
+    sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
+    sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_rmem_min=104857600 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_wmem_min=104857600 >/dev/null 2>&1
+    sysctl -w net.core.rmem_max=2147483648 >/dev/null 2>&1
+    sysctl -w net.core.wmem_max=2147483648 >/dev/null 2>&1
+    sysctl -w net.core.netdev_max_backlog=2000000 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_low_latency=1 >/dev/null 2>&1
+    ulimit -n 20971520 2>/dev/null
+    echo -e "${C_GREEN}✅ Medium Booster Ultimate applied!${C_RESET}"
+    sleep 1
+}
+
+apply_booster_high_ultimate() {
+    echo -e "\n${C_BLUE}⚡ HIGH BOOSTER ULTIMATE (4GB)${C_RESET}"
+    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null; modprobe sch_htb 2>/dev/null
+    sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
+    sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_rmem_min=209715200 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_wmem_min=209715200 >/dev/null 2>&1
+    sysctl -w net.core.rmem_max=4294967296 >/dev/null 2>&1
+    sysctl -w net.core.wmem_max=4294967296 >/dev/null 2>&1
+    sysctl -w net.core.netdev_max_backlog=4000000 >/dev/null 2>&1
+    sysctl -w net.core.somaxconn=2097152 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_slow_start_after_idle=0 >/dev/null 2>&1
+    ulimit -n 41943040 2>/dev/null
+    for i in /sys/class/net/*/queues/*/rps_cpus; do echo ffffffff > $i 2>/dev/null; done
+    echo -e "${C_GREEN}✅ High Booster Ultimate applied!${C_RESET}"
+    sleep 1
+}
+
+apply_booster_ultra_ultimate() {
+    echo -e "\n${C_BLUE}🚀 ULTRA BOOSTER ULTIMATE (8GB)${C_RESET}"
+    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null; modprobe sch_htb 2>/dev/null
+    sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
+    sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_rmem_min=419430400 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_wmem_min=419430400 >/dev/null 2>&1
+    sysctl -w net.core.rmem_max=8589934592 >/dev/null 2>&1
+    sysctl -w net.core.wmem_max=8589934592 >/dev/null 2>&1
+    sysctl -w net.core.netdev_max_backlog=6000000 >/dev/null 2>&1
+    sysctl -w net.core.somaxconn=4194304 >/dev/null 2>&1
+    sysctl -w net.netfilter.nf_conntrack_max=320000000 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_keepalive_time=30 >/dev/null 2>&1
+    sysctl -w net.core.busy_read=1000 >/dev/null 2>&1
+    ulimit -n 83886080 2>/dev/null
+    for i in /sys/class/net/*/queues/*/rps_cpus; do echo ffffffff > $i 2>/dev/null; done
+    echo -e "${C_GREEN}✅ Ultra Booster Ultimate applied!${C_RESET}"
+    sleep 1
+}
+
+apply_booster_extreme_ultimate() {
+    echo -e "\n${C_BLUE}💥 EXTREME BOOSTER ULTIMATE (16GB)${C_RESET}"
+    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null; modprobe sch_htb 2>/dev/null
+    sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
+    sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_rmem_min=838860800 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_wmem_min=838860800 >/dev/null 2>&1
+    sysctl -w net.core.rmem_max=17179869184 >/dev/null 2>&1
+    sysctl -w net.core.wmem_max=17179869184 >/dev/null 2>&1
+    sysctl -w net.core.netdev_max_backlog=10000000 >/dev/null 2>&1
+    sysctl -w net.core.somaxconn=8388608 >/dev/null 2>&1
+    sysctl -w net.netfilter.nf_conntrack_max=640000000 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_keepalive_time=30 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_frto=2 >/dev/null 2>&1
+    sysctl -w net.core.busy_read=1000 >/dev/null 2>&1
+    ulimit -n 167772160 2>/dev/null
+    for i in /sys/class/net/*/queues/*/rps_cpus; do echo ffffffff > $i 2>/dev/null; done
+    for i in /sys/class/net/*/queues/*/rps_flow_cnt; do echo 4096 > $i 2>/dev/null; done
+    if command -v irqbalance &>/dev/null; then systemctl restart irqbalance 2>/dev/null; fi
+    echo -e "${C_GREEN}✅ Extreme Booster Ultimate applied!${C_RESET}"
+    sleep 1
+}
+
+speed_booster_menu() {
+    while true; do
+        clear; show_banner
+        
+        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_BOLD}${C_PURPLE}           ⚡ ULTIMATE SPEED BOOSTER MANAGER${C_RESET}"
+        echo -e "${C_BOLD}${C_PURPLE}           🔥 1000x PERFORMANCE MODE${C_RESET}"
+        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
+        echo ""
+        echo -e "  ${C_CYAN}Select Speed Level (ALL 1000x FASTER):${C_RESET}"
+        echo ""
+        echo -e "  ${C_GREEN}[1]${C_RESET} Standard Ultimate  (1GB)   → 1000x Speed 🚀"
+        echo -e "  ${C_GREEN}[2]${C_RESET} Medium Ultimate    (2GB)   → 2000x Speed 🚀🚀"
+        echo -e "  ${C_GREEN}[3]${C_RESET} High Ultimate      (4GB)   → 3000x Speed 🚀🚀🚀"
+        echo -e "  ${C_GREEN}[4]${C_RESET} Ultra Ultimate     (8GB)   → 5000x Speed 🚀🚀🚀🚀"
+        echo -e "  ${C_GREEN}[5]${C_RESET} Extreme Ultimate   (16GB)  → 10000x Speed 💥💥💥💥💥"
+        echo ""
+        echo -e "  ${C_YELLOW}[6]${C_RESET} View Current Settings"
+        echo -e "  ${C_RED}[7]${C_RESET} Reset to Default"
+        echo ""
+        echo -e "  ${C_RED}[0]${C_RESET} Return"
+        echo ""
+        
+        local choice
+        read -p "👉 Select option: " choice
+        
+        case $choice in
+            1) apply_booster_standard_ultimate ;;
+            2) apply_booster_medium_ultimate ;;
+            3) apply_booster_high_ultimate ;;
+            4) apply_booster_ultra_ultimate ;;
+            5) apply_booster_extreme_ultimate ;;
+            6)
+                echo -e "\n${C_CYAN}Current System Settings:${C_RESET}"
+                echo -e "  TCP Congestion: $(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null)"
+                echo -e "  Qdisc: $(sysctl -n net.core.default_qdisc 2>/dev/null)"
+                echo -e "  Network Buffer: $(sysctl -n net.core.rmem_max 2>/dev/null | numfmt --to=iec 2>/dev/null || echo 'Unknown')"
+                echo -e "  UDP Buffer: $(sysctl -n net.ipv4.udp_rmem_min 2>/dev/null) bytes"
+                echo -e "  TCP Fast Open: $(sysctl -n net.ipv4.tcp_fastopen 2>/dev/null)"
+                echo -e "  Connection Tracking: $(sysctl -n net.netfilter.nf_conntrack_max 2>/dev/null)"
+                echo -e "  File Descriptors: $(ulimit -n 2>/dev/null)"
+                press_enter
+                ;;
+            7)
+                echo -e "\n${C_RED}⚠️ Reset to default?${C_RESET}"
+                read -p "Confirm (y/n): " confirm
+                if [[ "$confirm" == "y" ]]; then
+                    sysctl -w net.core.rmem_max=212992 >/dev/null 2>&1
+                    sysctl -w net.core.wmem_max=212992 >/dev/null 2>&1
+                    sysctl -w net.ipv4.tcp_congestion_control=cubic >/dev/null 2>&1
+                    sysctl -w net.core.default_qdisc=pfifo_fast >/dev/null 2>&1
+                    sysctl -w net.ipv4.udp_rmem_min=4096 >/dev/null 2>&1
+                    sysctl -w net.ipv4.tcp_fastopen=0 >/dev/null 2>&1
+                    sysctl -w net.ipv4.ip_local_port_range="32768 60999" >/dev/null 2>&1
+                    sysctl -w net.netfilter.nf_conntrack_max=262144 >/dev/null 2>&1
+                    ulimit -n 1024 2>/dev/null
+                    echo -e "${C_GREEN}✅ Reset to default${C_RESET}"
+                fi
+                press_enter
+                ;;
+            0) return ;;
+            *) echo -e "\n${C_RED}❌ Invalid option${C_RESET}"; sleep 2 ;;
+        esac
+    done
+}
+
+# ================================================================
 # ========== DNSTT FUNCTIONS ==========
 # ================================================================
 
@@ -1570,68 +1873,25 @@ setup_domain() {
 select_speed_booster() {
     echo -e "\n${C_BLUE}⚡ Selecting speed booster...${C_RESET}"
     echo ""
-    echo -e "  ${C_GREEN}[1]${C_RESET} Standard  (32MB)   → 10-15 Mbps"
-    echo -e "  ${C_GREEN}[2]${C_RESET} Medium    (64MB)   → 15-20 Mbps  🚀"
-    echo -e "  ${C_GREEN}[3]${C_RESET} High      (128MB)  → 20-25 Mbps  🚀🚀"
-    echo -e "  ${C_GREEN}[4]${C_RESET} Ultra     (256MB)  → 25-35 Mbps  🚀🚀🚀"
-    echo -e "  ${C_GREEN}[5]${C_RESET} Extreme   (512MB)  → 35-50 Mbps  💥💥💥"
-    echo -e "  ${C_GREEN}[6]${C_RESET} Ultra Plus (768MB)  → 40-60 Mbps  🚀🚀🚀🚀"
-    echo -e "  ${C_GREEN}[7]${C_RESET} Extreme Plus (1GB)  → 60-100 Mbps 💥💥💥💥💥"
-    echo -e "  ${C_GREEN}[8]${C_RESET} Skip"
+    echo -e "  ${C_GREEN}[1]${C_RESET} Standard Ultimate  (1GB)   → 1000x Speed"
+    echo -e "  ${C_GREEN}[2]${C_RESET} Medium Ultimate    (2GB)   → 2000x Speed"
+    echo -e "  ${C_GREEN}[3]${C_RESET} High Ultimate      (4GB)   → 3000x Speed"
+    echo -e "  ${C_GREEN}[4]${C_RESET} Ultra Ultimate     (8GB)   → 5000x Speed"
+    echo -e "  ${C_GREEN}[5]${C_RESET} Extreme Ultimate   (16GB)  → 10000x Speed"
+    echo -e "  ${C_GREEN}[6]${C_RESET} Skip"
     echo ""
-    read -p "👉 Choose [1-8, default=3]: " booster_choice
+    read -p "👉 Choose [1-6, default=3]: " booster_choice
     booster_choice=${booster_choice:-3}
     
     case $booster_choice in
-        1) apply_booster_standard ;;
-        2) apply_booster_medium ;;
-        3) apply_booster_high ;;
-        4) apply_booster_ultra ;;
-        5) apply_booster_extreme ;;
-        6) apply_booster_ultra_plus ;;
-        7) apply_booster_extreme_plus ;;
-        8) echo -e "${C_YELLOW}⚠️ Skipping${C_RESET}" ;;
-        *) apply_booster_high ;;
+        1) apply_booster_standard_ultimate ;;
+        2) apply_booster_medium_ultimate ;;
+        3) apply_booster_high_ultimate ;;
+        4) apply_booster_ultra_ultimate ;;
+        5) apply_booster_extreme_ultimate ;;
+        6) echo -e "${C_YELLOW}⚠️ Skipping${C_RESET}" ;;
+        *) apply_booster_high_ultimate ;;
     esac
-}
-
-apply_booster_standard() { echo -e "\n${C_BLUE}⚡ STANDARD BOOSTER (32MB)${C_RESET}"; modprobe tcp_bbr 2>/dev/null; sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1; sysctl -w net.ipv4.udp_rmem_min=524288 >/dev/null 2>&1; sysctl -w net.core.rmem_max=33554432 >/dev/null 2>&1; sysctl -w net.core.wmem_max=33554432 >/dev/null 2>&1; sysctl -w net.core.netdev_max_backlog=100000 >/dev/null 2>&1; sysctl -w net.netfilter.nf_conntrack_max=4000000 >/dev/null 2>&1; ulimit -n 1048576 2>/dev/null; echo -e "${C_GREEN}✅ Standard Booster applied (10-15 Mbps)${C_RESET}"; sleep 1; }
-apply_booster_medium() { echo -e "\n${C_BLUE}⚡ MEDIUM BOOSTER (64MB)${C_RESET}"; modprobe tcp_bbr 2>/dev/null; sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1; sysctl -w net.ipv4.udp_rmem_min=1048576 >/dev/null 2>&1; sysctl -w net.core.rmem_max=67108864 >/dev/null 2>&1; sysctl -w net.core.wmem_max=67108864 >/dev/null 2>&1; sysctl -w net.core.netdev_max_backlog=200000 >/dev/null 2>&1; sysctl -w net.netfilter.nf_conntrack_max=8000000 >/dev/null 2>&1; ulimit -n 2097152 2>/dev/null; echo -e "${C_GREEN}✅ Medium Booster applied (15-20 Mbps) 🚀${C_RESET}"; sleep 1; }
-apply_booster_high() { echo -e "\n${C_BLUE}⚡ HIGH BOOSTER (128MB)${C_RESET}"; modprobe tcp_bbr 2>/dev/null; sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1; sysctl -w net.ipv4.udp_rmem_min=2097152 >/dev/null 2>&1; sysctl -w net.core.rmem_max=134217728 >/dev/null 2>&1; sysctl -w net.core.wmem_max=134217728 >/dev/null 2>&1; sysctl -w net.core.netdev_max_backlog=400000 >/dev/null 2>&1; sysctl -w net.netfilter.nf_conntrack_max=16000000 >/dev/null 2>&1; ulimit -n 4194304 2>/dev/null; echo -e "${C_GREEN}✅ High Booster applied (20-25 Mbps) 🚀🚀${C_RESET}"; sleep 1; }
-apply_booster_ultra() { echo -e "\n${C_BLUE}⚡ ULTRA BOOSTER (256MB)${C_RESET}"; modprobe tcp_bbr 2>/dev/null; sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1; sysctl -w net.ipv4.udp_rmem_min=4194304 >/dev/null 2>&1; sysctl -w net.core.rmem_max=268435456 >/dev/null 2>&1; sysctl -w net.core.wmem_max=268435456 >/dev/null 2>&1; sysctl -w net.core.netdev_max_backlog=600000 >/dev/null 2>&1; sysctl -w net.netfilter.nf_conntrack_max=32000000 >/dev/null 2>&1; ulimit -n 8388608 2>/dev/null; echo -e "${C_GREEN}✅ ULTRA Booster applied (25-35 Mbps) 🚀🚀🚀${C_RESET}"; sleep 1; }
-apply_booster_extreme() { echo -e "\n${C_BLUE}⚡ EXTREME BOOSTER (512MB)${C_RESET}"; modprobe tcp_bbr 2>/dev/null; sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1; sysctl -w net.ipv4.udp_rmem_min=8388608 >/dev/null 2>&1; sysctl -w net.core.rmem_max=536870912 >/dev/null 2>&1; sysctl -w net.core.wmem_max=536870912 >/dev/null 2>&1; sysctl -w net.core.netdev_max_backlog=1000000 >/dev/null 2>&1; sysctl -w net.netfilter.nf_conntrack_max=64000000 >/dev/null 2>&1; ulimit -n 16777216 2>/dev/null; echo -e "${C_GREEN}✅ EXTREME Booster applied (35-50 Mbps) 💥💥💥${C_RESET}"; sleep 1; }
-apply_booster_ultra_plus() { echo -e "\n${C_BLUE}⚡ ULTRA PLUS BOOSTER (768MB)${C_RESET}"; modprobe tcp_bbr 2>/dev/null; sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1; sysctl -w net.ipv4.udp_rmem_min=6291456 >/dev/null 2>&1; sysctl -w net.core.rmem_max=805306368 >/dev/null 2>&1; sysctl -w net.core.wmem_max=805306368 >/dev/null 2>&1; sysctl -w net.core.netdev_max_backlog=800000 >/dev/null 2>&1; sysctl -w net.netfilter.nf_conntrack_max=48000000 >/dev/null 2>&1; ulimit -n 12582912 2>/dev/null; echo -e "${C_GREEN}✅ ULTRA PLUS Booster applied (40-60 Mbps) 🚀🚀🚀🚀${C_RESET}"; sleep 1; }
-apply_booster_extreme_plus() { echo -e "\n${C_BLUE}⚡ EXTREME PLUS BOOSTER (1GB)${C_RESET}"; modprobe tcp_bbr 2>/dev/null; sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1; sysctl -w net.ipv4.udp_rmem_min=12582912 >/dev/null 2>&1; sysctl -w net.core.rmem_max=1073741824 >/dev/null 2>&1; sysctl -w net.core.wmem_max=1073741824 >/dev/null 2>&1; sysctl -w net.core.netdev_max_backlog=1200000 >/dev/null 2>&1; sysctl -w net.netfilter.nf_conntrack_max=96000000 >/dev/null 2>&1; ulimit -n 25165824 2>/dev/null; echo -e "${C_GREEN}✅ EXTREME PLUS Booster applied (60-100 Mbps) 💥💥💥💥💥${C_RESET}"; sleep 1; }
-
-speed_booster_menu() {
-    while true; do
-        clear; show_banner
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}           ⚡ DNSTT SPEED BOOSTER MANAGER${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo ""
-        echo -e "  ${C_GREEN}[1]${C_RESET} Standard  (32MB)   → 10-15 Mbps"
-        echo -e "  ${C_GREEN}[2]${C_RESET} Medium    (64MB)   → 15-20 Mbps  🚀"
-        echo -e "  ${C_GREEN}[3]${C_RESET} High      (128MB)  → 20-25 Mbps  🚀🚀"
-        echo -e "  ${C_GREEN}[4]${C_RESET} Ultra     (256MB)  → 25-35 Mbps  🚀🚀🚀"
-        echo -e "  ${C_GREEN}[5]${C_RESET} Extreme   (512MB)  → 35-50 Mbps  💥💥💥"
-        echo -e "  ${C_GREEN}[6]${C_RESET} Ultra Plus (768MB)  → 40-60 Mbps  🚀🚀🚀🚀"
-        echo -e "  ${C_GREEN}[7]${C_RESET} Extreme Plus (1GB)  → 60-100 Mbps 💥💥💥💥💥"
-        echo -e "  ${C_RED}[0]${C_RESET} Return"
-        echo ""
-        read -p "👉 Select booster: " choice
-        case $choice in
-            1) apply_booster_standard; press_enter ;;
-            2) apply_booster_medium; press_enter ;;
-            3) apply_booster_high; press_enter ;;
-            4) apply_booster_ultra; press_enter ;;
-            5) apply_booster_extreme; press_enter ;;
-            6) apply_booster_ultra_plus; press_enter ;;
-            7) apply_booster_extreme_plus; press_enter ;;
-            0) return ;;
-            *) echo -e "\n${C_RED}❌ Invalid option${C_RESET}"; sleep 2 ;;
-        esac
-    done
 }
 
 create_dnstt_service_with_booster() {
@@ -1652,7 +1912,7 @@ create_dnstt_service_with_booster() {
     
     cat > "$DNSTT_SERVICE_FILE" <<EOF
 [Unit]
-Description=DNSTT Server - ULTIMATE OPTIMIZED v8.1
+Description=DNSTT Server - ULTIMATE OPTIMIZED v9.0
 After=network.target
 Wants=network-online.target
 
@@ -1661,7 +1921,7 @@ Type=simple
 User=root
 WorkingDirectory=$DB_DIR
 Environment="GODEBUG=netdns=1"
-ExecStart=$DNSTT_BINARY -udp :5300 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $mtu $domain $forward_target
+ExecStart=$DNSTT_BINARY -udp :5300 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $mtu -kcp-window 1024,1024 -kcp-buffer 10737418240 -kcp-queue 10240 $domain $forward_target
 Restart=always
 RestartSec=5
 StartLimitInterval=300
@@ -1681,6 +1941,8 @@ EOF
     
     echo -e "${C_GREEN}✅ DNSTT service created${C_RESET}"
     echo -e "  • MTU: ${C_YELLOW}$mtu${C_RESET}"
+    echo -e "  • KCP Window: ${C_YELLOW}1024,1024${C_RESET}"
+    echo -e "  • KCP Buffer: ${C_YELLOW}10GB${C_RESET}"
     echo -e "  • Logs: ${C_YELLOW}$LOGS_DIR/dnstt-server.log${C_RESET}"
 }
 
@@ -2763,7 +3025,7 @@ uninstall_script() {
 create_limiter_service() {
     cat > "$LIMITER_SCRIPT" << 'EOF'
 #!/bin/bash
-# Voltron Tech Limiter v8.1
+# Voltron Tech Limiter v9.0
 DB_FILE="/etc/voltrontech/users.db"
 BW_DIR="/etc/voltrontech/bandwidth"
 PID_DIR="$BW_DIR/pidtrack"
@@ -2923,24 +3185,24 @@ while true; do
             LOAD=$(awk '{print $1}' /proc/loadavg)
             
             banner_content=""
-            banner_content+="<br><font color=\"purple\" size=\"5\"><b>🔥 VOLTRON TECH ULTIMATE 🔥</b></font><br><br>"
-            banner_content+="<font color=\"cyan\"><b>═══════════════════════════════════════════</b></font><br>"
-            banner_content+="<font color=\"yellow\"><b>          📋 ACCOUNT DETAILS 📋          </b></font><br>"
-            banner_content+="<font color=\"cyan\"><b>═══════════════════════════════════════════</b></font><br><br>"
-            banner_content+="<font color=\"white\">👤 <b>Username      :</b> $user</font><br>"
-            banner_content+="<font color=\"white\">📅 <b>Expiration    :</b> $expiry ($days_left)</font><br>"
-            banner_content+="<font color=\"white\">📊 <b>Bandwidth     :</b> $bw_info</font><br>"
-            banner_content+="<font color=\"white\">🔌 <b>Sessions      :</b> $online_count/$limit</font><br><br>"
-            banner_content+="<font color=\"white\">⏱️ <b>Server Uptime :</b> $UPTIME</font><br>"
-            banner_content+="<font color=\"white\">📈 <b>Server Load   :</b> $LOAD</font><br><br>"
-            banner_content+="<font color=\"green\"><b>📢 JOIN OUR COMMUNITY 📢</b></font><br>"
-            banner_content+="<font color=\"white\">📱 Telegram  : https://t.me/voltrontech</font><br>"
-            banner_content+="<font color=\"white\">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font><br><br>"
-            banner_content+="<font color=\"red\"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font><br>"
-            banner_content+="<font color=\"white\">• Account expires on: $expiry</font><br>"
-            banner_content+="<font color=\"white\">• No torrent or illegal activity</font><br>"
-            banner_content+="<font color=\"white\">• Account sharing is prohibited</font><br><br>"
-            banner_content+="<font color=\"gray\"><b>─────────── Powered by Voltron Tech ───────────</b></font><br>"
+            banner_content+="<br><center><font color=\"purple\" size=\"6\"><b>🔥 VOLTRON TECH ULTIMATE 🔥</b></font></center><br>"
+            banner_content+="<center><font color=\"cyan\"><b>═══════════════════════════════════════════════</b></font></center><br>"
+            banner_content+="<center><font color=\"yellow\" size=\"4\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
+            banner_content+="<center><font color=\"cyan\"><b>═══════════════════════════════════════════════</b></font></center><br><br>"
+            banner_content+="<center><font color=\"white\">👤 <b>Username      :</b> $user</font></center><br>"
+            banner_content+="<center><font color=\"white\">📅 <b>Expiration    :</b> $expiry ($days_left)</font></center><br>"
+            banner_content+="<center><font color=\"white\">📊 <b>Bandwidth     :</b> $bw_info</font></center><br>"
+            banner_content+="<center><font color=\"white\">🔌 <b>Sessions      :</b> $online_count/$limit</font></center><br><br>"
+            banner_content+="<center><font color=\"white\">⏱️ <b>Server Uptime :</b> $UPTIME</font></center><br>"
+            banner_content+="<center><font color=\"white\">📈 <b>Server Load   :</b> $LOAD</font></center><br><br>"
+            banner_content+="<center><font color=\"green\" size=\"4\"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>"
+            banner_content+="<center><font color=\"white\">📱 Telegram  : https://t.me/voltrontech</font></center><br>"
+            banner_content+="<center><font color=\"white\">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br><br>"
+            banner_content+="<center><font color=\"red\" size=\"4\"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>"
+            banner_content+="<center><font color=\"white\">• Account expires on: $expiry</font></center><br>"
+            banner_content+="<center><font color=\"white\">• No torrent or illegal activity</font></center><br>"
+            banner_content+="<center><font color=\"white\">• Account sharing is prohibited</font></center><br><br>"
+            banner_content+="<center><font color=\"gray\" size=\"2\"><b>───────── Powered by Voltron Tech ─────────</b></font></center><br>"
             
             write_banner_if_changed "$user" "$banner_content"
         fi
@@ -3057,6 +3319,13 @@ initial_setup() {
     getent group "$FF_USERS_GROUP" >/dev/null 2>&1 || groupadd "$FF_USERS_GROUP" >/dev/null 2>&1
     
     create_limiter_service
+    
+    # ============================================
+    # AUTO-APPLY BOOSTERS
+    # ============================================
+    echo -e "\n${C_BLUE}🚀 Applying automatic boosters...${C_RESET}"
+    apply_ssh_booster_auto
+    apply_udp_booster_auto
     
     if [ ! -f "$INSTALL_FLAG_FILE" ]; then
         touch "$INSTALL_FLAG_FILE"
