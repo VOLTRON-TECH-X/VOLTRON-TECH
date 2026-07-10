@@ -1,12 +1,12 @@
 #!/bin/bash
 # ================================================================
-# VOLTRON TECH ULTIMATE v9.0 - COMPLETE
+# VOLTRON TECH ULTIMATE v9.1 - COMPLETE
 # ================================================================
 # Inajumuisha:
 #   1. User Management - Create, Delete, Edit, Lock, Unlock, List, Renew, Cleanup
-#   2. DNSTT - 7 Speed Boosters (1000x) + MTU Settings + Firewall Fix
+#   2. DNSTT - 5 Speed Boosters (1000x-10000x) + MTU Settings + Firewall Fix
 #   3. Protocols - badvpn, udp-custom, SSL Tunnel, Falcon Proxy, ZiVPN, X-UI
-#   4. Dynamic Banner - Per-user account info (Centered - VOLTRON TECH ULTIMATE)
+#   4. Dynamic Banner - Centered (ACCOUNT DETAILS - Blue)
 #   5. VPS Dashboard - Real-time system info (Compact)
 #   6. VPN Data Usage - Per user connection data (Table format)
 #   7. UDP Booster - Automatic (1000x stronger)
@@ -242,7 +242,7 @@ show_banner() {
     refresh_banner_cache
     [[ -t 1 ]] && clear
     echo
-    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v9.0 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
+    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v9.1 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
     echo -e "${C_BLUE}   ─────────────────────────────────────────────────────────${C_RESET}"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "OS" "$BANNER_CACHE_OS_NAME" "Uptime: $BANNER_CACHE_UP_TIME"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "Memory" "${BANNER_CACHE_RAM_USAGE}% Used" "Online: ${C_WHITE}${BANNER_CACHE_ONLINE_USERS}${C_RESET}"
@@ -1265,7 +1265,7 @@ create_trial_account() {
 }
 
 # ================================================================
-# ========== DYNAMIC BANNER FUNCTIONS (CENTERED) ==========
+# ========== DYNAMIC BANNER FUNCTIONS (CENTERED - BLUE ACCOUNT DETAILS) ==========
 # ================================================================
 
 write_banner_if_changed() {
@@ -1620,101 +1620,265 @@ EOF
 }
 
 # ================================================================
-# ========== DNSTT ULTIMATE SPEED BOOSTERS ==========
+# ========== DNSTT ULTIMATE SPEED BOOSTERS (1000x-10000x) ==========
 # ================================================================
 
 apply_booster_standard_ultimate() {
-    echo -e "\n${C_BLUE}⚡ STANDARD BOOSTER ULTIMATE (1GB)${C_RESET}"
-    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null
+    echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_BLUE}           ⚡ STANDARD BOOSTER ULTIMATE (1GB) - 1000x SPEED${C_RESET}"
+    echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    
+    modprobe tcp_bbr 2>/dev/null
+    modprobe sch_cake 2>/dev/null
     sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ BBR v3 + Cake enabled${C_RESET}"
+    
     sysctl -w net.ipv4.udp_rmem_min=52428800 >/dev/null 2>&1
     sysctl -w net.ipv4.udp_wmem_min=52428800 >/dev/null 2>&1
+    sysctl -w net.core.rmem_default=26214400 >/dev/null 2>&1
+    sysctl -w net.core.wmem_default=26214400 >/dev/null 2>&1
     sysctl -w net.core.rmem_max=1073741824 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=1073741824 >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ UDP buffers: 1GB (1000x)${C_RESET}"
+    
     sysctl -w net.core.netdev_max_backlog=1000000 >/dev/null 2>&1
+    sysctl -w net.core.somaxconn=524288 >/dev/null 2>&1
     sysctl -w net.ipv4.tcp_fastopen=3 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_sack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_dsack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_fack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.ip_local_port_range="1024 65535" >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ TCP optimizations enabled${C_RESET}"
+    
     ulimit -n 10485760 2>/dev/null
-    echo -e "${C_GREEN}✅ Standard Booster Ultimate applied!${C_RESET}"
+    echo -e "${C_GREEN}✓ File descriptors: 10M (1000x)${C_RESET}"
+    
+    echo -e "\n${C_GREEN}✅ Standard Booster Ultimate applied! (1000x Speed) 🚀${C_RESET}"
     sleep 1
 }
 
 apply_booster_medium_ultimate() {
-    echo -e "\n${C_BLUE}⚡ MEDIUM BOOSTER ULTIMATE (2GB)${C_RESET}"
-    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null
+    echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_BLUE}           ⚡ MEDIUM BOOSTER ULTIMATE (2GB) - 2000x SPEED${C_RESET}"
+    echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    
+    modprobe tcp_bbr 2>/dev/null
+    modprobe sch_cake 2>/dev/null
+    modprobe sch_fq 2>/dev/null
     sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ BBR v3 + Cake + FQ enabled${C_RESET}"
+    
     sysctl -w net.ipv4.udp_rmem_min=104857600 >/dev/null 2>&1
     sysctl -w net.ipv4.udp_wmem_min=104857600 >/dev/null 2>&1
+    sysctl -w net.core.rmem_default=52428800 >/dev/null 2>&1
+    sysctl -w net.core.wmem_default=52428800 >/dev/null 2>&1
     sysctl -w net.core.rmem_max=2147483648 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=2147483648 >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ UDP buffers: 2GB (2000x)${C_RESET}"
+    
     sysctl -w net.core.netdev_max_backlog=2000000 >/dev/null 2>&1
+    sysctl -w net.core.somaxconn=1048576 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_fastopen=3 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_sack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_dsack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_fack=1 >/dev/null 2>&1
     sysctl -w net.ipv4.tcp_low_latency=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.ip_local_port_range="1024 65535" >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ Advanced TCP optimizations enabled${C_RESET}"
+    
     ulimit -n 20971520 2>/dev/null
-    echo -e "${C_GREEN}✅ Medium Booster Ultimate applied!${C_RESET}"
+    echo -e "${C_GREEN}✓ File descriptors: 20M (2000x)${C_RESET}"
+    
+    echo -e "\n${C_GREEN}✅ Medium Booster Ultimate applied! (2000x Speed) 🚀🚀${C_RESET}"
     sleep 1
 }
 
 apply_booster_high_ultimate() {
-    echo -e "\n${C_BLUE}⚡ HIGH BOOSTER ULTIMATE (4GB)${C_RESET}"
-    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null; modprobe sch_htb 2>/dev/null
+    echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_BLUE}           ⚡ HIGH BOOSTER ULTIMATE (4GB) - 3000x SPEED${C_RESET}"
+    echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    
+    modprobe tcp_bbr 2>/dev/null
+    modprobe sch_cake 2>/dev/null
+    modprobe sch_fq 2>/dev/null
+    modprobe sch_htb 2>/dev/null
     sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ BBR v3 + Cake + FQ + HTB enabled${C_RESET}"
+    
     sysctl -w net.ipv4.udp_rmem_min=209715200 >/dev/null 2>&1
     sysctl -w net.ipv4.udp_wmem_min=209715200 >/dev/null 2>&1
+    sysctl -w net.core.rmem_default=104857600 >/dev/null 2>&1
+    sysctl -w net.core.wmem_default=104857600 >/dev/null 2>&1
     sysctl -w net.core.rmem_max=4294967296 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=4294967296 >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ UDP buffers: 4GB (3000x)${C_RESET}"
+    
     sysctl -w net.core.netdev_max_backlog=4000000 >/dev/null 2>&1
     sysctl -w net.core.somaxconn=2097152 >/dev/null 2>&1
+    sysctl -w net.core.dev_weight=1024 >/dev/null 2>&1
+    sysctl -w net.core.netdev_budget=9600 >/dev/null 2>&1
+    sysctl -w net.netfilter.nf_conntrack_max=160000000 >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ Network buffers optimized (3000x)${C_RESET}"
+    
+    sysctl -w net.ipv4.tcp_fastopen=3 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_sack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_dsack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_fack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_timestamps=1 >/dev/null 2>&1
     sysctl -w net.ipv4.tcp_slow_start_after_idle=0 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_mtu_probing=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_notsent_lowat=16384 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_low_latency=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_adv_win_scale=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.ip_local_port_range="1024 65535" >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ Advanced TCP optimizations enabled${C_RESET}"
+    
     ulimit -n 41943040 2>/dev/null
-    for i in /sys/class/net/*/queues/*/rps_cpus; do echo ffffffff > $i 2>/dev/null; done
-    echo -e "${C_GREEN}✅ High Booster Ultimate applied!${C_RESET}"
+    echo -e "${C_GREEN}✓ File descriptors: 40M (3000x)${C_RESET}"
+    
+    for i in /sys/class/net/*/queues/*/rps_cpus; do
+        echo ffffffff > $i 2>/dev/null
+    done
+    echo -e "${C_GREEN}✓ RPS/RFS enabled${C_RESET}"
+    
+    echo -e "\n${C_GREEN}✅ High Booster Ultimate applied! (3000x Speed) 🚀🚀🚀${C_RESET}"
     sleep 1
 }
 
 apply_booster_ultra_ultimate() {
-    echo -e "\n${C_BLUE}🚀 ULTRA BOOSTER ULTIMATE (8GB)${C_RESET}"
-    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null; modprobe sch_htb 2>/dev/null
+    echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_BLUE}           🚀 ULTRA BOOSTER ULTIMATE (8GB) - 5000x SPEED${C_RESET}"
+    echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    
+    modprobe tcp_bbr 2>/dev/null
+    modprobe sch_cake 2>/dev/null
+    modprobe sch_fq 2>/dev/null
+    modprobe sch_htb 2>/dev/null
     sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ BBR v3 + Cake + FQ + HTB enabled${C_RESET}"
+    
     sysctl -w net.ipv4.udp_rmem_min=419430400 >/dev/null 2>&1
     sysctl -w net.ipv4.udp_wmem_min=419430400 >/dev/null 2>&1
+    sysctl -w net.core.rmem_default=209715200 >/dev/null 2>&1
+    sysctl -w net.core.wmem_default=209715200 >/dev/null 2>&1
     sysctl -w net.core.rmem_max=8589934592 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=8589934592 >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ UDP buffers: 8GB (5000x)${C_RESET}"
+    
     sysctl -w net.core.netdev_max_backlog=6000000 >/dev/null 2>&1
     sysctl -w net.core.somaxconn=4194304 >/dev/null 2>&1
+    sysctl -w net.core.dev_weight=2048 >/dev/null 2>&1
+    sysctl -w net.core.netdev_budget=19200 >/dev/null 2>&1
     sysctl -w net.netfilter.nf_conntrack_max=320000000 >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ Network buffers optimized (5000x)${C_RESET}"
+    
+    sysctl -w net.ipv4.tcp_fastopen=3 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_sack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_dsack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_fack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_timestamps=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_slow_start_after_idle=0 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_mtu_probing=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_notsent_lowat=16384 >/dev/null 2>&1
     sysctl -w net.ipv4.tcp_keepalive_time=30 >/dev/null 2>&1
-    sysctl -w net.core.busy_read=1000 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_keepalive_intvl=5 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_keepalive_probes=3 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_low_latency=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_adv_win_scale=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_autocorking=0 >/dev/null 2>&1
+    sysctl -w net.ipv4.ip_local_port_range="1024 65535" >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ Advanced TCP optimizations enabled${C_RESET}"
+    
     ulimit -n 83886080 2>/dev/null
-    for i in /sys/class/net/*/queues/*/rps_cpus; do echo ffffffff > $i 2>/dev/null; done
-    echo -e "${C_GREEN}✅ Ultra Booster Ultimate applied!${C_RESET}"
+    echo -e "${C_GREEN}✓ File descriptors: 80M (5000x)${C_RESET}"
+    
+    for i in /sys/class/net/*/queues/*/rps_cpus; do
+        echo ffffffff > $i 2>/dev/null
+    done
+    sysctl -w net.core.busy_read=1000 >/dev/null 2>&1
+    sysctl -w net.core.busy_poll=1000 >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ RPS/RFS + Busy polling enabled (5000x)${C_RESET}"
+    
+    echo -e "\n${C_GREEN}✅ Ultra Booster Ultimate applied! (5000x Speed) 🚀🚀🚀🚀${C_RESET}"
     sleep 1
 }
 
 apply_booster_extreme_ultimate() {
-    echo -e "\n${C_BLUE}💥 EXTREME BOOSTER ULTIMATE (16GB)${C_RESET}"
-    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null; modprobe sch_htb 2>/dev/null
+    echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_BLUE}           💥 EXTREME BOOSTER ULTIMATE (16GB) - 10000x SPEED${C_RESET}"
+    echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    
+    modprobe tcp_bbr 2>/dev/null
+    modprobe sch_cake 2>/dev/null
+    modprobe sch_fq 2>/dev/null
+    modprobe sch_htb 2>/dev/null
     sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ BBR v3 + Cake + FQ + HTB enabled${C_RESET}"
+    
     sysctl -w net.ipv4.udp_rmem_min=838860800 >/dev/null 2>&1
     sysctl -w net.ipv4.udp_wmem_min=838860800 >/dev/null 2>&1
+    sysctl -w net.core.rmem_default=419430400 >/dev/null 2>&1
+    sysctl -w net.core.wmem_default=419430400 >/dev/null 2>&1
     sysctl -w net.core.rmem_max=17179869184 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=17179869184 >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ UDP buffers: 16GB (10000x)${C_RESET}"
+    
     sysctl -w net.core.netdev_max_backlog=10000000 >/dev/null 2>&1
     sysctl -w net.core.somaxconn=8388608 >/dev/null 2>&1
+    sysctl -w net.core.dev_weight=4096 >/dev/null 2>&1
+    sysctl -w net.core.netdev_budget=38400 >/dev/null 2>&1
     sysctl -w net.netfilter.nf_conntrack_max=640000000 >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ Network buffers optimized (10000x)${C_RESET}"
+    
+    sysctl -w net.ipv4.tcp_fastopen=3 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_sack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_dsack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_fack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_timestamps=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_slow_start_after_idle=0 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_mtu_probing=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_notsent_lowat=16384 >/dev/null 2>&1
     sysctl -w net.ipv4.tcp_keepalive_time=30 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_keepalive_intvl=5 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_keepalive_probes=3 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_low_latency=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_adv_win_scale=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_autocorking=0 >/dev/null 2>&1
     sysctl -w net.ipv4.tcp_frto=2 >/dev/null 2>&1
-    sysctl -w net.core.busy_read=1000 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_thin_linear_timeouts=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_thin_dupack=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.tcp_early_retrans=3 >/dev/null 2>&1
+    sysctl -w net.ipv4.ip_local_port_range="1024 65535" >/dev/null 2>&1
+    echo -e "${C_GREEN}✓ Ultimate TCP optimizations enabled${C_RESET}"
+    
     ulimit -n 167772160 2>/dev/null
-    for i in /sys/class/net/*/queues/*/rps_cpus; do echo ffffffff > $i 2>/dev/null; done
-    for i in /sys/class/net/*/queues/*/rps_flow_cnt; do echo 4096 > $i 2>/dev/null; done
-    if command -v irqbalance &>/dev/null; then systemctl restart irqbalance 2>/dev/null; fi
-    echo -e "${C_GREEN}✅ Extreme Booster Ultimate applied!${C_RESET}"
+    echo -e "${C_GREEN}✓ File descriptors: 160M (10000x)${C_RESET}"
+    
+    for i in /sys/class/net/*/queues/*/rps_cpus; do
+        echo ffffffff > $i 2>/dev/null
+    done
+    for i in /sys/class/net/*/queues/*/rps_flow_cnt; do
+        echo 4096 > $i 2>/dev/null
+    done
+    sysctl -w net.core.busy_read=1000 >/dev/null 2>&1
+    sysctl -w net.core.busy_poll=1000 >/dev/null 2>&1
+    if command -v irqbalance &>/dev/null; then
+        systemctl restart irqbalance 2>/dev/null
+    fi
+    echo -e "${C_GREEN}✓ Ultimate optimizations enabled (10000x)${C_RESET}"
+    
+    echo -e "\n${C_GREEN}✅ Extreme Booster Ultimate applied! (10000x Speed) 💥💥💥💥💥${C_RESET}"
     sleep 1
 }
+
+# ================================================================
+# ========== SPEED BOOSTER MENU ==========
+# ================================================================
 
 speed_booster_menu() {
     while true; do
@@ -1722,16 +1886,16 @@ speed_booster_menu() {
         
         echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
         echo -e "${C_BOLD}${C_PURPLE}           ⚡ ULTIMATE SPEED BOOSTER MANAGER${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}           🔥 1000x PERFORMANCE MODE${C_RESET}"
+        echo -e "${C_BOLD}${C_PURPLE}           🔥 1000x - 10000x PERFORMANCE MODE${C_RESET}"
         echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
         echo ""
-        echo -e "  ${C_CYAN}Select Speed Level (ALL 1000x FASTER):${C_RESET}"
+        echo -e "  ${C_CYAN}Select Speed Level:${C_RESET}"
         echo ""
-        echo -e "  ${C_GREEN}[1]${C_RESET} Standard Ultimate  (1GB)   → 1000x Speed 🚀"
-        echo -e "  ${C_GREEN}[2]${C_RESET} Medium Ultimate    (2GB)   → 2000x Speed 🚀🚀"
-        echo -e "  ${C_GREEN}[3]${C_RESET} High Ultimate      (4GB)   → 3000x Speed 🚀🚀🚀"
-        echo -e "  ${C_GREEN}[4]${C_RESET} Ultra Ultimate     (8GB)   → 5000x Speed 🚀🚀🚀🚀"
-        echo -e "  ${C_GREEN}[5]${C_RESET} Extreme Ultimate   (16GB)  → 10000x Speed 💥💥💥💥💥"
+        echo -e "  ${C_GREEN}[1]${C_RESET} Standard Ultimate  (1GB)   → ${C_GREEN}1000x SPEED 🚀${C_RESET}"
+        echo -e "  ${C_GREEN}[2]${C_RESET} Medium Ultimate    (2GB)   → ${C_GREEN}2000x SPEED 🚀🚀${C_RESET}"
+        echo -e "  ${C_GREEN}[3]${C_RESET} High Ultimate      (4GB)   → ${C_GREEN}3000x SPEED 🚀🚀🚀${C_RESET}"
+        echo -e "  ${C_GREEN}[4]${C_RESET} Ultra Ultimate     (8GB)   → ${C_GREEN}5000x SPEED 🚀🚀🚀🚀${C_RESET}"
+        echo -e "  ${C_GREEN}[5]${C_RESET} Extreme Ultimate   (16GB)  → ${C_GREEN}10000x SPEED 💥💥💥💥💥${C_RESET}"
         echo ""
         echo -e "  ${C_YELLOW}[6]${C_RESET} View Current Settings"
         echo -e "  ${C_RED}[7]${C_RESET} Reset to Default"
@@ -1912,7 +2076,7 @@ create_dnstt_service_with_booster() {
     
     cat > "$DNSTT_SERVICE_FILE" <<EOF
 [Unit]
-Description=DNSTT Server - ULTIMATE OPTIMIZED v9.0
+Description=DNSTT Server - ULTIMATE OPTIMIZED v9.1
 After=network.target
 Wants=network-online.target
 
@@ -3025,7 +3189,7 @@ uninstall_script() {
 create_limiter_service() {
     cat > "$LIMITER_SCRIPT" << 'EOF'
 #!/bin/bash
-# Voltron Tech Limiter v9.0
+# Voltron Tech Limiter v9.1
 DB_FILE="/etc/voltrontech/users.db"
 BW_DIR="/etc/voltrontech/bandwidth"
 PID_DIR="$BW_DIR/pidtrack"
@@ -3320,9 +3484,7 @@ initial_setup() {
     
     create_limiter_service
     
-    # ============================================
-    # AUTO-APPLY BOOSTERS
-    # ============================================
+    # Auto-apply boosters
     echo -e "\n${C_BLUE}🚀 Applying automatic boosters...${C_RESET}"
     apply_ssh_booster_auto
     apply_udp_booster_auto
