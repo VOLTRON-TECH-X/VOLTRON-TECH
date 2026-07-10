@@ -1,4 +1,3 @@
-markdown
 <div align="center">
   <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=32&duration=3000&pause=1000&color=F70000&center=true&vCenter=true&width=800&lines=WELCOME+TO+VOLTRON+TECH+ULTIMATE;Powered+By+Voltron+Tech" alt="Typing SVG" />
 </div>
