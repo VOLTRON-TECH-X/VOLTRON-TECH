@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================
-# VOLTRON TECH ULTIMATE v8.0 - COMPLETE
+# VOLTRON TECH ULTIMATE v8.1 - COMPLETE
 # ================================================================
 # Inajumuisha:
 #   1. User Management - Create, Delete, Edit, Lock, Unlock, List, Renew, Cleanup
@@ -238,7 +238,7 @@ show_banner() {
     refresh_banner_cache
     [[ -t 1 ]] && clear
     echo
-    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v8.0 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
+    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v8.1 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
     echo -e "${C_BLUE}   ─────────────────────────────────────────────────────────${C_RESET}"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "OS" "$BANNER_CACHE_OS_NAME" "Uptime: $BANNER_CACHE_UP_TIME"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "Memory" "${BANNER_CACHE_RAM_USAGE}% Used" "Online: ${C_WHITE}${BANNER_CACHE_ONLINE_USERS}${C_RESET}"
@@ -742,6 +742,10 @@ unlock_user() {
     press_enter
 }
 
+# ================================================================
+# ========== LIST USERS (FIXED) ==========
+# ================================================================
+
 list_users() {
     clear; show_banner
     if [[ ! -s "$DB_FILE" ]]; then
@@ -763,7 +767,8 @@ list_users() {
         bandwidth_gb=${bandwidth_gb:-0}
         
         local online_count=$(pgrep -c -u "$user" sshd 2>/dev/null || echo 0)
-        local connection_string="$online_count/$limit"
+        # FIX: connection_string on one line
+        local connection_string="${online_count}/${limit}"
         
         local bw_string="Unlimited"
         if [[ "$bandwidth_gb" != "0" ]]; then
@@ -1234,20 +1239,29 @@ update_ssh_banners_config() {
     if [[ ! -f "$BANNER_ENABLED_FILE" ]]; then
         if [[ -f "$SSHD_FF_CONFIG" ]]; then
             rm -f "$SSHD_FF_CONFIG" 2>/dev/null
-            systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null
+            systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
         fi
         return
     fi
 
     mkdir -p "$BANNER_DIR" /etc/ssh/sshd_config.d
     tmp_conf="/tmp/voltrontech_banners_new.conf"
+    
     echo "# Voltron Tech - Dynamic per-user SSH banners" > "$tmp_conf"
+    echo "# Generated: $(date)" >> "$tmp_conf"
+    echo "" >> "$tmp_conf"
 
     if [[ -f "$DB_FILE" ]]; then
         while IFS=: read -r user _rest; do
             [[ -z "$user" || "$user" == \#* ]] && continue
+            
+            if [[ ! -f "$BANNER_DIR/${user}.txt" ]]; then
+                echo "Waiting for limiter to generate banner..." > "$BANNER_DIR/${user}.txt"
+            fi
+            
             echo "Match User $user" >> "$tmp_conf"
             echo "    Banner $BANNER_DIR/${user}.txt" >> "$tmp_conf"
+            echo "" >> "$tmp_conf"
         done < "$DB_FILE"
     fi
 
@@ -1256,7 +1270,7 @@ update_ssh_banners_config() {
         if ! grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null; then
             echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
         fi
-        systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null
+        systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
     else
         rm -f "$tmp_conf"
     fi
@@ -1269,11 +1283,23 @@ enable_dynamic_banner() {
     
     mkdir -p "$BANNER_DIR"
     touch "$BANNER_ENABLED_FILE"
+    
+    # Update SSH banners config
     update_ssh_banners_config
+    
+    # Ensure Include directive exists
+    if ! grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null; then
+        echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
+    fi
+    
+    # Restart SSH
+    systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+    
+    # Restart limiter
     systemctl restart voltrontech-limiter 2>/dev/null
     
     echo -e "\n${C_GREEN}✅ Dynamic account banner enabled!${C_RESET}"
-    echo -e "${C_CYAN}📌 Users will see their account status when connecting via SSH${C_RESET}"
+    echo -e "${C_CYAN}📌 Users will see their account status when connecting via SSH/VPN${C_RESET}"
     echo -e "${C_CYAN}📌 Banner updates automatically every 15 seconds${C_RESET}"
     press_enter
 }
@@ -1286,7 +1312,7 @@ disable_dynamic_banner() {
     rm -f "$BANNER_ENABLED_FILE"
     rm -f "$SSHD_FF_CONFIG"
     rm -rf "$BANNER_DIR" 2>/dev/null
-    systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null
+    systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
     
     echo -e "\n${C_GREEN}✅ Dynamic banner disabled!${C_RESET}"
     press_enter
@@ -1426,33 +1452,26 @@ dnstt_mtu_menu() {
 configure_dnstt_firewall() {
     echo -e "\n${C_BLUE}🔥 Configuring firewall for DNSTT...${C_RESET}"
     
-    # Check if iptables is installed
     if ! command -v iptables &>/dev/null; then
         echo -e "${C_YELLOW}⚠️ iptables not found. Installing...${C_RESET}"
         ff_apt_install iptables iptables-persistent
     fi
     
-    # Flush existing rules
     iptables -t nat -F 2>/dev/null || true
     iptables -F 2>/dev/null || true
     
-    # Allow port 53 (DNS)
     iptables -A INPUT -p udp --dport 53 -j ACCEPT
     iptables -A OUTPUT -p udp --sport 53 -j ACCEPT
     
-    # Allow port 5300 (DNSTT internal)
     iptables -A INPUT -p udp --dport 5300 -j ACCEPT
     iptables -A OUTPUT -p udp --sport 5300 -j ACCEPT
     
-    # Redirect port 53 → 5300
     iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
     
-    # Save rules
     if command -v netfilter-persistent &>/dev/null; then
         netfilter-persistent save >/dev/null 2>&1
     fi
     
-    # Save to /etc/iptables/rules.v4
     mkdir -p /etc/iptables
     iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
     
@@ -1633,7 +1652,7 @@ create_dnstt_service_with_booster() {
     
     cat > "$DNSTT_SERVICE_FILE" <<EOF
 [Unit]
-Description=DNSTT Server - ULTIMATE OPTIMIZED v8.0
+Description=DNSTT Server - ULTIMATE OPTIMIZED v8.1
 After=network.target
 Wants=network-online.target
 
@@ -2274,7 +2293,6 @@ protocol_menu() {
 show_vps_dashboard() {
     clear; show_banner
     
-    # Get VPS info
     local VPS_IP=$(curl -s -4 icanhazip.com 2>/dev/null || echo "Unknown")
     local VPS_LOCATION=$(curl -s "http://ip-api.com/json/$VPS_IP" 2>/dev/null | grep -o '"city":"[^"]*"' | cut -d'"' -f4 2>/dev/null || echo "Unknown")
     local VPS_COUNTRY=$(curl -s "http://ip-api.com/json/$VPS_IP" 2>/dev/null | grep -o '"country":"[^"]*"' | cut -d'"' -f4 2>/dev/null || echo "Unknown")
@@ -2745,7 +2763,7 @@ uninstall_script() {
 create_limiter_service() {
     cat > "$LIMITER_SCRIPT" << 'EOF'
 #!/bin/bash
-# Voltron Tech Limiter v8.0
+# Voltron Tech Limiter v8.1
 DB_FILE="/etc/voltrontech/users.db"
 BW_DIR="/etc/voltrontech/bandwidth"
 PID_DIR="$BW_DIR/pidtrack"
