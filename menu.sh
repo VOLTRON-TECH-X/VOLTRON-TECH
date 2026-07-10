@@ -3308,23 +3308,30 @@ while true; do
             UPTIME=$(uptime -p | sed 's/up //')
             LOAD=$(awk '{print $1}' /proc/loadavg)
             
-            # SSH BANNER - IMEONDOLEWA MISTARI MIWILI YA JUU, VOLTRON TECH ULTIMATE KUBWA NA PANA, ACCOUNT DETAILS JUU KIDOGO
+            # SSH BANNER - VOLTRON TECH ULTIMATE KUBWA ZAIDI SIZE 8, KATIKATI, NAFASI KATI YAKE NA ACCOUNT DETAILS
             banner_content=""
-            banner_content+="<center><font color=\"purple\" size=\"7\"><b>🔥 VOLTRON TECH ULTIMATE 🔥</b></font></center><br>"
-            banner_content+="<center><font color=\"blue\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br><br>"
+            banner_content+="<br><br>"
+            banner_content+="<center><font color=\"purple\" size=\"8\"><b>🔥 VOLTRON TECH ULTIMATE 🔥</b></font></center><br>"
+            banner_content+="<br>"
+            banner_content+="<center><font color=\"blue\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
+            banner_content+="<br>"
             banner_content+="<center><font color=\"white\">👤 <b>Username      :</b> $user</font></center><br>"
             banner_content+="<center><font color=\"white\">📅 <b>Expiration    :</b> $expiry ($days_left)</font></center><br>"
             banner_content+="<center><font color=\"white\">📊 <b>Bandwidth     :</b> $bw_info</font></center><br>"
-            banner_content+="<center><font color=\"white\">🔌 <b>Sessions      :</b> $online_count/$limit</font></center><br><br>"
+            banner_content+="<center><font color=\"white\">🔌 <b>Sessions      :</b> $online_count/$limit</font></center><br>"
+            banner_content+="<br>"
             banner_content+="<center><font color=\"white\">⏱️ <b>Server Uptime :</b> $UPTIME</font></center><br>"
-            banner_content+="<center><font color=\"white\">📈 <b>Server Load   :</b> $LOAD</font></center><br><br>"
+            banner_content+="<center><font color=\"white\">📈 <b>Server Load   :</b> $LOAD</font></center><br>"
+            banner_content+="<br>"
             banner_content+="<center><font color=\"green\" size=\"4\"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>"
             banner_content+="<center><font color=\"white\">📱 Telegram  : https://t.me/voltrontech</font></center><br>"
-            banner_content+="<center><font color=\"white\">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br><br>"
+            banner_content+="<center><font color=\"white\">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>"
+            banner_content+="<br>"
             banner_content+="<center><font color=\"red\" size=\"4\"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>"
             banner_content+="<center><font color=\"white\">• Account expires on: $expiry</font></center><br>"
             banner_content+="<center><font color=\"white\">• No torrent or illegal activity</font></center><br>"
-            banner_content+="<center><font color=\"white\">• Account sharing is prohibited</font></center><br><br>"
+            banner_content+="<center><font color=\"white\">• Account sharing is prohibited</font></center><br>"
+            banner_content+="<br>"
             banner_content+="<center><font color=\"gray\" size=\"2\"><b>───────── Powered by Voltron Tech ─────────</b></font></center><br>"
             
             write_banner_if_changed "$user" "$banner_content"
