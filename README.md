@@ -351,5 +351,3 @@ VOLTRON TECH ULTIMATE is intended for educational purposes only. The developers 
 If you find this project useful, please consider giving it a star ⭐
 
 Made with ❤️ by Voltron Tech
-
-</div> ```
