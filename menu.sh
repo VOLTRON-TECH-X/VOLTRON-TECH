@@ -3187,7 +3187,7 @@ while true; do
             banner_content=""
             banner_content+="<br><center><font color=\"purple\" size=\"6\"><b>🔥 VOLTRON TECH ULTIMATE 🔥</b></font></center><br>"
             banner_content+="<center><font color=\"cyan\"><b>═══════════════════════════════════════════════</b></font></center><br>"
-            banner_content+="<center><font color=\"yellow\" size=\"4\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
+            banner_content+="<center><font color=\"blue\" size=\"4\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
             banner_content+="<center><font color=\"cyan\"><b>═══════════════════════════════════════════════</b></font></center><br><br>"
             banner_content+="<center><font color=\"white\">👤 <b>Username      :</b> $user</font></center><br>"
             banner_content+="<center><font color=\"white\">📅 <b>Expiration    :</b> $expiry ($days_left)</font></center><br>"
