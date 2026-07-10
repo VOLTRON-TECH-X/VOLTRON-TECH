@@ -761,7 +761,7 @@ unlock_user() {
 }
 
 # ================================================================
-# ========== LIST USERS (FALCON STYLE) ==========
+# ========== LIST USERS (FALCON STYLE - REKEBISHWA) ==========
 # ================================================================
 
 list_users() {
@@ -1250,7 +1250,7 @@ create_trial_account() {
 }
 
 # ================================================================
-# ========== DYNAMIC BANNER FUNCTIONS (CENTERED - BLUE ACCOUNT DETAILS) ==========
+# ========== DYNAMIC BANNER FUNCTIONS (REKEBISHWA) ==========
 # ================================================================
 
 write_banner_if_changed() {
@@ -2036,7 +2036,6 @@ create_dnstt_service() {
     chmod 644 "$LOGS_DIR/dnstt-server.log" 2>/dev/null || true
     chmod 644 "$LOGS_DIR/dnstt-error.log" 2>/dev/null || true
     
-    # NO KCP arguments - standard DNSTT binary doesn't support them
     cat > "$DNSTT_SERVICE_FILE" <<EOF
 [Unit]
 Description=DNSTT Server - ULTIMATE OPTIMIZED v9.2
@@ -3144,7 +3143,7 @@ uninstall_script() {
 }
 
 # ================================================================
-# ========== LIMITER SERVICE ==========
+# ========== LIMITER SERVICE (REKEBISHWA - SSH BANNER) ==========
 # ================================================================
 
 create_limiter_service() {
@@ -3309,11 +3308,10 @@ while true; do
             UPTIME=$(uptime -p | sed 's/up //')
             LOAD=$(awk '{print $1}' /proc/loadavg)
             
+            # SSH BANNER - IMEONDOLEWA MISTARI MIWILI YA JUU, VOLTRON TECH ULTIMATE KUBWA NA PANA, ACCOUNT DETAILS JUU KIDOGO
             banner_content=""
-            banner_content+="<br><center><font color=\"purple\" size=\"6\"><b>🔥 VOLTRON TECH ULTIMATE 🔥</b></font></center><br>"
-            banner_content+="<center><font color=\"cyan\"><b>═══════════════════════════════════════════════</b></font></center><br>"
-            banner_content+="<center><font color=\"blue\" size=\"4\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
-            banner_content+="<center><font color=\"cyan\"><b>═══════════════════════════════════════════════</b></font></center><br><br>"
+            banner_content+="<center><font color=\"purple\" size=\"7\"><b>🔥 VOLTRON TECH ULTIMATE 🔥</b></font></center><br>"
+            banner_content+="<center><font color=\"blue\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br><br>"
             banner_content+="<center><font color=\"white\">👤 <b>Username      :</b> $user</font></center><br>"
             banner_content+="<center><font color=\"white\">📅 <b>Expiration    :</b> $expiry ($days_left)</font></center><br>"
             banner_content+="<center><font color=\"white\">📊 <b>Bandwidth     :</b> $bw_info</font></center><br>"
