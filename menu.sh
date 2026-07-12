@@ -6,7 +6,7 @@
 #   1. User Management - Create, Delete, Edit, Lock, Unlock, List, Renew, Cleanup
 #   2. DNSTT - 5 Speed Boosters (1000x-10000x) + MTU Settings + Firewall Fix
 #   3. Protocols - badvpn, udp-custom, SSL Tunnel, Falcon Proxy, ZiVPN, X-UI
-#   4. Dynamic Banner - Centered (ACCOUNT DETAILS - Blue)
+#   4. Dynamic Banner - Centered (ACCOUNT DETAILS - Blue) WITH ACCOUNT STATUS
 #   5. VPS Dashboard - Real-time system info (Compact)
 #   6. VPN Data Usage - Per user connection data (Table format)
 #   7. UDP Booster - Automatic (sysctl parameters)
@@ -1330,18 +1330,14 @@ enable_dynamic_banner() {
     mkdir -p "$BANNER_DIR"
     touch "$BANNER_ENABLED_FILE"
     
-    # Update SSH banners config
     update_ssh_banners_config
     
-    # Ensure Include directive exists
     if ! grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null; then
         echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
     fi
     
-    # Restart SSH
     systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
     
-    # Restart limiter
     systemctl restart voltrontech-limiter 2>/dev/null
     
     echo -e "\n${C_GREEN}✅ Dynamic account banner enabled!${C_RESET}"
@@ -1567,7 +1563,6 @@ EOF
 apply_udp_booster_auto() {
     echo -e "\n${C_BLUE}🔧 Applying UDP Booster (Automatic)...${C_RESET}"
     
-    # UDP Tuning via sysctl
     sysctl -w net.core.rmem_max=10737418240 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=10737418240 >/dev/null 2>&1
     sysctl -w net.core.rmem_default=1073741824 >/dev/null 2>&1
@@ -1579,7 +1574,6 @@ apply_udp_booster_auto() {
     sysctl -w net.ipv4.udp_gro_enabled=1 >/dev/null 2>&1
     sysctl -w net.ipv4.udp_l3mdev_accept=1 >/dev/null 2>&1
     
-    # Save KCP parameters to sysctl (for speed boosters)
     echo "KCP_WINDOW_SIZE=1024,1024" >> /etc/sysctl.conf 2>/dev/null
     echo "KCP_MAX_STREAM_BUFFER=10737418240" >> /etc/sysctl.conf 2>/dev/null
     echo "KCP_QUEUE_SIZE=10240" >> /etc/sysctl.conf 2>/dev/null
@@ -3155,13 +3149,13 @@ uninstall_script() {
 }
 
 # ================================================================
-# ========== LIMITER SERVICE (REKEBISHWA - SSH BANNER) ==========
+# ========== LIMITER SERVICE (REKEBISHWA - WITH ACCOUNT STATUS) ==========
 # ================================================================
 
 create_limiter_service() {
     cat > "$LIMITER_SCRIPT" << 'EOF'
 #!/bin/bash
-# Voltron Tech Limiter v9.2
+# Voltron Tech Limiter v9.2 - WITH ACCOUNT STATUS
 DB_FILE="/etc/voltrontech/users.db"
 BW_DIR="/etc/voltrontech/bandwidth"
 PID_DIR="$BW_DIR/pidtrack"
@@ -3262,15 +3256,17 @@ while true; do
         fi
 
         expiry_ts=0
+        is_expired=false
         if [[ "$expiry" != "Never" && -n "$expiry" ]]; then
             expiry_ts=$(date -d "$expiry" +%s 2>/dev/null || echo 0)
             if [[ "$expiry_ts" =~ ^[0-9]+$ ]] && (( expiry_ts > 0 && expiry_ts < current_ts )); then
+                is_expired=true
                 if ! $user_locked; then
                     usermod -L "$user" &>/dev/null
                     killall -u "$user" -9 &>/dev/null
                     locked_users["$user"]=1
+                    user_locked=true
                 fi
-                continue
             fi
         fi
 
@@ -3288,6 +3284,71 @@ while true; do
         fi
 
         if $dynamic_banners_enabled; then
+            # ============================================================
+            # CALCULATE ACCOUNT STATUS
+            # ============================================================
+            
+            # Check if user is locked
+            if $user_locked; then
+                account_status="🔒 LOCKED"
+                status_color="yellow"
+                status_icon="🔒"
+            # Check if account is expired
+            elif $is_expired; then
+                account_status="🗓️ EXPIRED"
+                status_color="red"
+                status_icon="🗓️"
+            else
+                # Check bandwidth status
+                bw_exhausted=false
+                bw_warning=""
+                bw_percent=0
+                
+                if [[ "$bandwidth_gb" != "0" && -n "$bandwidth_gb" ]]; then
+                    usagefile="$BW_DIR/${user}.usage"
+                    accum_disp=0
+                    if [[ -f "$usagefile" ]]; then
+                        read -r accum_disp < "$usagefile"
+                        [[ "$accum_disp" =~ ^[0-9]+$ ]] || accum_disp=0
+                    fi
+                    
+                    quota_bytes=$(awk "BEGIN {printf \"%.0f\", $bandwidth_gb * 1073741824}")
+                    
+                    if (( quota_bytes > 0 )); then
+                        bw_percent=$(awk "BEGIN {printf \"%.0f\", ($accum_disp / $quota_bytes) * 100}")
+                        
+                        if (( $(echo "$bw_percent >= 100" | bc -l 2>/dev/null || echo "0") )); then
+                            bw_exhausted=true
+                            account_status="⚠️ DATA EXHAUSTED!"
+                            status_color="red"
+                            status_icon="⚠️"
+                            bw_warning="❌ DATA EXHAUSTED! Please contact admin."
+                        elif (( $(echo "$bw_percent >= 90" | bc -l 2>/dev/null || echo "0") )); then
+                            account_status="✅ ACTIVE"
+                            status_color="green"
+                            status_icon="✅"
+                            bw_warning="⚠️ ${bw_percent}% used - NEAR LIMIT!"
+                        else
+                            account_status="✅ ACTIVE"
+                            status_color="green"
+                            status_icon="✅"
+                        fi
+                    else
+                        account_status="✅ ACTIVE"
+                        status_color="green"
+                        status_icon="✅"
+                    fi
+                else
+                    account_status="✅ ACTIVE"
+                    status_color="green"
+                    status_icon="✅"
+                fi
+            fi
+
+            # ============================================================
+            # CALCULATE DAYS LEFT
+            # ============================================================
+            
             days_left="N/A"
             if [[ "$expiry" != "Never" && -n "$expiry" && "$expiry_ts" =~ ^[0-9]+$ && $expiry_ts -gt 0 ]]; then
                 diff_secs=$((expiry_ts - current_ts))
@@ -3304,7 +3365,12 @@ while true; do
                 fi
             fi
 
+            # ============================================================
+            # CALCULATE BANDWIDTH INFO
+            # ============================================================
+            
             bw_info="Unlimited"
+            bw_display=""
             if [[ "$bandwidth_gb" != "0" && -n "$bandwidth_gb" ]]; then
                 usagefile="$BW_DIR/${user}.usage"
                 accum_disp=0
@@ -3315,15 +3381,24 @@ while true; do
                 used_gb=$(awk "BEGIN {printf \"%.2f\", $accum_disp / 1073741824}")
                 remain_gb=$(awk "BEGIN {r=$bandwidth_gb - $used_gb; if(r<0) r=0; printf \"%.2f\", r}")
                 bw_info="${used_gb}/${bandwidth_gb} GB used | ${remain_gb} GB left"
+                
+                if (( $(echo "$remain_gb <= 0" | bc -l 2>/dev/null || echo "0") )); then
+                    bw_display="<center><font color=\"red\" size=\"4\"><b>⚠️ DATA EXHAUSTED! Please contact admin.</b></font></center><br>"
+                elif (( $(echo "$remain_gb <= 1" | bc -l 2>/dev/null || echo "0") )); then
+                    bw_display="<center><font color=\"yellow\" size=\"4\"><b>⚠️ WARNING: Low bandwidth! Only ${remain_gb} GB left.</b></font></center><br>"
+                fi
             fi
 
             UPTIME=$(uptime -p | sed 's/up //')
             LOAD=$(awk '{print $1}' /proc/loadavg)
             
-            # SSH BANNER - VOLTRON TECH ULTIMATE NA MISTARI MIFUPI MWANZONI NA MWISHONI
+            # ============================================================
+            # BUILD BANNER CONTENT
+            # ============================================================
+            
             banner_content=""
             banner_content+="<br><br>"
-            banner_content+="<center><font color=\"red\">=======</font><font color=\"purple\" size=\"8\"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color=\"red\">=======</font></center><br>"
+            banner_content+="<center><font color=\"cyan\">=======</font><font color=\"purple\" size=\"8\"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color=\"cyan\">=======</font></center><br>"
             banner_content+="<br>"
             banner_content+="<center><font color=\"blue\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
             banner_content+="<br>"
@@ -3331,6 +3406,13 @@ while true; do
             banner_content+="<center><font color=\"white\">📅 <b>Expiration    :</b> $expiry ($days_left)</font></center><br>"
             banner_content+="<center><font color=\"white\">📊 <b>Bandwidth     :</b> $bw_info</font></center><br>"
             banner_content+="<center><font color=\"white\">🔌 <b>Sessions      :</b> $online_count/$limit</font></center><br>"
+            banner_content+="<center><font color=\"${status_color}\" size=\"4\"><b>📌 Account Status : ${account_status}</b></font></center><br>"
+            
+            # Add bandwidth warning if exists
+            if [[ -n "$bw_display" ]]; then
+                banner_content+="$bw_display"
+            fi
+            
             banner_content+="<br>"
             banner_content+="<center><font color=\"white\">⏱️ <b>Server Uptime :</b> $UPTIME</font></center><br>"
             banner_content+="<center><font color=\"white\">📈 <b>Server Load   :</b> $LOAD</font></center><br>"
@@ -3344,11 +3426,15 @@ while true; do
             banner_content+="<center><font color=\"white\">• No torrent or illegal activity</font></center><br>"
             banner_content+="<center><font color=\"white\">• Account sharing is prohibited</font></center><br>"
             banner_content+="<br>"
-            banner_content+="<center><font color=\"gray\" size=\"2\"><b>──────── Powered by Voltron Tech ────────</b></font></center><br>"
+            banner_content+="<center><font color=\"gray\" size=\"2\"><b>───────── Powered by Voltron Tech ─────────</b></font></center><br>"
             
             write_banner_if_changed "$user" "$banner_content"
         fi
 
+        # ============================================================
+        # BANDWIDTH TRACKING
+        # ============================================================
+        
         [[ -z "$bandwidth_gb" || "$bandwidth_gb" == "0" ]] && continue
 
         usagefile="$BW_DIR/${user}.usage"
@@ -3462,7 +3548,6 @@ initial_setup() {
     
     create_limiter_service
     
-    # Auto-apply boosters
     echo -e "\n${C_BLUE}🚀 Applying automatic boosters...${C_RESET}"
     apply_ssh_booster_auto
     apply_udp_booster_auto
