@@ -695,8 +695,7 @@ edit_user() {
                else 
                    echo -e "\n${C_RED}❌ Invalid bandwidth value.${C_RESET}"
                fi
-               press_enter
-               ;;
+               press_enter               ;;
             5)
                echo "0" > "$BANDWIDTH_DIR/${username}.usage"
                usermod -U "$username" &>/dev/null
@@ -1709,7 +1708,9 @@ apply_booster_high_ultimate() {
     echo -e "${C_GREEN}✓ File descriptors: 40M (3000x)${C_RESET}"
     
     for i in /sys/class/net/*/queues/*/rps_cpus; do
-        echo ffffffff > $i 2>/dev/null
+        if [[ -f "$i" ]]; then
+            echo ffffffff > "$i" 2>/dev/null
+        fi
     done
     echo -e "${C_GREEN}✓ RPS/RFS enabled${C_RESET}"
     
@@ -1766,7 +1767,9 @@ apply_booster_ultra_ultimate() {
     echo -e "${C_GREEN}✓ File descriptors: 80M (5000x)${C_RESET}"
     
     for i in /sys/class/net/*/queues/*/rps_cpus; do
-        echo ffffffff > $i 2>/dev/null
+        if [[ -f "$i" ]]; then
+            echo ffffffff > "$i" 2>/dev/null
+        fi
     done
     sysctl -w net.core.busy_read=1000 >/dev/null 2>&1
     sysctl -w net.core.busy_poll=1000 >/dev/null 2>&1
@@ -1829,10 +1832,14 @@ apply_booster_extreme_ultimate() {
     echo -e "${C_GREEN}✓ File descriptors: 160M (10000x)${C_RESET}"
     
     for i in /sys/class/net/*/queues/*/rps_cpus; do
-        echo ffffffff > $i 2>/dev/null
+        if [[ -f "$i" ]]; then
+            echo ffffffff > "$i" 2>/dev/null
+        fi
     done
     for i in /sys/class/net/*/queues/*/rps_flow_cnt; do
-        echo 4096 > $i 2>/dev/null
+        if [[ -f "$i" ]]; then
+            echo 4096 > "$i" 2>/dev/null
+        fi
     done
     sysctl -w net.core.busy_read=1000 >/dev/null 2>&1
     sysctl -w net.core.busy_poll=1000 >/dev/null 2>&1
@@ -1846,7 +1853,7 @@ apply_booster_extreme_ultimate() {
 }
 
 # ================================================================
-# ========== SPEED OPTIMIZATION MENU (NEW) ==========
+# ========== SPEED OPTIMIZATION FUNCTIONS (FIXED) ==========
 # ================================================================
 
 apply_multiplexing() {
@@ -1860,10 +1867,8 @@ apply_multiplexing() {
         return 1
     fi
     
-    # Stop existing connections
     pkill -f dnstt-client 2>/dev/null
     
-    # Check if screen is installed
     if ! command -v screen &>/dev/null; then
         echo -e "${C_YELLOW}⚠️ screen not found. Installing...${C_RESET}"
         apt-get install screen -y 2>/dev/null
@@ -1883,7 +1888,7 @@ apply_multiplexing() {
         local resolver=${resolvers[$((i-1))]}
         screen -dmS "dnstt_$i" dnstt-client -udp "$resolver" \
             -pubkey-file /etc/voltrontech/dnstt/server.pub \
-            -mtu 512 "$domain" 127.0.0.1:22
+            -mtu 512 "$domain" 127.0.0.1:22 2>/dev/null
         echo -e "${C_GREEN}✅ Connection $i started with resolver $resolver${C_RESET}"
     done
     
@@ -1969,14 +1974,18 @@ apply_network_tuning() {
     echo -e "\n${C_BLUE}🔧 Applying Network Interface Tuning...${C_RESET}"
     
     # RPS/RFS - distribute load across CPUs
-    for i in /sys/class/net/*/queues/*/rps_cpus 2>/dev/null; do
-        echo ffffffff > "$i" 2>/dev/null
+    for i in /sys/class/net/*/queues/*/rps_cpus; do
+        if [[ -f "$i" ]]; then
+            echo ffffffff > "$i" 2>/dev/null
+        fi
     done
     
-    # Ring buffer
-    for iface in $(ip link show | grep -E '^[0-9]+:' | awk -F': ' '{print $2}' | grep -v lo); do
-        ethtool -G "$iface" rx 4096 tx 4096 2>/dev/null
-    done
+    # Ring buffer - ignore errors
+    if command -v ethtool &>/dev/null; then
+        for iface in $(ip link show 2>/dev/null | grep -E '^[0-9]+:' | awk -F': ' '{print $2}' | grep -v lo); do
+            ethtool -G "$iface" rx 4096 tx 4096 2>/dev/null || true
+        done
+    fi
     
     echo -e "${C_GREEN}✅ Network Interface Tuning applied${C_RESET}"
 }
@@ -1999,7 +2008,6 @@ EOF
 
     systemctl restart dnsmasq 2>/dev/null
     
-    # Update resolv.conf
     echo "nameserver 127.0.0.1" > /etc/resolv.conf
     echo "nameserver 8.8.8.8" >> /etc/resolv.conf
     echo "nameserver 1.1.1.1" >> /etc/resolv.conf
