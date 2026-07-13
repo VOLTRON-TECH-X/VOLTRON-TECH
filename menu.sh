@@ -14,6 +14,7 @@
 #   9. Trial Account - Auto-delete
 #   10. Orphan Detection
 #   11. Backup/Restore, Traffic Monitor, Torrent Blocking, Auto Reboot
+#   12. Speed Optimization Menu - MTU 512 OPTIMIZED
 # ================================================================
 
 # ========== COLOR CODES ==========
@@ -1845,73 +1846,257 @@ apply_booster_extreme_ultimate() {
 }
 
 # ================================================================
-# ========== SPEED BOOSTER MENU ==========
+# ========== SPEED OPTIMIZATION MENU (NEW) ==========
 # ================================================================
 
-speed_booster_menu() {
+apply_multiplexing() {
+    echo -e "\n${C_BLUE}🚀 Applying DNSTT Multiplexing...${C_RESET}"
+    
+    local num=${1:-5}
+    local domain=$(cat /etc/voltrontech/domain.txt 2>/dev/null)
+    
+    if [[ -z "$domain" ]]; then
+        echo -e "${C_RED}❌ Domain not found. Please install DNSTT first.${C_RESET}"
+        return 1
+    fi
+    
+    # Stop existing connections
+    pkill -f dnstt-client 2>/dev/null
+    
+    # Check if screen is installed
+    if ! command -v screen &>/dev/null; then
+        echo -e "${C_YELLOW}⚠️ screen not found. Installing...${C_RESET}"
+        apt-get install screen -y 2>/dev/null
+    fi
+    
+    local resolvers=(
+        "8.8.8.8:53"
+        "1.1.1.1:53"
+        "9.9.9.9:53"
+        "208.67.222.222:53"
+        "77.88.8.8:53"
+    )
+    
+    echo -e "${C_CYAN}Starting $num DNSTT connections...${C_RESET}"
+    
+    for i in $(seq 1 $num); do
+        local resolver=${resolvers[$((i-1))]}
+        screen -dmS "dnstt_$i" dnstt-client -udp "$resolver" \
+            -pubkey-file /etc/voltrontech/dnstt/server.pub \
+            -mtu 512 "$domain" 127.0.0.1:22
+        echo -e "${C_GREEN}✅ Connection $i started with resolver $resolver${C_RESET}"
+    done
+    
+    echo -e "\n${C_GREEN}✅ $num DNSTT connections started${C_RESET}"
+    echo -e "${C_CYAN}📌 To view: screen -r dnstt_1${C_RESET}"
+    echo -e "${C_CYAN}📌 To detach: Ctrl+A, D${C_RESET}"
+    echo -e "${C_CYAN}📌 To stop all: pkill -f dnstt-client${C_RESET}"
+}
+
+apply_compression() {
+    echo -e "\n${C_BLUE}🔧 Applying SSH Compression...${C_RESET}"
+    
+    cat > /etc/ssh/sshd_config.d/voltrontech-compression.conf << 'EOF'
+# Voltron Tech SSH Compression for DNSTT
+Compression yes
+CompressionLevel 9
+ClientAliveInterval 60
+ClientAliveCountMax 3
+TCPKeepAlive yes
+EOF
+
+    systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+    echo -e "${C_GREEN}✅ SSH Compression applied (Level 9)${C_RESET}"
+}
+
+apply_buffer_optimization() {
+    echo -e "\n${C_BLUE}📦 Applying Buffer Optimization...${C_RESET}"
+    
+    cat >> /etc/sysctl.conf << 'EOF'
+# Voltron Tech Buffer Optimizations for DNSTT
+net.core.rmem_max=1073741824
+net.core.wmem_max=1073741824
+net.core.rmem_default=26214400
+net.core.wmem_default=26214400
+net.ipv4.udp_rmem_min=52428800
+net.ipv4.udp_wmem_min=52428800
+net.core.netdev_max_backlog=1000000
+net.core.somaxconn=524288
+net.ipv4.tcp_rmem=4096 87380 1073741824
+net.ipv4.tcp_wmem=4096 65536 1073741824
+EOF
+
+    sysctl -p >/dev/null 2>&1
+    echo -e "${C_GREEN}✅ Buffer Optimization applied${C_RESET}"
+}
+
+apply_cloudflare_warp() {
+    echo -e "\n${C_BLUE}🌐 Installing Cloudflare Warp...${C_RESET}"
+    
+    if ! command -v warp-cli &>/dev/null; then
+        curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | apt-key add - 2>/dev/null
+        echo "deb https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/cloudflare-client.list
+        apt-get update 2>/dev/null
+        apt-get install cloudflare-warp -y 2>/dev/null
+    fi
+    
+    warp-cli register 2>/dev/null
+    warp-cli set-mode proxy 2>/dev/null
+    warp-cli set-proxy-port 1080 2>/dev/null
+    warp-cli connect 2>/dev/null
+    
+    echo -e "${C_GREEN}✅ Cloudflare Warp installed and running${C_RESET}"
+    echo -e "${C_CYAN}📌 Proxy running on 127.0.0.1:1080${C_RESET}"
+    echo -e "${C_CYAN}📌 Use: dnstt-client --socks5 127.0.0.1:1080 ...${C_RESET}"
+}
+
+apply_bbr() {
+    echo -e "\n${C_BLUE}⚡ Applying TCP BBR...${C_RESET}"
+    
+    modprobe tcp_bbr 2>/dev/null
+    echo "tcp_bbr" > /etc/modules-load.d/bbr.conf
+    
+    cat >> /etc/sysctl.conf << 'EOF'
+net.core.default_qdisc=fq
+net.ipv4.tcp_congestion_control=bbr
+EOF
+
+    sysctl -p >/dev/null 2>&1
+    echo -e "${C_GREEN}✅ TCP BBR enabled${C_RESET}"
+}
+
+apply_network_tuning() {
+    echo -e "\n${C_BLUE}🔧 Applying Network Interface Tuning...${C_RESET}"
+    
+    # RPS/RFS - distribute load across CPUs
+    for i in /sys/class/net/*/queues/*/rps_cpus 2>/dev/null; do
+        echo ffffffff > "$i" 2>/dev/null
+    done
+    
+    # Ring buffer
+    for iface in $(ip link show | grep -E '^[0-9]+:' | awk -F': ' '{print $2}' | grep -v lo); do
+        ethtool -G "$iface" rx 4096 tx 4096 2>/dev/null
+    done
+    
+    echo -e "${C_GREEN}✅ Network Interface Tuning applied${C_RESET}"
+}
+
+apply_dns_caching() {
+    echo -e "\n${C_BLUE}📡 Applying DNS Caching...${C_RESET}"
+    
+    if ! command -v dnsmasq &>/dev/null; then
+        apt-get install dnsmasq -y 2>/dev/null
+    fi
+    
+    cat > /etc/dnsmasq.conf << 'EOF'
+cache-size=10000
+dns-forward-max=1000
+server=8.8.8.8
+server=1.1.1.1
+server=9.9.9.9
+no-resolv
+EOF
+
+    systemctl restart dnsmasq 2>/dev/null
+    
+    # Update resolv.conf
+    echo "nameserver 127.0.0.1" > /etc/resolv.conf
+    echo "nameserver 8.8.8.8" >> /etc/resolv.conf
+    echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+    
+    echo -e "${C_GREEN}✅ DNS Caching applied${C_RESET}"
+}
+
+apply_all_optimizations() {
+    echo -e "\n${C_BLUE}🚀 Applying ALL Optimizations...${C_RESET}"
+    echo -e "${C_YELLOW}This may take a few minutes...${C_RESET}\n"
+    
+    echo -e "${C_CYAN}[1/7] Applying Extreme Booster...${C_RESET}"
+    apply_booster_extreme_ultimate
+    
+    echo -e "\n${C_CYAN}[2/7] Applying Multiplexing...${C_RESET}"
+    apply_multiplexing 5
+    
+    echo -e "\n${C_CYAN}[3/7] Applying Compression...${C_RESET}"
+    apply_compression
+    
+    echo -e "\n${C_CYAN}[4/7] Applying Buffer Optimization...${C_RESET}"
+    apply_buffer_optimization
+    
+    echo -e "\n${C_CYAN}[5/7] Applying TCP BBR...${C_RESET}"
+    apply_bbr
+    
+    echo -e "\n${C_CYAN}[6/7] Applying Network Tuning...${C_RESET}"
+    apply_network_tuning
+    
+    echo -e "\n${C_CYAN}[7/7] Applying DNS Caching...${C_RESET}"
+    apply_dns_caching
+    
+    echo -e "\n${C_GREEN}✅ ALL optimizations applied successfully!${C_RESET}"
+    echo -e "${C_CYAN}📌 Restarting DNSTT service...${C_RESET}"
+    systemctl restart dnstt 2>/dev/null
+    echo -e "${C_GREEN}✅ Done!${C_RESET}"
+}
+
+speed_optimization_menu() {
     while true; do
         clear; show_banner
         
         echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}           ⚡ ULTIMATE SPEED BOOSTER MANAGER${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}           🔥 1000x - 10000x PERFORMANCE MODE${C_RESET}"
+        echo -e "${C_BOLD}${C_PURPLE}           ⚡ SPEED OPTIMIZATION MENU${C_RESET}"
+        echo -e "${C_BOLD}${C_PURPLE}           🔥 MTU 512 OPTIMIZED${C_RESET}"
         echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
         echo ""
-        echo -e "  ${C_CYAN}Select Speed Level:${C_RESET}"
+        echo -e "  ${C_CYAN}DNSTT Boosters:${C_RESET}"
+        echo -e "  ${C_GREEN}[1]${C_RESET} Standard Booster (1000x)"
+        echo -e "  ${C_GREEN}[2]${C_RESET} Medium Booster (2000x)"
+        echo -e "  ${C_GREEN}[3]${C_RESET} High Booster (3000x)"
+        echo -e "  ${C_GREEN}[4]${C_RESET} Ultra Booster (5000x)"
+        echo -e "  ${C_GREEN}[5]${C_RESET} Extreme Booster (10000x)"
         echo ""
-        echo -e "  ${C_GREEN}[1]${C_RESET} Standard Ultimate  (1GB)   → ${C_GREEN}1000x SPEED 🚀${C_RESET}"
-        echo -e "  ${C_GREEN}[2]${C_RESET} Medium Ultimate    (2GB)   → ${C_GREEN}2000x SPEED 🚀🚀${C_RESET}"
-        echo -e "  ${C_GREEN}[3]${C_RESET} High Ultimate      (4GB)   → ${C_GREEN}3000x SPEED 🚀🚀🚀${C_RESET}"
-        echo -e "  ${C_GREEN}[4]${C_RESET} Ultra Ultimate     (8GB)   → ${C_GREEN}5000x SPEED 🚀🚀🚀🚀${C_RESET}"
-        echo -e "  ${C_GREEN}[5]${C_RESET} Extreme Ultimate   (16GB)  → ${C_GREEN}10000x SPEED 💥💥💥💥💥${C_RESET}"
+        echo -e "  ${C_CYAN}Additional Optimizations:${C_RESET}"
+        echo -e "  ${C_GREEN}[6]${C_RESET} Multiplexing (5 Connections)"
+        echo -e "  ${C_GREEN}[7]${C_RESET} SSH Compression"
+        echo -e "  ${C_GREEN}[8]${C_RESET} Buffer Optimization"
+        echo -e "  ${C_GREEN}[9]${C_RESET} Cloudflare Warp"
+        echo -e "  ${C_GREEN}[10]${C_RESET} TCP BBR"
+        echo -e "  ${C_GREEN}[11]${C_RESET} Network Tuning"
+        echo -e "  ${C_GREEN}[12]${C_RESET} DNS Caching"
         echo ""
-        echo -e "  ${C_YELLOW}[6]${C_RESET} View Current Settings"
-        echo -e "  ${C_RED}[7]${C_RESET} Reset to Default"
+        echo -e "  ${C_CYAN}All-in-One:${C_RESET}"
+        echo -e "  ${C_GREEN}[13]${C_RESET} Apply ALL Optimizations"
         echo ""
         echo -e "  ${C_RED}[0]${C_RESET} Return"
         echo ""
         
-        local choice
         read -p "👉 Select option: " choice
         
         case $choice in
-            1) apply_booster_standard_ultimate ;;
-            2) apply_booster_medium_ultimate ;;
-            3) apply_booster_high_ultimate ;;
-            4) apply_booster_ultra_ultimate ;;
-            5) apply_booster_extreme_ultimate ;;
-            6)
-                echo -e "\n${C_CYAN}Current System Settings:${C_RESET}"
-                echo -e "  TCP Congestion: $(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null)"
-                echo -e "  Qdisc: $(sysctl -n net.core.default_qdisc 2>/dev/null)"
-                echo -e "  Network Buffer: $(sysctl -n net.core.rmem_max 2>/dev/null | numfmt --to=iec 2>/dev/null || echo 'Unknown')"
-                echo -e "  UDP Buffer: $(sysctl -n net.ipv4.udp_rmem_min 2>/dev/null) bytes"
-                echo -e "  TCP Fast Open: $(sysctl -n net.ipv4.tcp_fastopen 2>/dev/null)"
-                echo -e "  Connection Tracking: $(sysctl -n net.netfilter.nf_conntrack_max 2>/dev/null)"
-                echo -e "  File Descriptors: $(ulimit -n 2>/dev/null)"
-                press_enter
-                ;;
-            7)
-                echo -e "\n${C_RED}⚠️ Reset to default?${C_RESET}"
-                read -p "Confirm (y/n): " confirm
-                if [[ "$confirm" == "y" ]]; then
-                    sysctl -w net.core.rmem_max=212992 >/dev/null 2>&1
-                    sysctl -w net.core.wmem_max=212992 >/dev/null 2>&1
-                    sysctl -w net.ipv4.tcp_congestion_control=cubic >/dev/null 2>&1
-                    sysctl -w net.core.default_qdisc=pfifo_fast >/dev/null 2>&1
-                    sysctl -w net.ipv4.udp_rmem_min=4096 >/dev/null 2>&1
-                    sysctl -w net.ipv4.tcp_fastopen=0 >/dev/null 2>&1
-                    sysctl -w net.ipv4.ip_local_port_range="32768 60999" >/dev/null 2>&1
-                    sysctl -w net.netfilter.nf_conntrack_max=262144 >/dev/null 2>&1
-                    ulimit -n 1024 2>/dev/null
-                    echo -e "${C_GREEN}✅ Reset to default${C_RESET}"
-                fi
-                press_enter
-                ;;
+            1) apply_booster_standard_ultimate; press_enter ;;
+            2) apply_booster_medium_ultimate; press_enter ;;
+            3) apply_booster_high_ultimate; press_enter ;;
+            4) apply_booster_ultra_ultimate; press_enter ;;
+            5) apply_booster_extreme_ultimate; press_enter ;;
+            6) apply_multiplexing 5; press_enter ;;
+            7) apply_compression; press_enter ;;
+            8) apply_buffer_optimization; press_enter ;;
+            9) apply_cloudflare_warp; press_enter ;;
+            10) apply_bbr; press_enter ;;
+            11) apply_network_tuning; press_enter ;;
+            12) apply_dns_caching; press_enter ;;
+            13) apply_all_optimizations; press_enter ;;
             0) return ;;
             *) echo -e "\n${C_RED}❌ Invalid option${C_RESET}"; sleep 2 ;;
         esac
     done
+}
+
+# ================================================================
+# ========== SPEED BOOSTER MENU (OLD - KEEP FOR COMPATIBILITY) ==========
+# ================================================================
+
+speed_booster_menu() {
+    speed_optimization_menu
 }
 
 # ================================================================
@@ -2053,6 +2238,7 @@ Type=simple
 User=root
 WorkingDirectory=$DB_DIR
 Environment="GODEBUG=netdns=1"
+Environment="GOMAXPROCS=4"
 ExecStart=$DNSTT_BINARY -udp :5300 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $mtu $domain $forward_target
 Restart=always
 RestartSec=5
@@ -2061,6 +2247,8 @@ StartLimitBurst=5
 LimitNOFILE=2097152
 LimitNPROC=infinity
 LimitCORE=infinity
+CPUQuota=200%
+MemoryMax=2G
 StandardOutput=append:$LOGS_DIR/dnstt-server.log
 StandardError=append:$LOGS_DIR/dnstt-error.log
 
@@ -2604,7 +2792,7 @@ protocol_menu() {
         echo -e "  ${C_GREEN}2)${C_RESET} udp-custom              $udp_status"
         echo -e "  ${C_GREEN}3)${C_RESET} SSL Tunnel (HAProxy)    $haproxy_status"
         echo -e "  ${C_GREEN}4)${C_RESET} DNSTT (Port 53)         $dnstt_status ${C_DIM}(MTU: $current_mtu)${C_RESET}"
-        echo -e "  ${C_GREEN}5)${C_RESET} ⚡ DNSTT Speed Booster"
+        echo -e "  ${C_GREEN}5)${C_RESET} ⚡ Speed Optimization"
         echo -e "  ${C_GREEN}6)${C_RESET} 📡 DNSTT MTU Settings"
         echo -e "  ${C_GREEN}7)${C_RESET} Falcon Proxy            $falconproxy_status"
         echo -e "  ${C_GREEN}8)${C_RESET} ZiVPN                   $zivpn_status"
@@ -2649,7 +2837,7 @@ protocol_menu() {
                 fi
                 press_enter
                 ;;
-            5) speed_booster_menu ;;
+            5) speed_optimization_menu ;;
             6) dnstt_mtu_menu ;;
             7)
                 echo -e "\n  ${C_GREEN}1)${C_RESET} Install"
@@ -3398,7 +3586,7 @@ while true; do
             
             banner_content=""
             banner_content+="<br><br>"
-            banner_content+="<center><font color=\"cyan\">=======</font><font color=\"purple\" size=\"8\"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color=\"cyan\">=======</font></center><br>"
+            banner_content+="<center><font color=\"cyan\">──</font><font color=\"purple\" size=\"8\"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color=\"cyan\">──</font></center><br>"
             banner_content+="<br>"
             banner_content+="<center><font color=\"blue\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
             banner_content+="<br>"
@@ -3540,7 +3728,7 @@ initial_setup() {
     echo -e "\n${C_BLUE}🔧 Running initial system setup...${C_RESET}"
     
     ff_apt_update
-    ff_apt_install bc jq curl wget iptables iptables-persistent
+    ff_apt_install bc jq curl wget iptables iptables-persistent screen
     mkdir -p "$DB_DIR" "$SSL_CERT_DIR" "$BANDWIDTH_DIR" "$BANNER_DIR" "$DNSTT_KEYS_DIR" "$LOGS_DIR" "$CONFIG_DIR"
     touch "$DB_FILE"
     
@@ -3585,7 +3773,7 @@ main_menu() {
         printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "14" "Backup Users" "19" "Auto Reboot"
         printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "15" "Restore Users" "20" "Traffic Monitor"
         printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "16" "DNS Domain" "21" "Block Torrent"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "17" "DNSTT Speed Booster" "22" "📊 VPN Data Usage"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "17" "Speed Optimization" "22" "📊 VPN Data Usage"
         printf "  ${C_GREEN}%2s${C_RESET}) %-25s\n" "23" "🖥️ VPS Dashboard"
 
         echo ""
@@ -3615,7 +3803,7 @@ main_menu() {
             14) backup_user_data ;;
             15) restore_user_data ;;
             16) dns_menu ;;
-            17) speed_booster_menu ;;
+            17) speed_optimization_menu ;;
             18) ssh_banner_menu ;;
             19) auto_reboot_menu ;;
             20) traffic_monitor_menu ;;
