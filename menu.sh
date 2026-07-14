@@ -1,10 +1,10 @@
 #!/bin/bash
 # ================================================================
-# VOLTRON TECH ULTIMATE v9.2 - COMPLETE (TCP PORT 53)
+# VOLTRON TECH ULTIMATE v9.2 - COMPLETE
 # ================================================================
 # Inajumuisha:
 #   1. User Management - Create, Delete, Edit, Lock, Unlock, List, Renew, Cleanup
-#   2. DNSTT - TCP Port 53 (5 Speed Boosters 1000x-10000x) + MTU Settings + Firewall Fix
+#   2. DNSTT - 5 Speed Boosters (1000x-10000x) + MTU Settings + Firewall Fix
 #   3. Protocols - badvpn, udp-custom, SSL Tunnel, Falcon Proxy, ZiVPN, X-UI
 #   4. Dynamic Banner - Centered (ACCOUNT DETAILS - Blue) WITH ACCOUNT STATUS
 #   5. VPS Dashboard - Real-time system info (Compact)
@@ -16,7 +16,6 @@
 #   11. Backup/Restore, Traffic Monitor, Torrent Blocking, Auto Reboot
 #   12. SSH Multiplexing - System-wide automatic
 #   13. SSH Compression - System-wide automatic
-#   14. DNSTT TCP Port 53
 # ================================================================
 
 # ========== COLOR CODES ==========
@@ -68,7 +67,6 @@ SSL_CERT_DIR="$DB_DIR/ssl"
 TRAFFIC_DIR="$DB_DIR/traffic"
 BACKUP_DIR="$DB_DIR/backups"
 MTU_CONFIG="$CONFIG_DIR/mtu"
-DNSTT_PORT_CONFIG="$CONFIG_DIR/dnstt_port"
 
 DNSTT_SERVICE_FILE="/etc/systemd/system/dnstt.service"
 DNSTT_BINARY="/usr/local/bin/dnstt-server"
@@ -634,13 +632,16 @@ create_user() {
     local bw_display="Unlimited"
     if [[ "$bandwidth_gb" != "0" ]]; then bw_display="${bandwidth_gb} GB"; fi
     
-    # CREATE BANNER FOR NEW USER
+    # ============================================================
+    # CREATE BANNER FOR NEW USER - MOJA KWA MOJA
+    # ============================================================
     if [[ -f "$BANNER_ENABLED_FILE" ]]; then
         generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"
         update_ssh_banners_config
         echo -e "${C_GREEN}✅ Dynamic banner created and configured for user '$username'${C_RESET}"
     else
         echo -e "${C_CYAN}ℹ️ Dynamic banner is not enabled. Enable it first: Menu → 18 → 1${C_RESET}"
+        echo -e "${C_CYAN}💡 After enabling, new users will get banners automatically.${C_RESET}"
     fi
     
     clear; show_banner
@@ -1057,7 +1058,7 @@ bulk_create_users() {
         chage -E "$expire_date" "$username"
         echo "$username:$password:$expire_date:$limit:$bandwidth_gb" >> "$DB_FILE"
         
-        # Create banner for bulk user
+        # Create banner for bulk user if dynamic banner is enabled
         if [[ -f "$BANNER_ENABLED_FILE" ]]; then
             generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"
         fi
@@ -1186,12 +1187,11 @@ generate_client_config() {
     if systemctl is-active --quiet dnstt 2>/dev/null; then
         if [ -f "$DNSTT_CONFIG_FILE" ]; then
             source "$DNSTT_CONFIG_FILE"
-            echo -e "\n🔹 ${C_BOLD}DNSTT (SlowDNS) - TCP Port 53${C_RESET}:"
+            echo -e "\n🔹 ${C_BOLD}DNSTT (SlowDNS)${C_RESET}:"
             echo -e "   • Nameserver: $TUNNEL_DOMAIN"
             echo -e "   • PubKey: $PUBLIC_KEY"
             echo -e "   • DNS IP: 8.8.8.8 / 1.1.1.1 / 169.255.187.58"
             echo -e "   • MTU: $MTU_VALUE"
-            echo -e "   • Protocol: TCP (Port 53)"
             echo -e "   • Username: $user"
             echo -e "   • Password: $pass"
         fi
@@ -1323,7 +1323,7 @@ create_trial_account() {
     local bw_display="Unlimited"
     if [[ "$bandwidth_gb" != "0" ]]; then bw_display="${bandwidth_gb} GB"; fi
     
-    # Create banner for trial user
+    # Create banner for trial user if dynamic banner is enabled
     if [[ -f "$BANNER_ENABLED_FILE" ]]; then
         generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"
         update_ssh_banners_config
@@ -1419,29 +1419,28 @@ dnstt_mtu_menu() {
 }
 
 # ================================================================
-# ========== DNSTT FIREWALL FIX (TCP PORT 53) ==========
+# ========== DNSTT FIREWALL FIX ==========
 # ================================================================
 
 configure_dnstt_firewall() {
-    echo -e "\n${C_BLUE}🔥 Configuring firewall for DNSTT (TCP Port 53)...${C_RESET}"
+    echo -e "\n${C_BLUE}🔥 Configuring firewall for DNSTT...${C_RESET}"
     
     if ! command -v iptables &>/dev/null; then
         echo -e "${C_YELLOW}⚠️ iptables not found. Installing...${C_RESET}"
         ff_apt_install iptables iptables-persistent
     fi
     
-    # Clear old NAT rules
     iptables -t nat -F 2>/dev/null || true
+    iptables -F 2>/dev/null || true
     
-    # TCP Port 53 rules
-    iptables -A INPUT -p tcp --dport 53 -j ACCEPT
-    iptables -A OUTPUT -p tcp --sport 53 -j ACCEPT
-    
-    # Keep UDP for standard DNS queries (optional)
     iptables -A INPUT -p udp --dport 53 -j ACCEPT
     iptables -A OUTPUT -p udp --sport 53 -j ACCEPT
     
-    # Save rules
+    iptables -A INPUT -p udp --dport 5300 -j ACCEPT
+    iptables -A OUTPUT -p udp --sport 5300 -j ACCEPT
+    
+    iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
+    
     if command -v netfilter-persistent &>/dev/null; then
         netfilter-persistent save >/dev/null 2>&1
     fi
@@ -1449,9 +1448,8 @@ configure_dnstt_firewall() {
     mkdir -p /etc/iptables
     iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
     
-    echo -e "${C_GREEN}✅ Firewall configured for DNSTT (TCP Port 53)${C_RESET}"
-    echo -e "${C_CYAN}📌 TCP Port 53 open for DNSTT${C_RESET}"
-    echo -e "${C_CYAN}📌 UDP Port 53 open for standard DNS${C_RESET}"
+    echo -e "${C_GREEN}✅ Firewall configured for DNSTT${C_RESET}"
+    echo -e "${C_CYAN}📌 Port 53 → 5300 redirect active${C_RESET}"
 }
 
 # ================================================================
@@ -1812,17 +1810,17 @@ apply_multiplexing() {
         "9.9.9.9:53"
     )
     
-    echo -e "${C_CYAN}Starting $num DNSTT connections (TCP)...${C_RESET}"
+    echo -e "${C_CYAN}Starting $num DNSTT connections...${C_RESET}"
     
     for i in $(seq 1 $num); do
         local resolver=${resolvers[$((i-1))]}
-        screen -dmS "dnstt_$i" dnstt-client -tcp "$resolver" \
+        screen -dmS "dnstt_$i" dnstt-client -udp "$resolver" \
             -pubkey-file /etc/voltrontech/dnstt/server.pub \
             -mtu 512 "$domain" 127.0.0.1:22 2>/dev/null
-        echo -e "${C_GREEN}✅ Connection $i started with resolver $resolver (TCP)${C_RESET}"
+        echo -e "${C_GREEN}✅ Connection $i started with resolver $resolver${C_RESET}"
     done
     
-    echo -e "\n${C_GREEN}✅ $num DNSTT connections started (TCP)${C_RESET}"
+    echo -e "\n${C_GREEN}✅ $num DNSTT connections started${C_RESET}"
     echo -e "${C_CYAN}📌 To view: screen -r dnstt_1${C_RESET}"
     echo -e "${C_CYAN}📌 To detach: Ctrl+A, D${C_RESET}"
     echo -e "${C_CYAN}📌 To stop all: pkill -f dnstt-client${C_RESET}"
@@ -1856,8 +1854,7 @@ apply_bbr() {
     echo "tcp_bbr" > /etc/modules-load.d/bbr.conf
     
     cat >> /etc/sysctl.conf << 'EOF'
-net.core.default_qdisc=fq
-net.ipv4.tcp_congestion_control=bbr
+net.core.default_qdisc=fqnet.ipv4.tcp_congestion_control=bbr
 EOF
 
     sysctl -p >/dev/null 2>&1
@@ -1997,10 +1994,6 @@ setup_domain() {
     echo "$DOMAIN" > "$DB_DIR/domain.txt"
 }
 
-# ================================================================
-# ========== CREATE DNSTT SERVICE (TCP PORT 53) ==========
-# ================================================================
-
 create_dnstt_service() {
     local domain=$1
     local mtu=$2
@@ -2019,7 +2012,7 @@ create_dnstt_service() {
     
     cat > "$DNSTT_SERVICE_FILE" <<EOF
 [Unit]
-Description=DNSTT Server - TCP PORT 53
+Description=DNSTT Server - ULTIMATE OPTIMIZED v9.2
 After=network.target
 Wants=network-online.target
 
@@ -2029,7 +2022,7 @@ User=root
 WorkingDirectory=$DB_DIR
 Environment="GODEBUG=netdns=1"
 Environment="GOMAXPROCS=4"
-ExecStart=$DNSTT_BINARY -tcp :53 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $mtu $domain $forward_target
+ExecStart=$DNSTT_BINARY -udp :5300 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $mtu $domain $forward_target
 Restart=always
 RestartSec=5
 StartLimitInterval=300
@@ -2049,9 +2042,8 @@ EOF
     systemctl daemon-reload
     systemctl enable dnstt.service > /dev/null 2>&1
     
-    echo -e "${C_GREEN}✅ DNSTT service created (TCP Port 53)${C_RESET}"
+    echo -e "${C_GREEN}✅ DNSTT service created${C_RESET}"
     echo -e "  • MTU: ${C_YELLOW}$mtu${C_RESET}"
-    echo -e "  • Port: ${C_YELLOW}53 TCP${C_RESET}"
     echo -e "  • Logs: ${C_YELLOW}$LOGS_DIR/dnstt-server.log${C_RESET}"
 }
 
@@ -2070,14 +2062,8 @@ TUNNEL_DOMAIN="$domain"
 PUBLIC_KEY="$pubkey"
 MTU_VALUE="$mtu"
 SSH_PORT="$ssh_port"
-PROTOCOL="TCP"
-PORT="53"
 EOF
 }
-
-# ================================================================
-# ========== SHOW CLIENT COMMANDS (TCP) ==========
-# ================================================================
 
 show_client_commands() {
     local domain=$1
@@ -2090,7 +2076,7 @@ show_client_commands() {
     fi
     
     echo -e "\n${C_GREEN}═══════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_GREEN}           📱 CLIENT CONNECTION DETAILS (TCP)${C_RESET}"
+    echo -e "${C_GREEN}           📱 CLIENT CONNECTION DETAILS${C_RESET}"
     echo -e "${C_GREEN}═══════════════════════════════════════════════════════════════${C_RESET}"
     echo ""
     
@@ -2099,27 +2085,22 @@ show_client_commands() {
     echo -e "  - ${C_CYAN}Public Key:${C_RESET}    ${C_YELLOW}$pubkey${C_RESET}"
     echo -e "  - ${C_CYAN}SSH Port:${C_RESET}      ${C_YELLOW}$ssh_port${C_RESET}"
     echo -e "  - ${C_CYAN}MTU Value:${C_RESET}     ${C_YELLOW}$mtu${C_RESET}"
-    echo -e "  - ${C_CYAN}Protocol:${C_RESET}      ${C_YELLOW}TCP (Port 53)${C_RESET}"
     echo ""
     
-    echo -e "${C_YELLOW}📌 Client Command (TCP):${C_RESET}"
-    echo -e "${C_WHITE}$DNSTT_CLIENT -tcp 8.8.8.8:53 \\${C_RESET}"
+    echo -e "${C_YELLOW}📌 Client Command:${C_RESET}"
+    echo -e "${C_WHITE}$DNSTT_CLIENT -udp 8.8.8.8:53 \\${C_RESET}"
     echo -e "${C_WHITE}  -pubkey-file $DNSTT_KEYS_DIR/server.pub \\${C_RESET}"
     echo -e "${C_WHITE}  -mtu $mtu \\${C_RESET}"
     echo -e "${C_WHITE}  $domain 127.0.0.1:$ssh_port${C_RESET}"
     echo ""
     
-    echo -e "${C_YELLOW}📌 Alternative Resolver (TCP):${C_RESET}"
-    echo -e "${C_WHITE}  $DNSTT_CLIENT -tcp 1.1.1.1:53 -pubkey-file $DNSTT_KEYS_DIR/server.pub -mtu $mtu $domain 127.0.0.1:$ssh_port${C_RESET}"
-    echo ""
-    
-    echo -e "${C_YELLOW}📌 Alternative Resolver (TCP):${C_RESET}"
-    echo -e "${C_WHITE}  $DNSTT_CLIENT -tcp 9.9.9.9:53 -pubkey-file $DNSTT_KEYS_DIR/server.pub -mtu $mtu $domain 127.0.0.1:$ssh_port${C_RESET}"
+    echo -e "${C_YELLOW}📌 Alternative Resolver:${C_RESET}"
+    echo -e "${C_WHITE}  $DNSTT_CLIENT -udp 169.255.187.58:53 -pubkey-file $DNSTT_KEYS_DIR/server.pub -mtu $mtu $domain 127.0.0.1:$ssh_port${C_RESET}"
 }
 
 show_dnstt_details() {
     clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 📡 DNSTT Details (TCP Port 53) ---${C_RESET}"
+    echo -e "${C_BOLD}${C_PURPLE}--- 📡 DNSTT Details ---${C_RESET}"
     
     if [ ! -f "$DB_DIR/domain.txt" ]; then
         echo -e "\n${C_YELLOW}DNSTT is not installed${C_RESET}"
@@ -2145,14 +2126,6 @@ show_dnstt_details() {
     echo -e "  ${C_CYAN}MTU:${C_RESET}           ${C_YELLOW}$MTU${C_RESET}"
     echo -e "  ${C_CYAN}SSH Port:${C_RESET}      ${C_YELLOW}$SSH_PORT${C_RESET}"
     echo -e "  ${C_CYAN}Public Key:${C_RESET}    ${C_YELLOW}${PUBKEY}${C_RESET}"
-    echo -e "  ${C_CYAN}Protocol:${C_RESET}      ${C_YELLOW}TCP (Port 53)${C_RESET}"
-    
-    # Check if TCP port 53 is listening
-    if ss -tlnp 2>/dev/null | grep -q ":53.*dnstt"; then
-        echo -e "  ${C_CYAN}Port 53 TCP:${C_RESET}  ${C_GREEN}LISTENING${C_RESET}"
-    else
-        echo -e "  ${C_CYAN}Port 53 TCP:${C_RESET}  ${C_RED}NOT LISTENING${C_RESET}"
-    fi
     
     press_enter
 }
@@ -2172,14 +2145,10 @@ uninstall_dnstt() {
     press_enter
 }
 
-# ================================================================
-# ========== INSTALL DNSTT (TCP PORT 53) ==========
-# ================================================================
-
 install_dnstt() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_BOLD}${C_PURPLE}           📡 DNSTT INSTALLATION (TCP PORT 53)${C_RESET}"
+    echo -e "${C_BOLD}${C_PURPLE}           📡 DNSTT INSTALLATION${C_RESET}"
     echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
     
     if [ -f "$DNSTT_SERVICE_FILE" ]; then
@@ -2274,7 +2243,7 @@ EOF
         *) apply_booster_high_ultimate ;;
     esac
     
-    echo -e "\n${C_BLUE}[8/9] Creating DNSTT service (TCP Port 53)...${C_RESET}"
+    echo -e "\n${C_BLUE}[8/9] Creating DNSTT service...${C_RESET}"
     SSH_PORT=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1)
     SSH_PORT=${SSH_PORT:-22}
     
@@ -2295,12 +2264,12 @@ EOF
     apply_dns_caching
     echo -e "\n${C_GREEN}✅ DNSTT optimizations applied automatically!${C_RESET}"
     
-    echo -e "\n${C_BLUE}🚀 Starting DNSTT (TCP Port 53)...${C_RESET}"
+    echo -e "\n${C_BLUE}🚀 Starting DNSTT...${C_RESET}"
     systemctl start dnstt.service
     sleep 2
     
     if systemctl is-active --quiet dnstt.service; then
-        echo -e "${C_GREEN}✅ Service started successfully on TCP Port 53${C_RESET}"
+        echo -e "${C_GREEN}✅ Service started successfully${C_RESET}"
     else
         echo -e "${C_RED}❌ Service failed to start${C_RESET}"
         journalctl -u dnstt.service -n 20 --no-pager
@@ -2308,6 +2277,47 @@ EOF
     
     show_client_commands "$DOMAIN" "$MTU" "$SSH_PORT"
     press_enter
+}
+
+# ================================================================
+# ========== SPEED OPTIMIZATION MENU ==========
+# ================================================================
+
+speed_optimization_menu() {
+    while true; do
+        clear; show_banner
+        
+        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_BOLD}${C_PURPLE}           ⚡ DNSTT SPEED BOOSTERS${C_RESET}"
+        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
+        echo ""
+        echo -e "  ${C_CYAN}Select Speed Level:${C_RESET}"
+        echo ""
+        echo -e "  ${C_GREEN}[1]${C_RESET} Standard Booster (512)   → ${C_GREEN}1000x SPEED 🚀${C_RESET}"
+        echo -e "  ${C_GREEN}[2]${C_RESET} Medium Booster (5120)    → ${C_GREEN}2000x SPEED 🚀🚀${C_RESET}"
+        echo -e "  ${C_GREEN}[3]${C_RESET} High Booster (51200)     → ${C_GREEN}3000x SPEED 🚀🚀🚀${C_RESET}"
+        echo -e "  ${C_GREEN}[4]${C_RESET} Ultra Booster (512000)   → ${C_GREEN}5000x SPEED 🚀🚀🚀🚀${C_RESET}"
+        echo -e "  ${C_GREEN}[5]${C_RESET} Extreme Booster (5120000)→ ${C_GREEN}10000x SPEED 💥💥💥💥💥${C_RESET}"
+        echo ""
+        echo -e "  ${C_DIM}ℹ️  SSH Multiplexing and Compression are applied automatically${C_RESET}"
+        echo -e "  ${C_DIM}   during system setup. DNSTT optimizations are applied${C_RESET}"
+        echo -e "  ${C_DIM}   during DNSTT installation.${C_RESET}"
+        echo ""
+        echo -e "  ${C_RED}[0]${C_RESET} Return"
+        echo ""
+        
+        read -p "👉 Select option: " choice
+        
+        case $choice in
+            1) apply_booster_standard_ultimate; press_enter ;;
+            2) apply_booster_medium_ultimate; press_enter ;;
+            3) apply_booster_high_ultimate; press_enter ;;
+            4) apply_booster_ultra_ultimate; press_enter ;;
+            5) apply_booster_extreme_ultimate; press_enter ;;
+            0) return ;;
+            *) echo -e "\n${C_RED}❌ Invalid option${C_RESET}"; sleep 2 ;;
+        esac
+    done
 }
 
 # ================================================================
@@ -2592,7 +2602,8 @@ protocol_menu() {
             udp_status="${C_GREEN}● RUNNING${C_RESET}"
         else
             udp_status="${C_DIM}● STOPPED${C_RESET}"
-        fi        
+        fi
+        
         local haproxy_status=""
         if systemctl is-active --quiet haproxy 2>/dev/null; then
             haproxy_status="${C_GREEN}● RUNNING${C_RESET}"
@@ -2602,7 +2613,7 @@ protocol_menu() {
         
         local dnstt_status=""
         if systemctl is-active --quiet dnstt 2>/dev/null; then
-            dnstt_status="${C_GREEN}● RUNNING (TCP:53)${C_RESET}"
+            dnstt_status="${C_GREEN}● RUNNING${C_RESET}"
         else
             dnstt_status="${C_DIM}● STOPPED${C_RESET}"
         fi
@@ -2637,7 +2648,7 @@ protocol_menu() {
         echo -e "  ${C_GREEN}1)${C_RESET} badvpn (UDP 7300)        $badvpn_status"
         echo -e "  ${C_GREEN}2)${C_RESET} udp-custom              $udp_status"
         echo -e "  ${C_GREEN}3)${C_RESET} SSL Tunnel (HAProxy)    $haproxy_status"
-        echo -e "  ${C_GREEN}4)${C_RESET} DNSTT (TCP:53)          $dnstt_status ${C_DIM}(MTU: $current_mtu)${C_RESET}"
+        echo -e "  ${C_GREEN}4)${C_RESET} DNSTT (Port 53)         $dnstt_status ${C_DIM}(MTU: $current_mtu)${C_RESET}"
         echo -e "  ${C_GREEN}5)${C_RESET} Falcon Proxy            $falconproxy_status"
         echo -e "  ${C_GREEN}6)${C_RESET} ZiVPN                   $zivpn_status"
         echo -e "  ${C_GREEN}7)${C_RESET} X-UI Panel              $xui_status"
@@ -2673,7 +2684,7 @@ protocol_menu() {
                 press_enter
                 ;;
             4)
-                echo -e "\n  ${C_GREEN}1)${C_RESET} Install DNSTT (TCP:53)"
+                echo -e "\n  ${C_GREEN}1)${C_RESET} Install DNSTT"
                 echo -e "  ${C_GREEN}2)${C_RESET} View Details"
                 echo -e "  ${C_RED}3)${C_RESET} Uninstall"
                 read -p "👉 Choose: " sub
@@ -3188,6 +3199,7 @@ uninstall_script() {
 update_ssh_banners_config() {
     local tmp_conf
 
+    # Only proceed if dynamic banner is enabled
     if [[ ! -f "$BANNER_ENABLED_FILE" ]]; then
         if [[ -f "$SSHD_FF_CONFIG" ]]; then
             rm -f "$SSHD_FF_CONFIG" 2>/dev/null
@@ -3207,6 +3219,7 @@ update_ssh_banners_config() {
         while IFS=: read -r user pass expiry limit bandwidth_gb _extra; do
             [[ -z "$user" || "$user" == \#* ]] && continue
             
+            # Ensure banner file exists for every user
             if [[ ! -f "$BANNER_DIR/${user}.txt" ]]; then
                 generate_user_banner "$user" "$expiry" "$limit" "$bandwidth_gb"
             fi
@@ -3253,14 +3266,18 @@ enable_dynamic_banner() {
     echo -e "\n${C_GREEN}✅ Banners created for all existing users${C_RESET}"
     echo -e "${C_CYAN}📌 New users will automatically get banners when created${C_RESET}"
     
+    # Update SSH config
     update_ssh_banners_config
     
+    # Ensure Include directive exists
     if ! grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null; then
         echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
     fi
     
+    # Restart SSH
     systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
     
+    # Restart limiter
     systemctl restart voltrontech-limiter 2>/dev/null
     
     echo -e "\n${C_GREEN}✅ Dynamic account banner enabled!${C_RESET}"
@@ -3329,47 +3346,6 @@ ssh_banner_menu() {
             1) enable_dynamic_banner ;;
             2) disable_dynamic_banner ;;
             3) preview_dynamic_ssh_banner ;;
-            0) return ;;
-            *) echo -e "\n${C_RED}❌ Invalid option${C_RESET}"; sleep 2 ;;
-        esac
-    done
-}
-
-# ================================================================
-# ========== SPEED OPTIMIZATION MENU ==========
-# ================================================================
-
-speed_optimization_menu() {
-    while true; do
-        clear; show_banner
-        
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}           ⚡ DNSTT SPEED BOOSTERS${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo ""
-        echo -e "  ${C_CYAN}Select Speed Level:${C_RESET}"
-        echo ""
-        echo -e "  ${C_GREEN}[1]${C_RESET} Standard Booster (512)   → ${C_GREEN}1000x SPEED 🚀${C_RESET}"
-        echo -e "  ${C_GREEN}[2]${C_RESET} Medium Booster (5120)    → ${C_GREEN}2000x SPEED 🚀🚀${C_RESET}"
-        echo -e "  ${C_GREEN}[3]${C_RESET} High Booster (51200)     → ${C_GREEN}3000x SPEED 🚀🚀🚀${C_RESET}"
-        echo -e "  ${C_GREEN}[4]${C_RESET} Ultra Booster (512000)   → ${C_GREEN}5000x SPEED 🚀🚀🚀🚀${C_RESET}"
-        echo -e "  ${C_GREEN}[5]${C_RESET} Extreme Booster (5120000)→ ${C_GREEN}10000x SPEED 💥💥💥💥💥${C_RESET}"
-        echo ""
-        echo -e "  ${C_DIM}ℹ️  SSH Multiplexing and Compression are applied automatically${C_RESET}"
-        echo -e "  ${C_DIM}   during system setup. DNSTT optimizations are applied${C_RESET}"
-        echo -e "  ${C_DIM}   during DNSTT installation.${C_RESET}"
-        echo ""
-        echo -e "  ${C_RED}[0]${C_RESET} Return"
-        echo ""
-        
-        read -p "👉 Select option: " choice
-        
-        case $choice in
-            1) apply_booster_standard_ultimate; press_enter ;;
-            2) apply_booster_medium_ultimate; press_enter ;;
-            3) apply_booster_high_ultimate; press_enter ;;
-            4) apply_booster_ultra_ultimate; press_enter ;;
-            5) apply_booster_extreme_ultimate; press_enter ;;
             0) return ;;
             *) echo -e "\n${C_RED}❌ Invalid option${C_RESET}"; sleep 2 ;;
         esac
@@ -3548,6 +3524,7 @@ while true; do
         is_expired=false
         bw_exhausted=false
         
+        # Check if user is locked by system
         if passwd -S "$user" 2>/dev/null | grep -q " L "; then
             user_locked=true
         fi
@@ -3556,6 +3533,7 @@ while true; do
             user_locked=true
         fi
 
+        # Check if account is expired
         expiry_ts=0
         if [[ "$expiry" != "Never" && -n "$expiry" ]]; then
             expiry_ts=$(date -d "$expiry" +%s 2>/dev/null || echo 0)
@@ -3568,6 +3546,7 @@ while true; do
             fi
         fi
 
+        # Check connection limit
         [[ "$limit" =~ ^[0-9]+$ ]] || limit=1
         if (( online_count > limit )); then
             if ! $user_locked; then
@@ -3577,6 +3556,7 @@ while true; do
             fi
         fi
 
+        # Check bandwidth
         usagefile="$BW_DIR/${user}.usage"
         accum_disp=0
         if [[ -f "$usagefile" ]]; then
@@ -3595,6 +3575,7 @@ while true; do
             fi
         fi
 
+        # Determine account status
         if $user_locked; then
             account_status="🔒 LOCKED"
             status_color="yellow"
@@ -3609,6 +3590,7 @@ while true; do
             status_color="green"
         fi
 
+        # Calculate days left
         days_left="N/A"
         if [[ "$expiry" != "Never" && -n "$expiry" && "$expiry_ts" =~ ^[0-9]+$ && $expiry_ts -gt 0 ]]; then
             diff_secs=$((expiry_ts - current_ts))
@@ -3625,6 +3607,7 @@ while true; do
             fi
         fi
 
+        # Calculate bandwidth info
         bw_info="Unlimited"
         bw_display=""
         if [[ "$bandwidth_gb" != "0" && -n "$bandwidth_gb" ]]; then
@@ -3642,6 +3625,7 @@ while true; do
         UPTIME=$(uptime -p | sed 's/up //')
         LOAD=$(awk '{print $1}' /proc/loadavg)
         
+        # Build banner content
         banner_content=""
         banner_content+="<br><br>"
         banner_content+="<center><font color=\"cyan\">──</font><font color=\"purple\" size=\"8\"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color=\"cyan\">──</font></center><br>"
@@ -3675,6 +3659,7 @@ while true; do
         
         write_banner_if_changed "$user" "$banner_content"
 
+        # Bandwidth tracking
         [[ -z "$bandwidth_gb" || "$bandwidth_gb" == "0" ]] && continue
 
         accumulated=$accum_disp
@@ -3775,6 +3760,7 @@ initial_setup() {
     
     create_limiter_service
     
+    # Apply SSH optimizations
     echo -e "\n${C_BLUE}🔧 Applying SSH Optimizations...${C_RESET}"
     apply_ssh_optimizations
     
