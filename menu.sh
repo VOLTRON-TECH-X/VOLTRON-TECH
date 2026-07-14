@@ -532,7 +532,51 @@ get_user_status() {
 }
 
 # ================================================================
-# ========== CREATE USER (WITH BANNER) ==========
+# ========== GENERATE USER BANNER FUNCTION ==========
+# ================================================================
+
+generate_user_banner() {
+    local username="$1"
+    local expiry="$2"
+    local limit="$3"
+    local bandwidth_gb="$4"
+    
+    local bw_display="Unlimited"
+    if [[ "$bandwidth_gb" != "0" ]]; then
+        bw_display="${bandwidth_gb} GB"
+    fi
+    
+    mkdir -p "$BANNER_DIR"
+    cat > "$BANNER_DIR/${username}.txt" << EOF
+<br><br>
+<center><font color="cyan">──</font><font color="purple" size="8"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color="cyan">──</font></center><br>
+<br>
+<center><font color="blue" size="5"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>
+<br>
+<center><font color="white">👤 <b>Username      :</b> $username</font></center><br>
+<center><font color="white">📅 <b>Expiration    :</b> $expiry</font></center><br>
+<center><font color="white">📊 <b>Bandwidth     :</b> $bw_display</font></center><br>
+<center><font color="white">🔌 <b>Sessions      :</b> 0/$limit</font></center><br>
+<center><font color="green" size="4"><b>📌 Account Status : ✅ ACTIVE</b></font></center><br>
+<br>
+<center><font color="white">⏱️ <b>Server Uptime :</b> $(uptime -p | sed 's/up //')</font></center><br>
+<center><font color="white">📈 <b>Server Load   :</b> $(awk '{print $1}' /proc/loadavg)</font></center><br>
+<br>
+<center><font color="green" size="4"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>
+<center><font color="white">📱 Telegram  : https://t.me/voltrontech</font></center><br>
+<center><font color="white">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>
+<br>
+<center><font color="red" size="4"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>
+<center><font color="white">• Account expires on: $expiry</font></center><br>
+<center><font color="white">• No torrent or illegal activity</font></center><br>
+<center><font color="white">• Account sharing is prohibited</font></center><br>
+<br>
+<center><font color="gray" size="2"><b>───────── Powered by Voltron Tech ─────────</b></font></center><br>
+EOF
+}
+
+# ================================================================
+# ========== CREATE USER ==========
 # ================================================================
 
 create_user() {
@@ -588,36 +632,16 @@ create_user() {
     local bw_display="Unlimited"
     if [[ "$bandwidth_gb" != "0" ]]; then bw_display="${bandwidth_gb} GB"; fi
     
-    # Create banner for new user if dynamic banner is enabled
+    # ============================================================
+    # CREATE BANNER FOR NEW USER - MOJA KWA MOJA
+    # ============================================================
     if [[ -f "$BANNER_ENABLED_FILE" ]]; then
-        mkdir -p "$BANNER_DIR"
-        cat > "$BANNER_DIR/${username}.txt" << EOF
-<br><br>
-<center><font color="cyan">──</font><font color="purple" size="8"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color="cyan">──</font></center><br>
-<br>
-<center><font color="blue" size="5"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>
-<br>
-<center><font color="white">👤 <b>Username      :</b> $username</font></center><br>
-<center><font color="white">📅 <b>Expiration    :</b> $expire_date</font></center><br>
-<center><font color="white">📊 <b>Bandwidth     :</b> $bw_display</font></center><br>
-<center><font color="white">🔌 <b>Sessions      :</b> 0/$limit</font></center><br>
-<center><font color="green" size="4"><b>📌 Account Status : ✅ ACTIVE</b></font></center><br>
-<br>
-<center><font color="white">⏱️ <b>Server Uptime :</b> $(uptime -p | sed 's/up //')</font></center><br>
-<center><font color="white">📈 <b>Server Load   :</b> $(awk '{print $1}' /proc/loadavg)</font></center><br>
-<br>
-<center><font color="green" size="4"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>
-<center><font color="white">📱 Telegram  : https://t.me/voltrontech</font></center><br>
-<center><font color="white">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>
-<br>
-<center><font color="red" size="4"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>
-<center><font color="white">• Account expires on: $expire_date</font></center><br>
-<center><font color="white">• No torrent or illegal activity</font></center><br>
-<center><font color="white">• Account sharing is prohibited</font></center><br>
-<br>
-<center><font color="gray" size="2"><b>───────── Powered by Voltron Tech ─────────</b></font></center><br>
-EOF
-        echo -e "${C_GREEN}✅ Dynamic banner created for user '$username'${C_RESET}"
+        generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"
+        update_ssh_banners_config
+        echo -e "${C_GREEN}✅ Dynamic banner created and configured for user '$username'${C_RESET}"
+    else
+        echo -e "${C_CYAN}ℹ️ Dynamic banner is not enabled. Enable it first: Menu → 18 → 1${C_RESET}"
+        echo -e "${C_CYAN}💡 After enabling, new users will get banners automatically.${C_RESET}"
     fi
     
     clear; show_banner
@@ -627,6 +651,11 @@ EOF
     echo -e "  - 🗓️ Expires on:        ${C_YELLOW}$expire_date${C_RESET}"
     echo -e "  - 📶 Connection Limit:  ${C_YELLOW}$limit${C_RESET}"
     echo -e "  - 📦 Bandwidth Limit:   ${C_YELLOW}$bw_display${C_RESET}"
+    
+    if [[ ! -f "$BANNER_ENABLED_FILE" ]]; then
+        echo -e "\n${C_CYAN}💡 Tip: Enable dynamic banner to show account status on login.${C_RESET}"
+        echo -e "${C_CYAN}   Menu → 18 → 1${C_RESET}"
+    fi
     press_enter
 }
 
@@ -799,7 +828,7 @@ unlock_user() {
 }
 
 # ================================================================
-# ========== LIST USERS (VERTICAL - REKEBISHWA) ==========
+# ========== LIST USERS (VERTICAL) ==========
 # ================================================================
 
 list_users() {
@@ -1029,40 +1058,19 @@ bulk_create_users() {
         chage -E "$expire_date" "$username"
         echo "$username:$password:$expire_date:$limit:$bandwidth_gb" >> "$DB_FILE"
         
-        # Create banner for bulk user
+        # Create banner for bulk user if dynamic banner is enabled
         if [[ -f "$BANNER_ENABLED_FILE" ]]; then
-            mkdir -p "$BANNER_DIR"
-            cat > "$BANNER_DIR/${username}.txt" << EOF
-<br><br>
-<center><font color="cyan">──</font><font color="purple" size="8"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color="cyan">──</font></center><br>
-<br>
-<center><font color="blue" size="5"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>
-<br>
-<center><font color="white">👤 <b>Username      :</b> $username</font></center><br>
-<center><font color="white">📅 <b>Expiration    :</b> $expire_date</font></center><br>
-<center><font color="white">📊 <b>Bandwidth     :</b> $bw_display</font></center><br>
-<center><font color="white">🔌 <b>Sessions      :</b> 0/$limit</font></center><br>
-<center><font color="green" size="4"><b>📌 Account Status : ✅ ACTIVE</b></font></center><br>
-<br>
-<center><font color="white">⏱️ <b>Server Uptime :</b> $(uptime -p | sed 's/up //')</font></center><br>
-<center><font color="white">📈 <b>Server Load   :</b> $(awk '{print $1}' /proc/loadavg)</font></center><br>
-<br>
-<center><font color="green" size="4"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>
-<center><font color="white">📱 Telegram  : https://t.me/voltrontech</font></center><br>
-<center><font color="white">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>
-<br>
-<center><font color="red" size="4"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>
-<center><font color="white">• Account expires on: $expire_date</font></center><br>
-<center><font color="white">• No torrent or illegal activity</font></center><br>
-<center><font color="white">• Account sharing is prohibited</font></center><br>
-<br>
-<center><font color="gray" size="2"><b>───────── Powered by Voltron Tech ─────────</b></font></center><br>
-EOF
+            generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"
         fi
         
         printf "  ${C_GREEN}%-20s${C_RESET} | ${C_YELLOW}%-15s${C_RESET} | ${C_CYAN}%-12s${C_RESET}\n" "$username" "$password" "$expire_date"
         created=$((created + 1))
     done
+    
+    if [[ -f "$BANNER_ENABLED_FILE" ]]; then
+        update_ssh_banners_config
+        echo -e "${C_GREEN}✅ SSH banners configured for all new users${C_RESET}"
+    fi
     
     echo -e "${C_YELLOW}================================================================${C_RESET}"
     echo -e "\n${C_GREEN}✅ Created $created users. Conn Limit: ${limit} | BW: ${bw_display}${C_RESET}"
@@ -1315,35 +1323,10 @@ create_trial_account() {
     local bw_display="Unlimited"
     if [[ "$bandwidth_gb" != "0" ]]; then bw_display="${bandwidth_gb} GB"; fi
     
-    # Create banner for trial user
+    # Create banner for trial user if dynamic banner is enabled
     if [[ -f "$BANNER_ENABLED_FILE" ]]; then
-        mkdir -p "$BANNER_DIR"
-        cat > "$BANNER_DIR/${username}.txt" << EOF
-<br><br>
-<center><font color="cyan">──</font><font color="purple" size="8"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color="cyan">──</font></center><br>
-<br>
-<center><font color="blue" size="5"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>
-<br>
-<center><font color="white">👤 <b>Username      :</b> $username</font></center><br>
-<center><font color="white">📅 <b>Expiration    :</b> $expire_date (TRIAL)</font></center><br>
-<center><font color="white">📊 <b>Bandwidth     :</b> $bw_display</font></center><br>
-<center><font color="white">🔌 <b>Sessions      :</b> 0/$limit</font></center><br>
-<center><font color="green" size="4"><b>📌 Account Status : ✅ ACTIVE (TRIAL)</b></font></center><br>
-<br>
-<center><font color="white">⏱️ <b>Server Uptime :</b> $(uptime -p | sed 's/up //')</font></center><br>
-<center><font color="white">📈 <b>Server Load   :</b> $(awk '{print $1}' /proc/loadavg)</font></center><br>
-<br>
-<center><font color="green" size="4"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>
-<center><font color="white">📱 Telegram  : https://t.me/voltrontech</font></center><br>
-<center><font color="white">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>
-<br>
-<center><font color="red" size="4"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>
-<center><font color="white">• Account expires on: $expire_date</font></center><br>
-<center><font color="white">• No torrent or illegal activity</font></center><br>
-<center><font color="white">• Account sharing is prohibited</font></center><br>
-<br>
-<center><font color="gray" size="2"><b>───────── Powered by Voltron Tech ─────────</b></font></center><br>
-EOF
+        generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"
+        update_ssh_banners_config
     fi
     
     clear; show_banner
@@ -1540,7 +1523,7 @@ EOF
 
 apply_booster_standard_ultimate() {
     echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_BLUE}           ⚡ STANDARD BOOSTER ULTIMATE (1GB) - 1000x SPEED${C_RESET}"
+    echo -e "${C_BLUE}           ⚡ STANDARD BOOSTER ULTIMATE (512) - 1000x SPEED${C_RESET}"
     echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
     
     modprobe tcp_bbr 2>/dev/null
@@ -1549,13 +1532,13 @@ apply_booster_standard_ultimate() {
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
     echo -e "${C_GREEN}✓ BBR v3 + Cake enabled${C_RESET}"
     
-    sysctl -w net.ipv4.udp_rmem_min=52428800 >/dev/null 2>&1
-    sysctl -w net.ipv4.udp_wmem_min=52428800 >/dev/null 2>&1
-    sysctl -w net.core.rmem_default=26214400 >/dev/null 2>&1
-    sysctl -w net.core.wmem_default=26214400 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_rmem_min=512 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_wmem_min=512 >/dev/null 2>&1
+    sysctl -w net.core.rmem_default=512 >/dev/null 2>&1
+    sysctl -w net.core.wmem_default=512 >/dev/null 2>&1
     sysctl -w net.core.rmem_max=1073741824 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=1073741824 >/dev/null 2>&1
-    echo -e "${C_GREEN}✓ UDP buffers: 1GB (1000x)${C_RESET}"
+    echo -e "${C_GREEN}✓ UDP buffers: 512 (1000x)${C_RESET}"
     
     sysctl -w net.core.netdev_max_backlog=1000000 >/dev/null 2>&1
     sysctl -w net.core.somaxconn=524288 >/dev/null 2>&1
@@ -1575,7 +1558,7 @@ apply_booster_standard_ultimate() {
 
 apply_booster_medium_ultimate() {
     echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_BLUE}           ⚡ MEDIUM BOOSTER ULTIMATE (2GB) - 2000x SPEED${C_RESET}"
+    echo -e "${C_BLUE}           ⚡ MEDIUM BOOSTER ULTIMATE (5120) - 2000x SPEED${C_RESET}"
     echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
     
     modprobe tcp_bbr 2>/dev/null
@@ -1585,13 +1568,13 @@ apply_booster_medium_ultimate() {
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
     echo -e "${C_GREEN}✓ BBR v3 + Cake + FQ enabled${C_RESET}"
     
-    sysctl -w net.ipv4.udp_rmem_min=104857600 >/dev/null 2>&1
-    sysctl -w net.ipv4.udp_wmem_min=104857600 >/dev/null 2>&1
-    sysctl -w net.core.rmem_default=52428800 >/dev/null 2>&1
-    sysctl -w net.core.wmem_default=52428800 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_rmem_min=5120 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_wmem_min=5120 >/dev/null 2>&1
+    sysctl -w net.core.rmem_default=5120 >/dev/null 2>&1
+    sysctl -w net.core.wmem_default=5120 >/dev/null 2>&1
     sysctl -w net.core.rmem_max=2147483648 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=2147483648 >/dev/null 2>&1
-    echo -e "${C_GREEN}✓ UDP buffers: 2GB (2000x)${C_RESET}"
+    echo -e "${C_GREEN}✓ UDP buffers: 5120 (2000x)${C_RESET}"
     
     sysctl -w net.core.netdev_max_backlog=2000000 >/dev/null 2>&1
     sysctl -w net.core.somaxconn=1048576 >/dev/null 2>&1
@@ -1612,7 +1595,7 @@ apply_booster_medium_ultimate() {
 
 apply_booster_high_ultimate() {
     echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_BLUE}           ⚡ HIGH BOOSTER ULTIMATE (4GB) - 3000x SPEED${C_RESET}"
+    echo -e "${C_BLUE}           ⚡ HIGH BOOSTER ULTIMATE (51200) - 3000x SPEED${C_RESET}"
     echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
     
     modprobe tcp_bbr 2>/dev/null
@@ -1623,13 +1606,13 @@ apply_booster_high_ultimate() {
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
     echo -e "${C_GREEN}✓ BBR v3 + Cake + FQ + HTB enabled${C_RESET}"
     
-    sysctl -w net.ipv4.udp_rmem_min=209715200 >/dev/null 2>&1
-    sysctl -w net.ipv4.udp_wmem_min=209715200 >/dev/null 2>&1
-    sysctl -w net.core.rmem_default=104857600 >/dev/null 2>&1
-    sysctl -w net.core.wmem_default=104857600 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_rmem_min=51200 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_wmem_min=51200 >/dev/null 2>&1
+    sysctl -w net.core.rmem_default=51200 >/dev/null 2>&1
+    sysctl -w net.core.wmem_default=51200 >/dev/null 2>&1
     sysctl -w net.core.rmem_max=4294967296 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=4294967296 >/dev/null 2>&1
-    echo -e "${C_GREEN}✓ UDP buffers: 4GB (3000x)${C_RESET}"
+    echo -e "${C_GREEN}✓ UDP buffers: 51200 (3000x)${C_RESET}"
     
     sysctl -w net.core.netdev_max_backlog=4000000 >/dev/null 2>&1
     sysctl -w net.core.somaxconn=2097152 >/dev/null 2>&1
@@ -1667,7 +1650,7 @@ apply_booster_high_ultimate() {
 
 apply_booster_ultra_ultimate() {
     echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_BLUE}           🚀 ULTRA BOOSTER ULTIMATE (8GB) - 5000x SPEED${C_RESET}"
+    echo -e "${C_BLUE}           🚀 ULTRA BOOSTER ULTIMATE (512000) - 5000x SPEED${C_RESET}"
     echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
     
     modprobe tcp_bbr 2>/dev/null
@@ -1678,13 +1661,13 @@ apply_booster_ultra_ultimate() {
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
     echo -e "${C_GREEN}✓ BBR v3 + Cake + FQ + HTB enabled${C_RESET}"
     
-    sysctl -w net.ipv4.udp_rmem_min=419430400 >/dev/null 2>&1
-    sysctl -w net.ipv4.udp_wmem_min=419430400 >/dev/null 2>&1
-    sysctl -w net.core.rmem_default=209715200 >/dev/null 2>&1
-    sysctl -w net.core.wmem_default=209715200 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_rmem_min=512000 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_wmem_min=512000 >/dev/null 2>&1
+    sysctl -w net.core.rmem_default=512000 >/dev/null 2>&1
+    sysctl -w net.core.wmem_default=512000 >/dev/null 2>&1
     sysctl -w net.core.rmem_max=8589934592 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=8589934592 >/dev/null 2>&1
-    echo -e "${C_GREEN}✓ UDP buffers: 8GB (5000x)${C_RESET}"
+    echo -e "${C_GREEN}✓ UDP buffers: 512000 (5000x)${C_RESET}"
     
     sysctl -w net.core.netdev_max_backlog=6000000 >/dev/null 2>&1
     sysctl -w net.core.somaxconn=4194304 >/dev/null 2>&1
@@ -1728,7 +1711,7 @@ apply_booster_ultra_ultimate() {
 
 apply_booster_extreme_ultimate() {
     echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_BLUE}           💥 EXTREME BOOSTER ULTIMATE (16GB) - 10000x SPEED${C_RESET}"
+    echo -e "${C_BLUE}           💥 EXTREME BOOSTER ULTIMATE (5120000) - 10000x SPEED${C_RESET}"
     echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
     
     modprobe tcp_bbr 2>/dev/null
@@ -1739,13 +1722,13 @@ apply_booster_extreme_ultimate() {
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
     echo -e "${C_GREEN}✓ BBR v3 + Cake + FQ + HTB enabled${C_RESET}"
     
-    sysctl -w net.ipv4.udp_rmem_min=838860800 >/dev/null 2>&1
-    sysctl -w net.ipv4.udp_wmem_min=838860800 >/dev/null 2>&1
-    sysctl -w net.core.rmem_default=419430400 >/dev/null 2>&1
-    sysctl -w net.core.wmem_default=419430400 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_rmem_min=5120000 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_wmem_min=5120000 >/dev/null 2>&1
+    sysctl -w net.core.rmem_default=5120000 >/dev/null 2>&1
+    sysctl -w net.core.wmem_default=5120000 >/dev/null 2>&1
     sysctl -w net.core.rmem_max=17179869184 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=17179869184 >/dev/null 2>&1
-    echo -e "${C_GREEN}✓ UDP buffers: 16GB (10000x)${C_RESET}"
+    echo -e "${C_GREEN}✓ UDP buffers: 5120000 (10000x)${C_RESET}"
     
     sysctl -w net.core.netdev_max_backlog=10000000 >/dev/null 2>&1
     sysctl -w net.core.somaxconn=8388608 >/dev/null 2>&1
@@ -1871,8 +1854,7 @@ apply_bbr() {
     echo "tcp_bbr" > /etc/modules-load.d/bbr.conf
     
     cat >> /etc/sysctl.conf << 'EOF'
-net.core.default_qdisc=fq
-net.ipv4.tcp_congestion_control=bbr
+net.core.default_qdisc=fqnet.ipv4.tcp_congestion_control=bbr
 EOF
 
     sysctl -p >/dev/null 2>&1
@@ -1922,26 +1904,6 @@ EOF
     echo "nameserver 1.1.1.1" >> /etc/resolv.conf
     
     echo -e "${C_GREEN}✅ DNS Caching applied${C_RESET}"
-}
-
-apply_cloudflare_warp() {
-    echo -e "\n${C_BLUE}🌐 Installing Cloudflare Warp...${C_RESET}"
-    
-    if ! command -v warp-cli &>/dev/null; then
-        curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | apt-key add - 2>/dev/null
-        echo "deb https://pkg.cloudflareclient.com/ $(lsb_release -cs) main" > /etc/apt/sources.list.d/cloudflare-client.list
-        apt-get update 2>/dev/null
-        apt-get install cloudflare-warp -y 2>/dev/null
-    fi
-    
-    warp-cli register 2>/dev/null
-    warp-cli set-mode proxy 2>/dev/null
-    warp-cli set-proxy-port 1080 2>/dev/null
-    warp-cli connect 2>/dev/null
-    
-    echo -e "${C_GREEN}✅ Cloudflare Warp installed and running${C_RESET}"
-    echo -e "${C_CYAN}📌 Proxy running on 127.0.0.1:1080${C_RESET}"
-    echo -e "${C_CYAN}📌 Use: dnstt-client --socks5 127.0.0.1:1080 ...${C_RESET}"
 }
 
 # ================================================================
@@ -2292,7 +2254,7 @@ EOF
     configure_dnstt_firewall
     
     # ============================================================
-    # AUTO-APPLY DNSTT OPTIMIZATIONS (EXCLUDING SSH)
+    # AUTO-APPLY DNSTT OPTIMIZATIONS
     # ============================================================
     echo -e "\n${C_BLUE}⚡ Auto-applying DNSTT optimizations...${C_RESET}"
     apply_multiplexing 3
@@ -2331,11 +2293,11 @@ speed_optimization_menu() {
         echo ""
         echo -e "  ${C_CYAN}Select Speed Level:${C_RESET}"
         echo ""
-        echo -e "  ${C_GREEN}[1]${C_RESET} Standard Booster (1GB)   → ${C_GREEN}1000x SPEED 🚀${C_RESET}"
-        echo -e "  ${C_GREEN}[2]${C_RESET} Medium Booster (2GB)     → ${C_GREEN}2000x SPEED 🚀🚀${C_RESET}"
-        echo -e "  ${C_GREEN}[3]${C_RESET} High Booster (4GB)       → ${C_GREEN}3000x SPEED 🚀🚀🚀${C_RESET}"
-        echo -e "  ${C_GREEN}[4]${C_RESET} Ultra Booster (8GB)      → ${C_GREEN}5000x SPEED 🚀🚀🚀🚀${C_RESET}"
-        echo -e "  ${C_GREEN}[5]${C_RESET} Extreme Booster (16GB)   → ${C_GREEN}10000x SPEED 💥💥💥💥💥${C_RESET}"
+        echo -e "  ${C_GREEN}[1]${C_RESET} Standard Booster (512)   → ${C_GREEN}1000x SPEED 🚀${C_RESET}"
+        echo -e "  ${C_GREEN}[2]${C_RESET} Medium Booster (5120)    → ${C_GREEN}2000x SPEED 🚀🚀${C_RESET}"
+        echo -e "  ${C_GREEN}[3]${C_RESET} High Booster (51200)     → ${C_GREEN}3000x SPEED 🚀🚀🚀${C_RESET}"
+        echo -e "  ${C_GREEN}[4]${C_RESET} Ultra Booster (512000)   → ${C_GREEN}5000x SPEED 🚀🚀🚀🚀${C_RESET}"
+        echo -e "  ${C_GREEN}[5]${C_RESET} Extreme Booster (5120000)→ ${C_GREEN}10000x SPEED 💥💥💥💥💥${C_RESET}"
         echo ""
         echo -e "  ${C_DIM}ℹ️  SSH Multiplexing and Compression are applied automatically${C_RESET}"
         echo -e "  ${C_DIM}   during system setup. DNSTT optimizations are applied${C_RESET}"
@@ -3231,6 +3193,232 @@ uninstall_script() {
 }
 
 # ================================================================
+# ========== UPDATE SSH BANNERS CONFIG ==========
+# ================================================================
+
+update_ssh_banners_config() {
+    local tmp_conf
+
+    # Only proceed if dynamic banner is enabled
+    if [[ ! -f "$BANNER_ENABLED_FILE" ]]; then
+        if [[ -f "$SSHD_FF_CONFIG" ]]; then
+            rm -f "$SSHD_FF_CONFIG" 2>/dev/null
+            systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+        fi
+        return
+    fi
+
+    mkdir -p "$BANNER_DIR" /etc/ssh/sshd_config.d
+    tmp_conf="/tmp/voltrontech_banners_new.conf"
+    
+    echo "# Voltron Tech - Dynamic per-user SSH banners" > "$tmp_conf"
+    echo "# Generated: $(date)" >> "$tmp_conf"
+    echo "" >> "$tmp_conf"
+
+    if [[ -f "$DB_FILE" ]]; then
+        while IFS=: read -r user pass expiry limit bandwidth_gb _extra; do
+            [[ -z "$user" || "$user" == \#* ]] && continue
+            
+            # Ensure banner file exists for every user
+            if [[ ! -f "$BANNER_DIR/${user}.txt" ]]; then
+                generate_user_banner "$user" "$expiry" "$limit" "$bandwidth_gb"
+            fi
+            
+            echo "Match User $user" >> "$tmp_conf"
+            echo "    Banner $BANNER_DIR/${user}.txt" >> "$tmp_conf"
+            echo "" >> "$tmp_conf"
+        done < "$DB_FILE"
+    fi
+
+    if ! cmp -s "$tmp_conf" "$SSHD_FF_CONFIG" 2>/dev/null; then
+        mv "$tmp_conf" "$SSHD_FF_CONFIG"
+        if ! grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null; then
+            echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
+        fi
+        systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+    else
+        rm -f "$tmp_conf"
+    fi
+}
+
+# ================================================================
+# ========== DYNAMIC BANNER FUNCTIONS ==========
+# ================================================================
+
+enable_dynamic_banner() {
+    echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_BLUE}           🎨 ENABLING DYNAMIC ACCOUNT BANNER${C_RESET}"
+    echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    
+    mkdir -p "$BANNER_DIR"
+    touch "$BANNER_ENABLED_FILE"
+    
+    echo -e "\n${C_CYAN}📝 Creating banners for all existing users...${C_RESET}"
+    
+    if [[ -f "$DB_FILE" ]]; then
+        while IFS=: read -r user pass expiry limit bandwidth_gb _extra; do
+            [[ -z "$user" || "$user" == \#* ]] && continue
+            generate_user_banner "$user" "$expiry" "$limit" "$bandwidth_gb"
+            echo -e "${C_GREEN}✅ Banner created for user: ${C_YELLOW}$user${C_RESET}"
+        done < "$DB_FILE"
+    fi
+    
+    echo -e "\n${C_GREEN}✅ Banners created for all existing users${C_RESET}"
+    echo -e "${C_CYAN}📌 New users will automatically get banners when created${C_RESET}"
+    
+    # Update SSH config
+    update_ssh_banners_config
+    
+    # Ensure Include directive exists
+    if ! grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null; then
+        echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
+    fi
+    
+    # Restart SSH
+    systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+    
+    # Restart limiter
+    systemctl restart voltrontech-limiter 2>/dev/null
+    
+    echo -e "\n${C_GREEN}✅ Dynamic account banner enabled!${C_RESET}"
+    echo -e "${C_CYAN}📌 Users will see their account status when connecting via SSH/VPN${C_RESET}"
+    echo -e "${C_CYAN}📌 Banner updates automatically every 15 seconds${C_RESET}"
+    echo -e "${C_CYAN}📌 New users created after this will get banners automatically${C_RESET}"
+    echo -e "${C_CYAN}📌 No need to enable again!${C_RESET}"
+    press_enter
+}
+
+disable_dynamic_banner() {
+    echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_BLUE}           🛑 DISABLING DYNAMIC ACCOUNT BANNER${C_RESET}"
+    echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    
+    rm -f "$BANNER_ENABLED_FILE"
+    rm -f "$SSHD_FF_CONFIG"
+    rm -rf "$BANNER_DIR" 2>/dev/null
+    systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+    
+    echo -e "\n${C_GREEN}✅ Dynamic banner disabled!${C_RESET}"
+    press_enter
+}
+
+preview_dynamic_ssh_banner() {
+    if [[ ! -f "$BANNER_ENABLED_FILE" ]]; then
+        echo -e "\n${C_RED}❌ Dynamic banners are not enabled right now.${C_RESET}"
+        press_enter
+        return
+    fi
+
+    _select_user_interface "--- 📝 Preview Dynamic Banner ---"
+    local u=$SELECTED_USER
+    if [[ -z "$u" || "$u" == "NO_USERS" ]]; then
+        return
+    fi
+
+    echo -e "\n${C_CYAN}--- Dynamic Banner Preview for user '$u' ---${C_RESET}\n"
+    if [[ -f "$BANNER_DIR/${u}.txt" ]]; then
+        cat "$BANNER_DIR/${u}.txt"
+    else
+        echo -e "${C_RED}Banner file not generated yet. Waiting up to 10s...${C_RESET}"
+        sleep 5
+        if ! cat "$BANNER_DIR/${u}.txt" 2>/dev/null; then
+            echo -e "\n${C_RED}Still not generated. Check limiter logs:${C_RESET}"
+            journalctl -u voltrontech-limiter -n 15 --no-pager
+        fi
+    fi
+    press_enter
+}
+
+ssh_banner_menu() {
+    while true; do
+        clear; show_banner
+        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_BOLD}${C_PURPLE}           🎨 SSH BANNER MANAGEMENT${C_RESET}"
+        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
+        echo ""
+        echo -e "  ${C_GREEN}1)${C_RESET} Enable Dynamic Account Banner"
+        echo -e "  ${C_RED}2)${C_RESET} Disable Dynamic Banner"
+        echo -e "  ${C_GREEN}3)${C_RESET} Preview Dynamic Banner"
+        echo -e "  ${C_RED}0)${C_RESET} Return"
+        echo ""
+        read -p "👉 Select option: " choice
+        case $choice in
+            1) enable_dynamic_banner ;;
+            2) disable_dynamic_banner ;;
+            3) preview_dynamic_ssh_banner ;;
+            0) return ;;
+            *) echo -e "\n${C_RED}❌ Invalid option${C_RESET}"; sleep 2 ;;
+        esac
+    done
+}
+
+# ================================================================
+# ========== APPLY SSH BOOSTER AUTO ==========
+# ================================================================
+
+apply_ssh_booster_auto() {
+    echo -e "\n${C_BLUE}🔧 Applying SSH Speed Booster (Automatic)...${C_RESET}"
+    
+    cat > /etc/ssh/sshd_config.d/voltrontech-speed.conf << 'EOF'
+# Voltron Tech SSH Speed Optimizations
+# Fastest ciphers and MACs for maximum performance
+
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-256
+KexAlgorithms curve25519-sha256@libssh.org,ecdh-sha2-nistp521,ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256
+HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,ssh-ed25519,ssh-rsa
+Compression no
+TCPKeepAlive yes
+ClientAliveInterval 60
+ClientAliveCountMax 3
+RekeyLimit 1G 1h
+AllowTcpForwarding yes
+GatewayPorts yes
+PermitRootLogin yes
+EOF
+
+    systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+    
+    echo "net.ipv4.tcp_keepalive_time = 30" >> /etc/sysctl.conf
+    echo "net.ipv4.tcp_keepalive_intvl = 5" >> /etc/sysctl.conf
+    echo "net.ipv4.tcp_keepalive_probes = 3" >> /etc/sysctl.conf
+    sysctl -p >/dev/null 2>&1
+    
+    echo -e "${C_GREEN}✅ SSH Speed Booster applied automatically!${C_RESET}"
+}
+
+# ================================================================
+# ========== APPLY UDP BOOSTER AUTO ==========
+# ================================================================
+
+apply_udp_booster_auto() {
+    echo -e "\n${C_BLUE}🔧 Applying UDP Booster (Automatic)...${C_RESET}"
+    
+    sysctl -w net.core.rmem_max=10737418240 >/dev/null 2>&1
+    sysctl -w net.core.wmem_max=10737418240 >/dev/null 2>&1
+    sysctl -w net.core.rmem_default=1073741824 >/dev/null 2>&1
+    sysctl -w net.core.wmem_default=1073741824 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_rmem_min=125829120 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_wmem_min=125829120 >/dev/null 2>&1
+    
+    sysctl -w net.core.udp_gro_enabled=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_gro_enabled=1 >/dev/null 2>&1
+    sysctl -w net.ipv4.udp_l3mdev_accept=1 >/dev/null 2>&1
+    
+    echo "KCP_WINDOW_SIZE=1024,1024" >> /etc/sysctl.conf 2>/dev/null
+    echo "KCP_MAX_STREAM_BUFFER=10737418240" >> /etc/sysctl.conf 2>/dev/null
+    echo "KCP_QUEUE_SIZE=10240" >> /etc/sysctl.conf 2>/dev/null
+    
+    mkdir -p "$CONFIG_DIR"
+    cat > "$CONFIG_DIR/udp_booster.conf" << EOF
+UDP_BOOSTER_APPLIED="true"
+DATE_APPLIED="$(date)"
+EOF
+    
+    echo -e "${C_GREEN}✅ UDP Booster applied automatically!${C_RESET}"
+}
+
+# ================================================================
 # ========== LIMITER SERVICE (WITH ACCOUNT STATUS) ==========
 # ================================================================
 
@@ -3333,187 +3521,148 @@ while true; do
 
         online_count=${#unique_pids[@]}
         user_locked=false
+        is_expired=false
+        bw_exhausted=false
+        
+        # Check if user is locked by system
+        if passwd -S "$user" 2>/dev/null | grep -q " L "; then
+            user_locked=true
+        fi
+        
         if [[ -n "${locked_users[$user]+x}" ]]; then
             user_locked=true
         fi
 
+        # Check if account is expired
         expiry_ts=0
-        is_expired=false
         if [[ "$expiry" != "Never" && -n "$expiry" ]]; then
             expiry_ts=$(date -d "$expiry" +%s 2>/dev/null || echo 0)
             if [[ "$expiry_ts" =~ ^[0-9]+$ ]] && (( expiry_ts > 0 && expiry_ts < current_ts )); then
                 is_expired=true
                 if ! $user_locked; then
                     usermod -L "$user" &>/dev/null
-                    killall -u "$user" -9 &>/dev/null
-                    locked_users["$user"]=1
                     user_locked=true
                 fi
             fi
         fi
 
+        # Check connection limit
         [[ "$limit" =~ ^[0-9]+$ ]] || limit=1
         if (( online_count > limit )); then
             if ! $user_locked; then
                 usermod -L "$user" &>/dev/null
                 killall -u "$user" -9 &>/dev/null
-                (sleep 120; usermod -U "$user" &>/dev/null) &
-                locked_users["$user"]=1
                 user_locked=true
-            else
-                killall -u "$user" -9 &>/dev/null
             fi
         fi
 
-        if $dynamic_banners_enabled; then
-            # ============================================================
-            # CALCULATE ACCOUNT STATUS
-            # ============================================================
-            
-            # Check if user is locked
-            if $user_locked; then
-                account_status="🔒 LOCKED"
-                status_color="yellow"
-            # Check if account is expired
-            elif $is_expired; then
-                account_status="🗓️ EXPIRED"
-                status_color="red"
-            else
-                # Check bandwidth status
-                bw_exhausted=false
-                bw_percent=0
-                
-                if [[ "$bandwidth_gb" != "0" && -n "$bandwidth_gb" ]]; then
-                    usagefile="$BW_DIR/${user}.usage"
-                    accum_disp=0
-                    if [[ -f "$usagefile" ]]; then
-                        read -r accum_disp < "$usagefile"
-                        [[ "$accum_disp" =~ ^[0-9]+$ ]] || accum_disp=0
-                    fi
-                    
-                    quota_bytes=$(awk "BEGIN {printf \"%.0f\", $bandwidth_gb * 1073741824}")
-                    
-                    if (( quota_bytes > 0 )); then
-                        bw_percent=$(awk "BEGIN {printf \"%.0f\", ($accum_disp / $quota_bytes) * 100}")
-                        
-                        if (( $(echo "$bw_percent >= 100" | bc -l 2>/dev/null || echo "0") )); then
-                            bw_exhausted=true
-                            account_status="⚠️ DATA EXHAUSTED!"
-                            status_color="red"
-                        elif (( $(echo "$bw_percent >= 90" | bc -l 2>/dev/null || echo "0") )); then
-                            account_status="✅ ACTIVE"
-                            status_color="green"
-                        else
-                            account_status="✅ ACTIVE"
-                            status_color="green"
-                        fi
-                    else
-                        account_status="✅ ACTIVE"
-                        status_color="green"
-                    fi
-                else
-                    account_status="✅ ACTIVE"
-                    status_color="green"
-                fi
-            fi
-
-            # ============================================================
-            # CALCULATE DAYS LEFT
-            # ============================================================
-            
-            days_left="N/A"
-            if [[ "$expiry" != "Never" && -n "$expiry" && "$expiry_ts" =~ ^[0-9]+$ && $expiry_ts -gt 0 ]]; then
-                diff_secs=$((expiry_ts - current_ts))
-                if (( diff_secs <= 0 )); then
-                    days_left="EXPIRED"
-                else
-                    d_l=$(( diff_secs / 86400 ))
-                    h_l=$(( (diff_secs % 86400) / 3600 ))
-                    if (( d_l == 0 )); then
-                        days_left="${h_l}h left"
-                    else
-                        days_left="${d_l}d ${h_l}h"
-                    fi
-                fi
-            fi
-
-            # ============================================================
-            # CALCULATE BANDWIDTH INFO
-            # ============================================================
-            
-            bw_info="Unlimited"
-            bw_display=""
-            if [[ "$bandwidth_gb" != "0" && -n "$bandwidth_gb" ]]; then
-                usagefile="$BW_DIR/${user}.usage"
-                accum_disp=0
-                if [[ -f "$usagefile" ]]; then
-                    read -r accum_disp < "$usagefile"
-                    [[ "$accum_disp" =~ ^[0-9]+$ ]] || accum_disp=0
-                fi
-                used_gb=$(awk "BEGIN {printf \"%.2f\", $accum_disp / 1073741824}")
-                remain_gb=$(awk "BEGIN {r=$bandwidth_gb - $used_gb; if(r<0) r=0; printf \"%.2f\", r}")
-                bw_info="${used_gb}/${bandwidth_gb} GB used | ${remain_gb} GB left"
-                
-                if (( $(echo "$remain_gb <= 0" | bc -l 2>/dev/null || echo "0") )); then
-                    bw_display="<center><font color=\"red\" size=\"4\"><b>⚠️ DATA EXHAUSTED! Please contact admin.</b></font></center><br>"
-                elif (( $(echo "$remain_gb <= 1" | bc -l 2>/dev/null || echo "0") )); then
-                    bw_display="<center><font color=\"yellow\" size=\"4\"><b>⚠️ WARNING: Low bandwidth! Only ${remain_gb} GB left.</b></font></center><br>"
-                fi
-            fi
-
-            UPTIME=$(uptime -p | sed 's/up //')
-            LOAD=$(awk '{print $1}' /proc/loadavg)
-            
-            # ============================================================
-            # BUILD BANNER CONTENT
-            # ============================================================
-            
-            banner_content=""
-            banner_content+="<br><br>"
-            banner_content+="<center><font color=\"cyan\">──</font><font color=\"purple\" size=\"8\"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color=\"cyan\">──</font></center><br>"
-            banner_content+="<br>"
-            banner_content+="<center><font color=\"blue\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
-            banner_content+="<br>"
-            banner_content+="<center><font color=\"white\">👤 <b>Username      :</b> $user</font></center><br>"
-            banner_content+="<center><font color=\"white\">📅 <b>Expiration    :</b> $expiry ($days_left)</font></center><br>"
-            banner_content+="<center><font color=\"white\">📊 <b>Bandwidth     :</b> $bw_info</font></center><br>"
-            banner_content+="<center><font color=\"white\">🔌 <b>Sessions      :</b> $online_count/$limit</font></center><br>"
-            banner_content+="<center><font color=\"${status_color}\" size=\"4\"><b>📌 Account Status : ${account_status}</b></font></center><br>"
-            
-            if [[ -n "$bw_display" ]]; then
-                banner_content+="$bw_display"
-            fi
-            
-            banner_content+="<br>"
-            banner_content+="<center><font color=\"white\">⏱️ <b>Server Uptime :</b> $UPTIME</font></center><br>"
-            banner_content+="<center><font color=\"white\">📈 <b>Server Load   :</b> $LOAD</font></center><br>"
-            banner_content+="<br>"
-            banner_content+="<center><font color=\"green\" size=\"4\"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>"
-            banner_content+="<center><font color=\"white\">📱 Telegram  : https://t.me/voltrontech</font></center><br>"
-            banner_content+="<center><font color=\"white\">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>"
-            banner_content+="<br>"
-            banner_content+="<center><font color=\"red\" size=\"4\"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>"
-            banner_content+="<center><font color=\"white\">• Account expires on: $expiry</font></center><br>"
-            banner_content+="<center><font color=\"white\">• No torrent or illegal activity</font></center><br>"
-            banner_content+="<center><font color=\"white\">• Account sharing is prohibited</font></center><br>"
-            banner_content+="<br>"
-            banner_content+="<center><font color=\"gray\" size=\"2\"><b>───────── Powered by Voltron Tech ─────────</b></font></center><br>"
-            
-            write_banner_if_changed "$user" "$banner_content"
+        # Check bandwidth
+        usagefile="$BW_DIR/${user}.usage"
+        accum_disp=0
+        if [[ -f "$usagefile" ]]; then
+            read -r accum_disp < "$usagefile"
+            [[ "$accum_disp" =~ ^[0-9]+$ ]] || accum_disp=0
         fi
-
-        # ============================================================
-        # BANDWIDTH TRACKING
-        # ============================================================
         
+        if [[ "$bandwidth_gb" != "0" && -n "$bandwidth_gb" ]]; then
+            quota_bytes=$(awk "BEGIN {printf \"%.0f\", $bandwidth_gb * 1073741824}")
+            if (( quota_bytes > 0 && accum_disp >= quota_bytes )); then
+                bw_exhausted=true
+                if ! $user_locked; then
+                    usermod -L "$user" &>/dev/null
+                    user_locked=true
+                fi
+            fi
+        fi
+
+        # Determine account status
+        if $user_locked; then
+            account_status="🔒 LOCKED"
+            status_color="yellow"
+        elif $is_expired; then
+            account_status="🗓️ EXPIRED"
+            status_color="red"
+        elif $bw_exhausted; then
+            account_status="⚠️ DATA EXHAUSTED"
+            status_color="red"
+        else
+            account_status="✅ ACTIVE"
+            status_color="green"
+        fi
+
+        # Calculate days left
+        days_left="N/A"
+        if [[ "$expiry" != "Never" && -n "$expiry" && "$expiry_ts" =~ ^[0-9]+$ && $expiry_ts -gt 0 ]]; then
+            diff_secs=$((expiry_ts - current_ts))
+            if (( diff_secs <= 0 )); then
+                days_left="EXPIRED"
+            else
+                d_l=$(( diff_secs / 86400 ))
+                h_l=$(( (diff_secs % 86400) / 3600 ))
+                if (( d_l == 0 )); then
+                    days_left="${h_l}h left"
+                else
+                    days_left="${d_l}d ${h_l}h"
+                fi
+            fi
+        fi
+
+        # Calculate bandwidth info
+        bw_info="Unlimited"
+        bw_display=""
+        if [[ "$bandwidth_gb" != "0" && -n "$bandwidth_gb" ]]; then
+            used_gb=$(awk "BEGIN {printf \"%.2f\", $accum_disp / 1073741824}")
+            remain_gb=$(awk "BEGIN {r=$bandwidth_gb - $used_gb; if(r<0) r=0; printf \"%.2f\", r}")
+            bw_info="${used_gb}/${bandwidth_gb} GB used | ${remain_gb} GB left"
+            
+            if (( $(echo "$remain_gb <= 0" | bc -l 2>/dev/null || echo "0") )); then
+                bw_display="<center><font color=\"red\" size=\"4\"><b>⚠️ DATA EXHAUSTED! Please contact admin.</b></font></center><br>"
+            elif (( $(echo "$remain_gb <= 1" | bc -l 2>/dev/null || echo "0") )); then
+                bw_display="<center><font color=\"yellow\" size=\"4\"><b>⚠️ WARNING: Low bandwidth! Only ${remain_gb} GB left.</b></font></center><br>"
+            fi
+        fi
+
+        UPTIME=$(uptime -p | sed 's/up //')
+        LOAD=$(awk '{print $1}' /proc/loadavg)
+        
+        # Build banner content
+        banner_content=""
+        banner_content+="<br><br>"
+        banner_content+="<center><font color=\"cyan\">──</font><font color=\"purple\" size=\"8\"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color=\"cyan\">──</font></center><br>"
+        banner_content+="<br>"
+        banner_content+="<center><font color=\"blue\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
+        banner_content+="<br>"
+        banner_content+="<center><font color=\"white\">👤 <b>Username      :</b> $user</font></center><br>"
+        banner_content+="<center><font color=\"white\">📅 <b>Expiration    :</b> $expiry ($days_left)</font></center><br>"
+        banner_content+="<center><font color=\"white\">📊 <b>Bandwidth     :</b> $bw_info</font></center><br>"
+        banner_content+="<center><font color=\"white\">🔌 <b>Sessions      :</b> $online_count/$limit</font></center><br>"
+        banner_content+="<center><font color=\"${status_color}\" size=\"4\"><b>📌 Account Status : ${account_status}</b></font></center><br>"
+        
+        if [[ -n "$bw_display" ]]; then
+            banner_content+="$bw_display"
+        fi
+        
+        banner_content+="<br>"
+        banner_content+="<center><font color=\"white\">⏱️ <b>Server Uptime :</b> $UPTIME</font></center><br>"
+        banner_content+="<center><font color=\"white\">📈 <b>Server Load   :</b> $LOAD</font></center><br>"
+        banner_content+="<br>"
+        banner_content+="<center><font color=\"green\" size=\"4\"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>"
+        banner_content+="<center><font color=\"white\">📱 Telegram  : https://t.me/voltrontech</font></center><br>"
+        banner_content+="<center><font color=\"white\">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>"
+        banner_content+="<br>"
+        banner_content+="<center><font color=\"red\" size=\"4\"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>"
+        banner_content+="<center><font color=\"white\">• Account expires on: $expiry</font></center><br>"
+        banner_content+="<center><font color=\"white\">• No torrent or illegal activity</font></center><br>"
+        banner_content+="<center><font color=\"white\">• Account sharing is prohibited</font></center><br>"
+        banner_content+="<br>"
+        banner_content+="<center><font color=\"gray\" size=\"2\"><b>───────── Powered by Voltron Tech ─────────</b></font></center><br>"
+        
+        write_banner_if_changed "$user" "$banner_content"
+
+        # Bandwidth tracking
         [[ -z "$bandwidth_gb" || "$bandwidth_gb" == "0" ]] && continue
 
-        usagefile="$BW_DIR/${user}.usage"
-        accumulated=0
-        if [[ -f "$usagefile" ]]; then
-            read -r accumulated < "$usagefile"
-            [[ "$accumulated" =~ ^[0-9]+$ ]] || accumulated=0
-        fi
+        accumulated=$accum_disp
 
         if (( ${#unique_pids[@]} == 0 )); then
             rm -f "$PID_DIR/${user}__"*.last 2>/dev/null
@@ -3560,14 +3709,6 @@ while true; do
         new_total=$((accumulated + delta_total))
         printf "%s\n" "$new_total" > "$usagefile"
 
-        quota_bytes=$(awk "BEGIN {printf \"%.0f\", $bandwidth_gb * 1073741824}")
-        if [[ "$quota_bytes" =~ ^[0-9]+$ ]] && (( new_total >= quota_bytes )); then
-            if ! $user_locked; then
-                usermod -L "$user" &>/dev/null
-                killall -u "$user" -9 &>/dev/null
-                locked_users["$user"]=1
-            fi
-        fi
     done < "$DB_FILE"
 
     sleep "$SCAN_INTERVAL"
@@ -3604,184 +3745,6 @@ EOF
 }
 
 # ================================================================
-# ========== DYNAMIC BANNER FUNCTIONS ==========
-# ================================================================
-
-update_ssh_banners_config() {
-    local tmp_conf
-
-    if [[ ! -f "$BANNER_ENABLED_FILE" ]]; then
-        if [[ -f "$SSHD_FF_CONFIG" ]]; then
-            rm -f "$SSHD_FF_CONFIG" 2>/dev/null
-            systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-        fi
-        return
-    fi
-
-    mkdir -p "$BANNER_DIR" /etc/ssh/sshd_config.d
-    tmp_conf="/tmp/voltrontech_banners_new.conf"
-    
-    echo "# Voltron Tech - Dynamic per-user SSH banners" > "$tmp_conf"
-    echo "# Generated: $(date)" >> "$tmp_conf"
-    echo "" >> "$tmp_conf"
-
-    if [[ -f "$DB_FILE" ]]; then
-        while IFS=: read -r user _rest; do
-            [[ -z "$user" || "$user" == \#* ]] && continue
-            
-            if [[ ! -f "$BANNER_DIR/${user}.txt" ]]; then
-                echo "Waiting for limiter to generate banner..." > "$BANNER_DIR/${user}.txt"
-            fi
-            
-            echo "Match User $user" >> "$tmp_conf"
-            echo "    Banner $BANNER_DIR/${user}.txt" >> "$tmp_conf"
-            echo "" >> "$tmp_conf"
-        done < "$DB_FILE"
-    fi
-
-    if ! cmp -s "$tmp_conf" "$SSHD_FF_CONFIG" 2>/dev/null; then
-        mv "$tmp_conf" "$SSHD_FF_CONFIG"
-        if ! grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null; then
-            echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
-        fi
-        systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-    else
-        rm -f "$tmp_conf"
-    fi
-}
-
-enable_dynamic_banner() {
-    echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_BLUE}           🎨 ENABLING DYNAMIC ACCOUNT BANNER${C_RESET}"
-    echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    
-    mkdir -p "$BANNER_DIR"
-    touch "$BANNER_ENABLED_FILE"
-    
-    echo -e "\n${C_CYAN}📝 Creating banners for all existing users...${C_RESET}"
-    
-    if [[ -f "$DB_FILE" ]]; then
-        while IFS=: read -r user pass expiry limit bandwidth_gb _extra; do
-            [[ -z "$user" || "$user" == \#* ]] && continue
-            
-            local bw_display="Unlimited"
-            if [[ "$bandwidth_gb" != "0" ]]; then
-                bw_display="${bandwidth_gb} GB"
-            fi
-            
-            cat > "$BANNER_DIR/${user}.txt" << EOF
-<br><br>
-<center><font color="cyan">──</font><font color="purple" size="8"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color="cyan">──</font></center><br>
-<br>
-<center><font color="blue" size="5"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>
-<br>
-<center><font color="white">👤 <b>Username      :</b> $user</font></center><br>
-<center><font color="white">📅 <b>Expiration    :</b> $expiry</font></center><br>
-<center><font color="white">📊 <b>Bandwidth     :</b> $bw_display</font></center><br>
-<center><font color="white">🔌 <b>Sessions      :</b> 0/$limit</font></center><br>
-<center><font color="green" size="4"><b>📌 Account Status : ✅ ACTIVE</b></font></center><br>
-<br>
-<center><font color="white">⏱️ <b>Server Uptime :</b> $(uptime -p | sed 's/up //')</font></center><br>
-<center><font color="white">📈 <b>Server Load   :</b> $(awk '{print $1}' /proc/loadavg)</font></center><br>
-<br>
-<center><font color="green" size="4"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>
-<center><font color="white">📱 Telegram  : https://t.me/voltrontech</font></center><br>
-<center><font color="white">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>
-<br>
-<center><font color="red" size="4"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>
-<center><font color="white">• Account expires on: $expiry</font></center><br>
-<center><font color="white">• No torrent or illegal activity</font></center><br>
-<center><font color="white">• Account sharing is prohibited</font></center><br>
-<br>
-<center><font color="gray" size="2"><b>───────── Powered by Voltron Tech ─────────</b></font></center><br>
-EOF
-            echo -e "${C_GREEN}✅ Banner created for user: ${C_YELLOW}$user${C_RESET}"
-        done < "$DB_FILE"
-    fi
-    
-    echo -e "\n${C_GREEN}✅ Banners created for all existing users${C_RESET}"
-    
-    update_ssh_banners_config
-    
-    if ! grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null; then
-        echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
-    fi
-    
-    systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-    
-    systemctl restart voltrontech-limiter 2>/dev/null
-    
-    echo -e "\n${C_GREEN}✅ Dynamic account banner enabled!${C_RESET}"
-    echo -e "${C_CYAN}📌 Users will see their account status when connecting via SSH/VPN${C_RESET}"
-    echo -e "${C_CYAN}📌 Banner updates automatically every 15 seconds${C_RESET}"
-    press_enter
-}
-
-disable_dynamic_banner() {
-    echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_BLUE}           🛑 DISABLING DYNAMIC ACCOUNT BANNER${C_RESET}"
-    echo -e "${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    
-    rm -f "$BANNER_ENABLED_FILE"
-    rm -f "$SSHD_FF_CONFIG"
-    rm -rf "$BANNER_DIR" 2>/dev/null
-    systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-    
-    echo -e "\n${C_GREEN}✅ Dynamic banner disabled!${C_RESET}"
-    press_enter
-}
-
-preview_dynamic_ssh_banner() {
-    if [[ ! -f "$BANNER_ENABLED_FILE" ]]; then
-        echo -e "\n${C_RED}❌ Dynamic banners are not enabled right now.${C_RESET}"
-        press_enter
-        return
-    fi
-
-    _select_user_interface "--- 📝 Preview Dynamic Banner ---"
-    local u=$SELECTED_USER
-    if [[ -z "$u" || "$u" == "NO_USERS" ]]; then
-        return
-    fi
-
-    echo -e "\n${C_CYAN}--- Dynamic Banner Preview for user '$u' ---${C_RESET}\n"
-    if [[ -f "$BANNER_DIR/${u}.txt" ]]; then
-        cat "$BANNER_DIR/${u}.txt"
-    else
-        echo -e "${C_RED}Banner file not generated yet. Waiting up to 10s...${C_RESET}"
-        sleep 5
-        if ! cat "$BANNER_DIR/${u}.txt" 2>/dev/null; then
-            echo -e "\n${C_RED}Still not generated. Check limiter logs:${C_RESET}"
-            journalctl -u voltrontech-limiter -n 15 --no-pager
-        fi
-    fi
-    press_enter
-}
-
-ssh_banner_menu() {
-    while true; do
-        clear; show_banner
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}           🎨 SSH BANNER MANAGEMENT${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo ""
-        echo -e "  ${C_GREEN}1)${C_RESET} Enable Dynamic Account Banner"
-        echo -e "  ${C_RED}2)${C_RESET} Disable Dynamic Banner"
-        echo -e "  ${C_GREEN}3)${C_RESET} Preview Dynamic Banner"
-        echo -e "  ${C_RED}0)${C_RESET} Return"
-        echo ""
-        read -p "👉 Select option: " choice
-        case $choice in
-            1) enable_dynamic_banner ;;
-            2) disable_dynamic_banner ;;
-            3) preview_dynamic_ssh_banner ;;
-            0) return ;;
-            *) echo -e "\n${C_RED}❌ Invalid option${C_RESET}"; sleep 2 ;;
-        esac
-    done
-}
-
-# ================================================================
 # ========== INITIAL SETUP ==========
 # ================================================================
 
@@ -3797,9 +3760,7 @@ initial_setup() {
     
     create_limiter_service
     
-    # ============================================================
-    # APPLY SSH OPTIMIZATIONS (SYSTEM-WIDE)
-    # ============================================================
+    # Apply SSH optimizations
     echo -e "\n${C_BLUE}🔧 Applying SSH Optimizations...${C_RESET}"
     apply_ssh_optimizations
     
@@ -3812,72 +3773,6 @@ initial_setup() {
     fi
     
     echo -e "${C_GREEN}✅ Setup finished.${C_RESET}"
-}
-
-# ================================================================
-# ========== APPLY SSH BOOSTER AUTO ==========
-# ================================================================
-
-apply_ssh_booster_auto() {
-    echo -e "\n${C_BLUE}🔧 Applying SSH Speed Booster (Automatic)...${C_RESET}"
-    
-    cat > /etc/ssh/sshd_config.d/voltrontech-speed.conf << 'EOF'
-# Voltron Tech SSH Speed Optimizations
-# Fastest ciphers and MACs for maximum performance
-
-Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
-MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512,hmac-sha2-256
-KexAlgorithms curve25519-sha256@libssh.org,ecdh-sha2-nistp521,ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256
-HostKeyAlgorithms ssh-ed25519-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,ssh-ed25519,ssh-rsa
-Compression no
-TCPKeepAlive yes
-ClientAliveInterval 60
-ClientAliveCountMax 3
-RekeyLimit 1G 1h
-AllowTcpForwarding yes
-GatewayPorts yes
-PermitRootLogin yes
-EOF
-
-    systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-    
-    echo "net.ipv4.tcp_keepalive_time = 30" >> /etc/sysctl.conf
-    echo "net.ipv4.tcp_keepalive_intvl = 5" >> /etc/sysctl.conf
-    echo "net.ipv4.tcp_keepalive_probes = 3" >> /etc/sysctl.conf
-    sysctl -p >/dev/null 2>&1
-    
-    echo -e "${C_GREEN}✅ SSH Speed Booster applied automatically!${C_RESET}"
-}
-
-# ================================================================
-# ========== APPLY UDP BOOSTER AUTO ==========
-# ================================================================
-
-apply_udp_booster_auto() {
-    echo -e "\n${C_BLUE}🔧 Applying UDP Booster (Automatic)...${C_RESET}"
-    
-    sysctl -w net.core.rmem_max=10737418240 >/dev/null 2>&1
-    sysctl -w net.core.wmem_max=10737418240 >/dev/null 2>&1
-    sysctl -w net.core.rmem_default=1073741824 >/dev/null 2>&1
-    sysctl -w net.core.wmem_default=1073741824 >/dev/null 2>&1
-    sysctl -w net.ipv4.udp_rmem_min=125829120 >/dev/null 2>&1
-    sysctl -w net.ipv4.udp_wmem_min=125829120 >/dev/null 2>&1
-    
-    sysctl -w net.core.udp_gro_enabled=1 >/dev/null 2>&1
-    sysctl -w net.ipv4.udp_gro_enabled=1 >/dev/null 2>&1
-    sysctl -w net.ipv4.udp_l3mdev_accept=1 >/dev/null 2>&1
-    
-    echo "KCP_WINDOW_SIZE=1024,1024" >> /etc/sysctl.conf 2>/dev/null
-    echo "KCP_MAX_STREAM_BUFFER=10737418240" >> /etc/sysctl.conf 2>/dev/null
-    echo "KCP_QUEUE_SIZE=10240" >> /etc/sysctl.conf 2>/dev/null
-    
-    mkdir -p "$CONFIG_DIR"
-    cat > "$CONFIG_DIR/udp_booster.conf" << EOF
-UDP_BOOSTER_APPLIED="true"
-DATE_APPLIED="$(date)"
-EOF
-    
-    echo -e "${C_GREEN}✅ UDP Booster applied automatically!${C_RESET}"
 }
 
 # ================================================================
