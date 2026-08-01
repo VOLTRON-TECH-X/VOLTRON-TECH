@@ -4333,7 +4333,7 @@ while true; do
         banner_content+="<center><font color=\"white\">• No torrent or illegal activity</font></center><br>"
         banner_content+="<center><font color=\"white\">• Account sharing is prohibited</font></center><br>"
         banner_content+="<br>"
-        banner_content+="<center><font color=\"gray\" size=\"2\"><b>─────── Powered by Voltron Tech ───────</b></font></center><br>"
+        banner_content+="<center><font color=\"gray\" size=\"2\"><b>======= Powered by Voltron Tech =======</b></font></center><br>"
         
         write_banner_if_changed "$user" "$banner_content"
 
