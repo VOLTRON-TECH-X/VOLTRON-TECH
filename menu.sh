@@ -68,7 +68,6 @@ SSL_CERT_DIR="$DB_DIR/ssl"
 TRAFFIC_DIR="$DB_DIR/traffic"
 BACKUP_DIR="$DB_DIR/backups"
 MTU_CONFIG="$CONFIG_DIR/mtu"
-DNSTT_PORT_CONFIG="$CONFIG_DIR/dnstt_port"
 
 DNSTT_SERVICE_FILE="/etc/systemd/system/dnstt.service"
 DNSTT_BINARY="/usr/local/bin/dnstt-server"
@@ -2507,12 +2506,14 @@ create_dnstt_service() {
         mtu=512
     fi
     
+    # Create logs directory
     mkdir -p "$LOGS_DIR"
     touch "$LOGS_DIR/dnstt-server.log" 2>/dev/null || true
     touch "$LOGS_DIR/dnstt-error.log" 2>/dev/null || true
     chmod 644 "$LOGS_DIR/dnstt-server.log" 2>/dev/null || true
     chmod 644 "$LOGS_DIR/dnstt-error.log" 2>/dev/null || true
     
+    # Create service file
     cat > "$DNSTT_SERVICE_FILE" <<EOF
 [Unit]
 Description=DNSTT Server - ULTIMATE OPTIMIZED v9.2
@@ -2542,6 +2543,12 @@ StandardError=append:$LOGS_DIR/dnstt-error.log
 WantedBy=multi-user.target
 EOF
 
+    # Verify service file was created
+    if [[ ! -f "$DNSTT_SERVICE_FILE" ]]; then
+        echo -e "${C_RED}❌ Failed to create service file!${C_RESET}"
+        return 1
+    fi
+    
     systemctl daemon-reload
     systemctl enable dnstt.service > /dev/null 2>&1
     
@@ -2549,6 +2556,7 @@ EOF
     echo -e "  • MTU: ${C_YELLOW}$mtu${C_RESET}"
     echo -e "  • Port: ${C_YELLOW}5300 UDP${C_RESET}"
     echo -e "  • Logs: ${C_YELLOW}$LOGS_DIR/dnstt-server.log${C_RESET}"
+    echo -e "  • Service: ${C_YELLOW}$DNSTT_SERVICE_FILE${C_RESET}"
 }
 
 save_dnstt_info() {
@@ -2603,8 +2611,13 @@ show_client_commands() {
     echo -e "${C_WHITE}  $domain 127.0.0.1:$ssh_port${C_RESET}"
     echo ""
     
-    echo -e "${C_YELLOW}📌 Alternative Resolver:${C_RESET}"
-    echo -e "${C_WHITE}  $DNSTT_CLIENT -udp 1.1.1.1:53 -pubkey-file $DNSTT_KEYS_DIR/server.pub -mtu $mtu $domain 127.0.0.1:$ssh_port${C_RESET}"
+    echo -e "${C_YELLOW}📌 Alternative Resolvers:${C_RESET}"
+    echo -e "${C_WHITE}  1) $DNSTT_CLIENT -udp 1.1.1.1:53 -pubkey-file $DNSTT_KEYS_DIR/server.pub -mtu $mtu $domain 127.0.0.1:$ssh_port${C_RESET}"
+    echo -e "${C_WHITE}  2) $DNSTT_CLIENT -udp 9.9.9.9:53 -pubkey-file $DNSTT_KEYS_DIR/server.pub -mtu $mtu $domain 127.0.0.1:$ssh_port${C_RESET}"
+    echo -e "${C_WHITE}  3) $DNSTT_CLIENT -udp 208.67.222.222:53 -pubkey-file $DNSTT_KEYS_DIR/server.pub -mtu $mtu $domain 127.0.0.1:$ssh_port${C_RESET}"
+    echo ""
+    
+    echo -e "${C_DIM}💡 You can also use: 169.255.187.58 (Tanzania resolver)${C_RESET}"
 }
 
 show_dnstt_details() {
@@ -2820,6 +2833,48 @@ EOF
     echo -e "\n${C_BLUE}🔥 Configuring firewall...${C_RESET}"
     configure_dnstt_firewall
     
+    # ============================================================
+    # CREATE DNSTT SERVICE
+    # ============================================================
+    echo -e "\n${C_BLUE}🚀 Creating DNSTT service...${C_RESET}"
+    create_dnstt_service "$domain" "$MTU" "$ssh_port" "127.0.0.1:$ssh_port"
+    
+    # Verify service was created
+    if [[ ! -f "$DNSTT_SERVICE_FILE" ]]; then
+        echo -e "${C_RED}❌ Service creation failed! Creating manually...${C_RESET}"
+        # Create manually
+        cat > "$DNSTT_SERVICE_FILE" <<EOF
+[Unit]
+Description=DNSTT Server - ULTIMATE OPTIMIZED v9.2
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$DB_DIR
+Environment="GODEBUG=netdns=1"
+Environment="GOMAXPROCS=4"
+ExecStart=$DNSTT_BINARY -udp :5300 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $MTU $domain 127.0.0.1:$ssh_port
+Restart=always
+RestartSec=5
+StartLimitInterval=300
+StartLimitBurst=5
+LimitNOFILE=2097152
+LimitNPROC=infinity
+LimitCORE=infinity
+CPUQuota=200%
+MemoryMax=2G
+StandardOutput=append:$LOGS_DIR/dnstt-server.log
+StandardError=append:$LOGS_DIR/dnstt-error.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        systemctl daemon-reload
+        echo -e "${C_GREEN}✅ Service created manually${C_RESET}"
+    fi
+    
     echo -e "\n${C_BLUE}🚀 Starting DNSTT...${C_RESET}"
     systemctl start dnstt.service
     sleep 2
@@ -2831,7 +2886,8 @@ EOF
         echo -e "${C_CYAN}📌 To view full details: Menu → 13 → 7 → 5${C_RESET}"
     else
         echo -e "${C_RED}❌ Service failed to start${C_RESET}"
-        journalctl -u dnstt.service -n 20 --no-pager
+        echo -e "${C_YELLOW}Checking service status...${C_RESET}"
+        systemctl status dnstt.service --no-pager
     fi
     
     show_client_commands "$domain" "$MTU" "$ssh_port"
@@ -4306,7 +4362,7 @@ while true; do
         
         banner_content=""
         banner_content+="<br><br>"
-        banner_content+="<center><font color=\"red\">=======</font><font color=\"purple\" size=\"8\"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color=\"red\">=======</font></center><br>"
+        banner_content+="<center><font color=\"red\">‎▬▬▬▬▬</font><font color=\"purple\" size=\"8\"><b> ‎ஜ۩ VOLTRON TECH ULTIMATE ‎۩ஜ </b></font><font color=\"red\">‎▬▬▬▬▬</font></center><br>"
         banner_content+="<br>"
         banner_content+="<center><font color=\"blue\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
         banner_content+="<br>"
@@ -4333,7 +4389,7 @@ while true; do
         banner_content+="<center><font color=\"white\">• No torrent or illegal activity</font></center><br>"
         banner_content+="<center><font color=\"white\">• Account sharing is prohibited</font></center><br>"
         banner_content+="<br>"
-        banner_content+="<center><font color=\"gray\" size=\"2\"><b>======= Powered by Voltron Tech =======</b></font></center><br>"
+        banner_content+="<center><font color=\"gray\" size=\"2\"><b>‎▬▬▬▬▬Powered by Voltron Tech ‎▬▬▬▬▬</b></font></center><br>"
         
         write_banner_if_changed "$user" "$banner_content"
 
