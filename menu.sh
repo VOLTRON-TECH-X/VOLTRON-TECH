@@ -549,7 +549,7 @@ generate_user_banner() {
     mkdir -p "$BANNER_DIR"
     cat > "$BANNER_DIR/${username}.txt" << EOF
 <br><br>
-<center><font color="cyan">──</font><font color="purple" size="8"><b> 🔥 VOLTRON TECH ULTIMATE 🔥 </b></font><font color="cyan">──</font></center><br>
+<center><font color=\"purple\">‎▬▬▬▬▬ஜ۩</font><font color=\"red\" size=\"8\"><b> 🌍VOLTRON TECH ULTIMATE🌍</b></font><font color=\"purple\">‎۩ஜ▬▬▬▬▬</font></center><br>
 <br>
 <center><font color="blue" size="5"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>
 <br>
@@ -571,7 +571,8 @@ generate_user_banner() {
 <center><font color="white">• No torrent or illegal activity</font></center><br>
 <center><font color="white">• Account sharing is prohibited</font></center><br>
 <br>
-<center><font color="gray" size="2"><b>───────── Powered by Voltron Tech ─────────</b></font></center><br>
+<center><font color=\"purple\">‎▬▬▬▬▬ஜ۩</font><font color=\"red\" size=\"8\"><b>  🌍VOLTRON TECH 🌍 </b></font><font color=\"purple\">‎۩ஜ▬▬▬▬▬</font></center><br>
+        
 EOF
 }
 
