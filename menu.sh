@@ -529,7 +529,7 @@ get_user_status() {
 }
 
 # ================================================================
-# ========== GENERATE USER BANNER - RANGI NYEUSI + BANDWIDTH BLUE ==========
+# ========== GENERATE USER BANNER ==========
 # ================================================================
 
 generate_user_banner() {
@@ -3061,7 +3061,7 @@ uninstall_xui_panel() {
 }
 
 # ================================================================
-# ========== VPS DASHBOARD - KISASA & SIMPLE ==========
+# ========== VPS DASHBOARD ==========
 # ================================================================
 
 show_vps_dashboard() {
@@ -3777,8 +3777,7 @@ update_ssh_banners_config() {
         if ! grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null; then
             echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
         fi
-        systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-    else
+        systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null    else
         rm -f "$tmp_conf"
     fi
 }
@@ -4144,7 +4143,7 @@ while true; do
         
         banner_content=""
         banner_content+="<br><br>"
-        banner_content+="<center><font color=\"#9B59B6\">‎▬▬▬▬▬ஜ۩</font><font color=\"#FF6B6B\" size=\"8\"><b> 🌍VOLTRON TECH ULTIMATE🌍</b></font><font color=\"#9B59B6\">‎۩ஜ▬▬▬▬▬</font></center><br>"
+        banner_content+="<center><font color=\"#9B59B6\">‎▬▬▬ஜ۩</font><font color=\"#FF6B6B\" size=\"8\"><b> 🌍VOLTRON TECH ULTIMATE🌍</b></font><font color=\"#9B59B6\">‎۩ஜ▬▬▬</font></center><br>"
         banner_content+="<br>"
         banner_content+="<center><font color=\"#4D96FF\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
         banner_content+="<br>"
