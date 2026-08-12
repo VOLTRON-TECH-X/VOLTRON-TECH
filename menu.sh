@@ -6,7 +6,7 @@
 #   1. User Management - Create, Delete, Edit, Lock, Unlock, List, Renew, Cleanup
 #   2. DNSTT - 5 Speed Boosters (1000x-10000x) + MTU Settings + Firewall Fix + FULL MANAGEMENT
 #   3. Protocols - badvpn, udp-custom, SSL Tunnel, Falcon Proxy, ZiVPN, X-UI
-#   4. Dynamic Banner - Mapambo ya awali + Rangi za kisasa
+#   4. Dynamic Banner - Mapambo ya awali + Rangi nyeusi + Bandwidth Blue
 #   5. VPS Dashboard - Modern & Simple (Real-time system info)
 #   6. VPN Data Usage - Per user connection data (Table format)
 #   7. UDP Booster - Automatic (sysctl parameters)
@@ -529,7 +529,7 @@ get_user_status() {
 }
 
 # ================================================================
-# ========== GENERATE USER BANNER - MAPAMBO YA AWALI + RANGI KISASA ==========
+# ========== GENERATE USER BANNER - RANGI NYEUSI + BANDWIDTH BLUE ==========
 # ================================================================
 
 generate_user_banner() {
@@ -550,23 +550,23 @@ generate_user_banner() {
 <br>
 <center><font color="#4D96FF" size="5"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>
 <br>
-<center><font color="#FFFFFF">👤 <b>Username      :</b> $username</font></center><br>
-<center><font color="#FFFFFF">📅 <b>Expiration    :</b> $expiry</font></center><br>
-<center><font color="#FFFFFF">📊 <b>Bandwidth     :</b> $bw_display</font></center><br>
-<center><font color="#FFFFFF">🔌 <b>Sessions      :</b> 0/$limit</font></center><br>
+<center><font color="#000000">👤 <b>Username      :</b> $username</font></center><br>
+<center><font color="#000000">📅 <b>Expiration    :</b> $expiry</font></center><br>
+<center><font color="#4D96FF">📊 <b>Bandwidth     :</b> $bw_display</font></center><br>
+<center><font color="#000000">🔌 <b>Sessions      :</b> 0/$limit</font></center><br>
 <center><font color="#6BCB77" size="4"><b>📌 Account Status : ✅ ACTIVE</b></font></center><br>
 <br>
-<center><font color="#FFFFFF">⏱️ <b>Server Uptime :</b> $(uptime -p | sed 's/up //')</font></center><br>
-<center><font color="#FFFFFF">📈 <b>Server Load   :</b> $(awk '{print $1}' /proc/loadavg)</font></center><br>
+<center><font color="#000000">⏱️ <b>Server Uptime :</b> $(uptime -p | sed 's/up //')</font></center><br>
+<center><font color="#000000">📈 <b>Server Load   :</b> $(awk '{print $1}' /proc/loadavg)</font></center><br>
 <br>
 <center><font color="#6BCB77" size="4"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>
-<center><font color="#FFFFFF">📱 Telegram  : https://t.me/voltrontech</font></center><br>
-<center><font color="#FFFFFF">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>
+<center><font color="#000000">📱 Telegram  : https://t.me/voltrontech</font></center><br>
+<center><font color="#000000">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>
 <br>
 <center><font color="#FF6B6B" size="4"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>
-<center><font color="#FFFFFF">• Account expires on: $expiry</font></center><br>
-<center><font color="#FFFFFF">• No torrent or illegal activity</font></center><br>
-<center><font color="#FFFFFF">• Account sharing is prohibited</font></center><br>
+<center><font color="#000000">• Account expires on: $expiry</font></center><br>
+<center><font color="#000000">• No torrent or illegal activity</font></center><br>
+<center><font color="#000000">• Account sharing is prohibited</font></center><br>
 <br>
 <center><font color="#9B59B6">‎▬▬▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b>  🌍VOLTRON TECH 🌍 </b></font><font color="#9B59B6">‎۩ஜ▬▬▬▬▬</font></center><br>
         
@@ -1929,6 +1929,7 @@ set_custom_dnstt_domain() {
     
     echo ""
     echo -e "${C_YELLOW}📌 Enter your custom DNSTT domain:${C_RESET}"
+    echo -e "${C_DIM}Example: tunnel.yourdomain.com${C_RESET}"
     echo ""
     
     read -p "👉 Enter domain: " new_domain
@@ -1973,8 +1974,16 @@ set_custom_dnstt_domain() {
     systemctl daemon-reload
     systemctl restart dnstt.service
     
-    echo -e "\n${C_GREEN}✅ Custom DNSTT domain saved successfully!${C_RESET}"
-    echo -e "${C_CYAN}📌 New Domain: ${C_YELLOW}$new_domain${C_RESET}"
+    sleep 2
+    if systemctl is-active --quiet dnstt.service; then
+        echo -e "\n${C_GREEN}✅ Custom DNSTT domain saved successfully!${C_RESET}"
+        echo -e "${C_CYAN}📌 New Domain: ${C_YELLOW}$new_domain${C_RESET}"
+        echo -e "${C_CYAN}📌 Service restarted successfully${C_RESET}"
+    else
+        echo -e "\n${C_RED}❌ Service failed to restart. Check logs:${C_RESET}"
+        journalctl -u dnstt.service -n 10 --no-pager
+    fi
+    
     press_enter
 }
 
@@ -2057,6 +2066,7 @@ set_custom_dnstt_public_key() {
     
     echo ""
     echo -e "${C_YELLOW}📌 Enter your custom DNSTT public key:${C_RESET}"
+    echo -e "${C_DIM}This key MUST match the private key on the server${C_RESET}"
     echo ""
     
     read -p "👉 Enter public key: " custom_pubkey
@@ -2075,6 +2085,11 @@ set_custom_dnstt_public_key() {
     
     echo -e "\n${C_YELLOW}⚠️ You are about to change the DNSTT public key to:${C_RESET}"
     echo -e "${C_GREEN}$custom_pubkey${C_RESET}"
+    echo ""
+    echo -e "${C_RED}⚠️ IMPORTANT:${C_RESET}"
+    echo -e "  • This public key MUST match the private key on the server"
+    echo -e "  • Clients will need to update their configuration"
+    echo -e "  • DNSTT service will be restarted"
     echo ""
     read -p "👉 Confirm change? (y/n): " confirm
     
@@ -2098,8 +2113,20 @@ set_custom_dnstt_public_key() {
     
     systemctl restart dnstt.service 2>/dev/null
     
-    echo -e "\n${C_GREEN}✅ Custom DNSTT public key saved successfully!${C_RESET}"
-    echo -e "${C_CYAN}📌 New Public Key: ${C_YELLOW}$custom_pubkey${C_RESET}"
+    sleep 2
+    if systemctl is-active --quiet dnstt.service; then
+        echo -e "\n${C_GREEN}✅ Custom DNSTT public key saved successfully!${C_RESET}"
+        echo -e "${C_CYAN}📌 New Public Key: ${C_YELLOW}$custom_pubkey${C_RESET}"
+        echo -e "${C_CYAN}📌 Service restarted successfully${C_RESET}"
+    else
+        echo -e "\n${C_RED}❌ Service failed to restart. The key may be invalid.${C_RESET}"
+        echo -e "${C_YELLOW}💡 Restoring backup...${C_RESET}"
+        if [ -f "$DNSTT_KEYS_DIR/server.pub.bak" ]; then
+            cp "$DNSTT_KEYS_DIR/server.pub.bak" "$DNSTT_KEYS_DIR/server.pub"
+            systemctl restart dnstt.service
+        fi
+    fi
+    
     echo -e "\n${C_YELLOW}⚠️ Clients MUST update their configuration with this new key!${C_RESET}"
     press_enter
 }
@@ -2110,6 +2137,12 @@ regenerate_dnstt_keys() {
     
     if [ ! -f "$DNSTT_SERVICE_FILE" ]; then
         echo -e "\n${C_RED}❌ DNSTT is not installed.${C_RESET}"
+        press_enter
+        return
+    fi
+    
+    if [ ! -f "$DNSTT_BINARY" ]; then
+        echo -e "\n${C_RED}❌ DNSTT binary not found at $DNSTT_BINARY${C_RESET}"
         press_enter
         return
     fi
@@ -2135,7 +2168,10 @@ regenerate_dnstt_keys() {
     cd "$DNSTT_KEYS_DIR"
     rm -f server.key server.pub
     
+    echo -e "\n${C_BLUE}🔑 Generating new keys...${C_RESET}"
+    
     if ! "$DNSTT_BINARY" -gen-key -privkey-file server.key -pubkey-file server.pub 2>/dev/null; then
+        echo -e "${C_YELLOW}⚠️ DNSTT key generation failed. Using fallback method...${C_RESET}"
         openssl rand -hex 32 > server.key
         cat server.key | sha256sum | awk '{print $1}' > server.pub
     fi
@@ -2143,7 +2179,12 @@ regenerate_dnstt_keys() {
     chmod 600 server.key
     chmod 644 server.pub
     
-    local new_pubkey=$(cat server.pub)
+    local new_pubkey=$(cat server.pub 2>/dev/null)
+    if [[ -z "$new_pubkey" ]]; then
+        echo -e "\n${C_RED}❌ Failed to generate keys.${C_RESET}"
+        press_enter
+        return
+    fi
     
     if [ -f "$DNSTT_CONFIG_FILE" ]; then
         sed -i "s|PUBLIC_KEY=.*|PUBLIC_KEY=\"$new_pubkey\"|" "$DNSTT_CONFIG_FILE"
@@ -2151,8 +2192,20 @@ regenerate_dnstt_keys() {
     
     systemctl restart dnstt.service
     
-    echo -e "\n${C_GREEN}✅ New keys generated successfully!${C_RESET}"
-    echo -e "${C_CYAN}📌 New Public Key: ${C_YELLOW}$new_pubkey${C_RESET}"
+    sleep 2
+    if systemctl is-active --quiet dnstt.service; then
+        echo -e "\n${C_GREEN}✅ New keys generated successfully!${C_RESET}"
+        echo -e "${C_CYAN}📌 New Public Key: ${C_YELLOW}$new_pubkey${C_RESET}"
+        echo -e "${C_CYAN}📌 Service restarted successfully${C_RESET}"
+    else
+        echo -e "\n${C_RED}❌ Service failed to restart. Restoring backup...${C_RESET}"
+        if [ -f "$DNSTT_KEYS_DIR/server.key.bak" ]; then
+            cp "$DNSTT_KEYS_DIR/server.key.bak" "$DNSTT_KEYS_DIR/server.key"
+            cp "$DNSTT_KEYS_DIR/server.pub.bak" "$DNSTT_KEYS_DIR/server.pub"
+            systemctl restart dnstt.service
+        fi
+    fi
+    
     echo -e "\n${C_YELLOW}⚠️ Clients MUST update their configuration with the new public key!${C_RESET}"
     press_enter
 }
@@ -2429,6 +2482,16 @@ setup_domain() {
     domain_option=${domain_option:-2}
     
     if [[ "$domain_option" == "2" ]]; then
+        echo -e "\n${C_BLUE}🔄 Generating domain with deSEC...${C_RESET}"
+        
+        if [ -f "$DB_DIR/domain.txt" ]; then
+            local old_domain=$(cat "$DB_DIR/domain.txt")
+            local old_sub=$(echo "$old_domain" | cut -d. -f1)
+            curl -s -X DELETE "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/$old_sub/NS/" \
+                -H "Authorization: Token $DESEC_TOKEN" > /dev/null 2>&1
+            echo -e "${C_CYAN}📌 Old domain removed${C_RESET}"
+        fi
+        
         local rand=$(head /dev/urandom | tr -dc a-z0-9 | head -c 8)
         local tun="tun-$rand"
         local SERVER_IPV4=$(curl -s -4 icanhazip.com)
@@ -2440,15 +2503,18 @@ setup_domain() {
         
         if [[ "$HTTP_CODE" -eq 201 ]]; then
             DOMAIN="$tun.$DESEC_DOMAIN"
-            echo -e "${C_GREEN}✅ Domain: ${C_YELLOW}$DOMAIN${C_RESET}"
+            echo -e "${C_GREEN}✅ Domain generated: ${C_YELLOW}$DOMAIN${C_RESET}"
         else
-            read -p "👉 Enter domain manually: " DOMAIN
+            echo -e "${C_RED}❌ Failed to generate domain. HTTP: $HTTP_CODE${C_RESET}"
+            echo -e "${C_YELLOW}Please enter domain manually:${C_RESET}"
+            read -p "👉 Enter domain: " DOMAIN
         fi
     else
         read -p "👉 Enter domain: " DOMAIN
     fi
     
     echo "$DOMAIN" > "$DB_DIR/domain.txt"
+    echo -e "${C_GREEN}✅ Domain saved: ${C_YELLOW}$DOMAIN${C_RESET}"
 }
 
 create_dnstt_service() {
@@ -2619,7 +2685,7 @@ install_dnstt() {
     fi
     
     echo -e "\n${C_BLUE}[1/9] Installing dependencies...${C_RESET}"
-    ff_apt_install wget curl openssl bc
+    ff_apt_install wget curl openssl bc dnsutils
     
     echo -e "\n${C_BLUE}[2/9] Downloading DNSTT binary...${C_RESET}"
     download_dnstt_binary
@@ -2716,13 +2782,15 @@ EOF
     echo -e "\n${C_GREEN}✅ DNSTT optimizations applied automatically!${C_RESET}"
     
     echo -e "\n${C_BLUE}🚀 Starting DNSTT...${C_RESET}"
+    systemctl daemon-reload
     systemctl start dnstt.service
-    sleep 2
+    sleep 3
     
     if systemctl is-active --quiet dnstt.service; then
         echo -e "${C_GREEN}✅ Service started successfully${C_RESET}"
     else
         echo -e "${C_RED}❌ Service failed to start${C_RESET}"
+        echo -e "${C_YELLOW}📌 Checking logs...${C_RESET}"
         journalctl -u dnstt.service -n 20 --no-pager
     fi
     
@@ -3078,12 +3146,12 @@ show_vps_dashboard() {
     echo -e "${C_BOLD}${C_PURPLE}╚═══════════════════════════════════════════════════════════════════════════╝${C_RESET}"
     echo ""
     
-    # Row 1: IP + Location
+    # Row 1: IP + Location + ISP
     echo -e "${C_BOLD}${C_CYAN}┌─────────────────────────────────────────────────────────────────────────────┐${C_RESET}"
-    printf "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_YELLOW}🌐 IP:${C_RESET} ${C_GREEN}%-15s${C_RESET}  ${C_YELLOW}📍 Location:${C_RESET} ${C_GREEN}%-20s${C_RESET}  ${C_YELLOW}🏢 ISP:${C_RESET} ${C_GREEN}%-20s${C_RESET}  ${C_BOLD}${C_CYAN}│${C_RESET}\n" "$IP" "$LOCATION, $COUNTRY" "$ISP"
+    printf "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_YELLOW}🌐 IP:${C_RESET} ${C_GREEN}%-15s${C_RESET}  ${C_YELLOW}📍 Location:${C_RESET} ${C_GREEN}%-20s${C_RESET}  ${C_YELLOW}🏢 ISP:${C_RESET} ${C_GREEN}%-15s${C_RESET}  ${C_BOLD}${C_CYAN}│${C_RESET}\n" "$IP" "$LOCATION, $COUNTRY" "$ISP"
     echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
     
-    # Row 2: OS + Kernel
+    # Row 2: OS + Kernel + Arch
     printf "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_YELLOW}💻 OS:${C_RESET} ${C_GREEN}%-12s${C_RESET}  ${C_YELLOW}⚙️ Kernel:${C_RESET} ${C_GREEN}%-18s${C_RESET}  ${C_YELLOW}📦 Arch:${C_RESET} ${C_GREEN}%-8s${C_RESET}  ${C_BOLD}${C_CYAN}│${C_RESET}\n" "$OS" "$KERNEL" "$ARCH"
     echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
     
@@ -3091,7 +3159,7 @@ show_vps_dashboard() {
     printf "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_YELLOW}⏱️ Uptime:${C_RESET} ${C_GREEN}%-20s${C_RESET}  ${C_YELLOW}📊 Load:${C_RESET} ${C_GREEN}%-15s${C_RESET}  ${C_YELLOW}👥 Users:${C_RESET} ${C_GREEN}%2s/%2s${C_RESET}  ${C_BOLD}${C_CYAN}│${C_RESET}\n" "$UPTIME" "$LOAD" "$ONLINE_USERS" "$TOTAL_USERS"
     echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
     
-    # Row 4: CPU + RAM
+    # Row 4: CPU Model + Cores + RAM
     printf "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_YELLOW}🔹 CPU:${C_RESET} ${C_WHITE}%-20s${C_RESET} ${C_CYAN}%2s cores${C_RESET}  ${C_YELLOW}🔹 RAM:${C_RESET} ${C_WHITE}%5s / %5s${C_RESET}  ${C_BOLD}${C_CYAN}│${C_RESET}\n" "$CPU_MODEL" "$CPU_CORES" "$RAM_USED" "$RAM_TOTAL"
     echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
     
@@ -3103,7 +3171,7 @@ show_vps_dashboard() {
     printf "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_YELLOW}📀 Disk:${C_RESET} %4s / %4s  %-20s  ${C_YELLOW}📶 Net:${C_RESET} ↓ %6s  ↑ %6s  ${C_BOLD}${C_CYAN}│${C_RESET}\n" "$DISK_USED" "$DISK_TOTAL" "$(make_bar $DISK_PERCENT)" "$RX" "$TX"
     echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
     
-    # Row 7: Services Status
+    # Row 7: Services Status (SSH + DNSTT)
     local ssh_color=""
     [[ "$SSH_STATUS" == "active" ]] && ssh_color="${C_GREEN}● RUNNING${C_RESET}" || ssh_color="${C_RED}● STOPPED${C_RESET}"
     local dnstt_color=""
@@ -4080,10 +4148,10 @@ while true; do
         banner_content+="<br>"
         banner_content+="<center><font color=\"#4D96FF\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
         banner_content+="<br>"
-        banner_content+="<center><font color=\"#FFFFFF\">👤 <b>Username      :</b> $user</font></center><br>"
-        banner_content+="<center><font color=\"#FFFFFF\">📅 <b>Expiration    :</b> $expiry ($days_left)</font></center><br>"
-        banner_content+="<center><font color=\"#FFFFFF\">📊 <b>Bandwidth     :</b> $bw_info</font></center><br>"
-        banner_content+="<center><font color=\"#FFFFFF\">🔌 <b>Sessions      :</b> $online_count/$limit</font></center><br>"
+        banner_content+="<center><font color=\"#000000\">👤 <b>Username      :</b> $user</font></center><br>"
+        banner_content+="<center><font color=\"#000000\">📅 <b>Expiration    :</b> $expiry ($days_left)</font></center><br>"
+        banner_content+="<center><font color=\"#4D96FF\">📊 <b>Bandwidth     :</b> $bw_info</font></center><br>"
+        banner_content+="<center><font color=\"#000000\">🔌 <b>Sessions      :</b> $online_count/$limit</font></center><br>"
         banner_content+="<center><font color=\"$status_color\" size=\"4\"><b>📌 Account Status : $account_status</b></font></center><br>"
         
         if [[ -n "$bw_display" ]]; then
@@ -4091,17 +4159,17 @@ while true; do
         fi
         
         banner_content+="<br>"
-        banner_content+="<center><font color=\"#FFFFFF\">⏱️ <b>Server Uptime :</b> $UPTIME</font></center><br>"
-        banner_content+="<center><font color=\"#FFFFFF\">📈 <b>Server Load   :</b> $LOAD</font></center><br>"
+        banner_content+="<center><font color=\"#000000\">⏱️ <b>Server Uptime :</b> $UPTIME</font></center><br>"
+        banner_content+="<center><font color=\"#000000\">📈 <b>Server Load   :</b> $LOAD</font></center><br>"
         banner_content+="<br>"
         banner_content+="<center><font color=\"#6BCB77\" size=\"4\"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>"
-        banner_content+="<center><font color=\"#FFFFFF\">📱 Telegram  : https://t.me/voltrontech</font></center><br>"
-        banner_content+="<center><font color=\"#FFFFFF\">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>"
+        banner_content+="<center><font color=\"#000000\">📱 Telegram  : https://t.me/voltrontech</font></center><br>"
+        banner_content+="<center><font color=\"#000000\">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>"
         banner_content+="<br>"
         banner_content+="<center><font color=\"#FF6B6B\" size=\"4\"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>"
-        banner_content+="<center><font color=\"#FFFFFF\">• Account expires on: $expiry</font></center><br>"
-        banner_content+="<center><font color=\"#FFFFFF\">• No torrent or illegal activity</font></center><br>"
-        banner_content+="<center><font color=\"#FFFFFF\">• Account sharing is prohibited</font></center><br>"
+        banner_content+="<center><font color=\"#000000\">• Account expires on: $expiry</font></center><br>"
+        banner_content+="<center><font color=\"#000000\">• No torrent or illegal activity</font></center><br>"
+        banner_content+="<center><font color=\"#000000\">• Account sharing is prohibited</font></center><br>"
         banner_content+="<br>"
         banner_content+="<center><font color=\"#9B59B6\">‎▬▬▬▬▬ஜ۩</font><font color=\"#FF6B6B\" size=\"8\"><b>  🌍VOLTRON TECH 🌍 </b></font><font color=\"#9B59B6\">‎۩ஜ▬▬▬▬▬</font></center><br>"
         
