@@ -546,7 +546,7 @@ generate_user_banner() {
     mkdir -p "$BANNER_DIR"
     cat > "$BANNER_DIR/${username}.txt" << EOF
 <br><br>
-<center><font color="#9B59B6">‎▬▬▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b> 🌍VOLTRON TECH ULTIMATE🌍</b></font><font color="#9B59B6">‎۩ஜ▬▬▬▬▬</font></center><br>
+<center><font color="#9B59B6">‎▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b> 🌍VOLTRON TECH ULTIMATE🌍</b></font><font color="#9B59B6">‎۩ஜ▬▬▬</font></center><br>
 <br>
 <center><font color="#4D96FF" size="5"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>
 <br>
