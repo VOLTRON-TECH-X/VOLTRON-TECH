@@ -6,7 +6,7 @@
 #   1. User Management - Create, Delete, Edit, Lock, Unlock, List, Renew, Cleanup
 #   2. DNSTT - 5 Speed Boosters (1000x-10000x) + MTU Settings + Firewall Fix + FULL MANAGEMENT
 #   3. Protocols - badvpn, udp-custom, SSL Tunnel, Falcon Proxy, ZiVPN, X-UI
-#   4. Dynamic Banner - Mapambo ya awali + Rangi nyeusi + Bandwidth Blue
+#   4. Dynamic Banner - Mapambo ya awali + Rangi nyeusi + Bandwidth Blue + Header "VOLTRON VPN"
 #   5. VPS Dashboard - Modern & Simple (Real-time system info)
 #   6. VPN Data Usage - Per user connection data (Table format)
 #   7. UDP Booster - Automatic (sysctl parameters)
@@ -513,7 +513,7 @@ get_user_status() {
     echo -e "${C_GREEN}🟢 Active${C_RESET}"
 }
 
-# ========== GENERATE USER BANNER ==========
+# ========== GENERATE USER BANNER - HEADER "VOLTRON VPN" ==========
 generate_user_banner() {
     local username="$1"
     local expiry="$2"
@@ -528,7 +528,7 @@ generate_user_banner() {
     mkdir -p "$BANNER_DIR"
     cat > "$BANNER_DIR/${username}.txt" << EOF
 <br><br>
-<center><font color="#9B59B6">‎▬▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b> 🌍VOLTRON TECH ULTIMATE🌍</b></font><font color="#9B59B6">‎۩ஜ▬▬▬▬</font></center><br>
+<center><font color="#9B59B6">‎▬▬▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b> 🌍VOLTRON VPN🌍</b></font><font color="#9B59B6">‎۩ஜ▬▬▬▬▬</font></center><br>
 <br>
 <center><font color="#4D96FF" size="5"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>
 <br>
@@ -550,7 +550,7 @@ generate_user_banner() {
 <center><font color="#000000">• No torrent or illegal activity</font></center><br>
 <center><font color="#000000">• Account sharing is prohibited</font></center><br>
 <br>
-<center><font color="#9B59B6">‎▬▬▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b>  🌍VOLTRON TECH 🌍 </b></font><font color="#9B59B6">‎۩ஜ▬▬▬▬▬</font></center><br>
+<center><font color="#9B59B6">‎▬▬▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b>  🌍VOLTRON VPN🌍 </b></font><font color="#9B59B6">‎۩ஜ▬▬▬▬▬</font></center><br>
         
 EOF
 }
@@ -4022,7 +4022,7 @@ while true; do
         
         banner_content=""
         banner_content+="<br><br>"
-        banner_content+="<center><font color=\"#9B59B6\">‎▬▬▬▬ஜ۩</font><font color=\"#FF6B6B\" size=\"8\"><b> 🌍VOLTRON TECH ULTIMATE🌍</b></font><font color=\"#9B59B6\">‎۩ஜ▬▬▬▬</font></center><br>"
+        banner_content+="<center><font color=\"#9B59B6\">‎▬▬▬▬▬ஜ۩</font><font color=\"#FF6B6B\" size=\"8\"><b> 🌍VOLTRON VPN🌍</b></font><font color=\"#9B59B6\">‎۩ஜ▬▬▬▬▬</font></center><br>"
         banner_content+="<br>"
         banner_content+="<center><font color=\"#4D96FF\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
         banner_content+="<br>"
@@ -4049,7 +4049,7 @@ while true; do
         banner_content+="<center><font color=\"#000000\">• No torrent or illegal activity</font></center><br>"
         banner_content+="<center><font color=\"#000000\">• Account sharing is prohibited</font></center><br>"
         banner_content+="<br>"
-        banner_content+="<center><font color=\"#9B59B6\">‎▬▬▬▬▬ஜ۩</font><font color=\"#FF6B6B\" size=\"8\"><b>  🌍VOLTRON TECH 🌍 </b></font><font color=\"#9B59B6\">‎۩ஜ▬▬▬▬▬</font></center><br>"
+        banner_content+="<center><font color=\"#9B59B6\">‎▬▬▬▬▬ஜ۩</font><font color=\"#FF6B6B\" size=\"8\"><b>  🌍VOLTRON VPN🌍 </b></font><font color=\"#9B59B6\">‎۩ஜ▬▬▬▬▬</font></center><br>"
         
         write_banner_if_changed "$user" "$banner_content"
 
