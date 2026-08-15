@@ -103,10 +103,7 @@ SELECTED_USER=""
 SELECTED_USERS=()
 UNINSTALL_MODE="interactive"
 
-# ================================================================
 # ========== APT FUNCTIONS ==========
-# ================================================================
-
 ff_apt_update() {
     DEBIAN_FRONTEND=noninteractive apt-get update 2>/dev/null || true
 }
@@ -120,10 +117,7 @@ ff_apt_purge() {
     DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Use-Pty=0 purge "$@"
 }
 
-# ================================================================
 # ========== BANNER CACHE FUNCTIONS ==========
-# ================================================================
-
 BANNER_CACHE_TTL=15
 BANNER_CACHE_TS=0
 BANNER_CACHE_OS_NAME=""
@@ -238,10 +232,7 @@ press_enter() {
     echo -e "\nPress ${C_YELLOW}[Enter]${C_RESET} to continue..." && read -r
 }
 
-# ================================================================
 # ========== ORPHAN USER FUNCTIONS ==========
-# ================================================================
-
 is_voltrontech_orphan_user() {
     local username="$1"
     local passwd_line system_user _ uid _ home shell
@@ -332,10 +323,7 @@ invalidate_banner_cache() {
     SSH_SESSION_CACHE_TS=0
 }
 
-# ================================================================
 # ========== USER SELECTION FUNCTIONS ==========
-# ================================================================
-
 _select_user_interface() {
     local title="$1"
     clear; show_banner
@@ -484,10 +472,7 @@ _select_multi_user_interface() {
     done
 }
 
-# ================================================================
 # ========== USER MANAGEMENT ==========
-# ================================================================
-
 get_user_status() {
     local username="$1"
     
@@ -528,10 +513,7 @@ get_user_status() {
     echo -e "${C_GREEN}🟢 Active${C_RESET}"
 }
 
-# ================================================================
 # ========== GENERATE USER BANNER ==========
-# ================================================================
-
 generate_user_banner() {
     local username="$1"
     local expiry="$2"
@@ -546,7 +528,7 @@ generate_user_banner() {
     mkdir -p "$BANNER_DIR"
     cat > "$BANNER_DIR/${username}.txt" << EOF
 <br><br>
-<center><font color="#9B59B6">‎▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b> 🌍VOLTRON TECH ULTIMATE🌍</b></font><font color="#9B59B6">‎۩ஜ▬▬▬</font></center><br>
+<center><font color="#9B59B6">‎▬▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b> 🌍VOLTRON TECH ULTIMATE🌍</b></font><font color="#9B59B6">‎۩ஜ▬▬▬▬</font></center><br>
 <br>
 <center><font color="#4D96FF" size="5"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>
 <br>
@@ -573,10 +555,7 @@ generate_user_banner() {
 EOF
 }
 
-# ================================================================
 # ========== CREATE USER ==========
-# ================================================================
-
 create_user() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- ✨ Create New SSH User ---${C_RESET}"
@@ -654,10 +633,7 @@ create_user() {
     press_enter
 }
 
-# ================================================================
 # ========== DELETE USER ==========
-# ================================================================
-
 delete_user() {
     _select_multi_user_interface "--- 🗑️ Delete Users ---"
     if [[ ${#SELECTED_USERS[@]} -eq 0 || "${SELECTED_USERS[0]}" == "NO_USERS" ]]; then 
@@ -678,10 +654,7 @@ delete_user() {
     press_enter
 }
 
-# ================================================================
 # ========== EDIT USER ==========
-# ================================================================
-
 edit_user() {
     _select_user_interface "--- ✏️ Edit a User ---"
     local username=$SELECTED_USER
@@ -783,10 +756,7 @@ edit_user() {
     done
 }
 
-# ================================================================
 # ========== LOCK USER ==========
-# ================================================================
-
 lock_user() {
     _select_multi_user_interface "--- 🔒 Lock Users ---"
     if [[ ${#SELECTED_USERS[@]} -eq 0 || "${SELECTED_USERS[0]}" == "NO_USERS" ]]; then 
@@ -811,10 +781,7 @@ lock_user() {
     press_enter
 }
 
-# ================================================================
 # ========== UNLOCK USER ==========
-# ================================================================
-
 unlock_user() {
     _select_multi_user_interface "--- 🔓 Unlock Users ---"
     if [[ ${#SELECTED_USERS[@]} -eq 0 || "${SELECTED_USERS[0]}" == "NO_USERS" ]]; then 
@@ -838,10 +805,7 @@ unlock_user() {
     press_enter
 }
 
-# ================================================================
 # ========== LIST USERS ==========
-# ================================================================
-
 list_users() {
     clear; show_banner
     if [[ ! -s "$DB_FILE" ]]; then
@@ -925,10 +889,7 @@ list_users() {
     press_enter
 }
 
-# ================================================================
 # ========== RENEW USER ==========
-# ================================================================
-
 renew_user() {
     _select_multi_user_interface "--- 🔄 Renew Users ---"
     if [[ ${#SELECTED_USERS[@]} -eq 0 || "${SELECTED_USERS[0]}" == "NO_USERS" ]]; then 
@@ -958,10 +919,7 @@ renew_user() {
     press_enter
 }
 
-# ================================================================
 # ========== CLEANUP EXPIRED ==========
-# ================================================================
-
 cleanup_expired() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 🧹 Cleanup Expired Users ---${C_RESET}"
@@ -1009,10 +967,7 @@ cleanup_expired() {
     press_enter
 }
 
-# ================================================================
 # ========== BULK CREATE USERS ==========
-# ================================================================
-
 bulk_create_users() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 👥 Bulk Create Users ---${C_RESET}"
@@ -1099,10 +1054,7 @@ bulk_create_users() {
     press_enter
 }
 
-# ================================================================
 # ========== VIEW USER BANDWIDTH ==========
-# ================================================================
-
 view_user_bandwidth() {
     _select_user_interface "--- 📊 View User Bandwidth ---"
     local u=$SELECTED_USER
@@ -1159,10 +1111,7 @@ view_user_bandwidth() {
     press_enter
 }
 
-# ================================================================
 # ========== GENERATE CLIENT CONFIG ==========
-# ================================================================
-
 generate_client_config() {
     local user=$1
     local pass=$2
@@ -1241,10 +1190,7 @@ client_config_menu() {
     generate_client_config "$u" "$pass"
 }
 
-# ================================================================
 # ========== TRIAL ACCOUNT ==========
-# ================================================================
-
 setup_trial_cleanup_script() {
     cat > "$TRIAL_CLEANUP_SCRIPT" << 'TREOF'
 #!/bin/bash
@@ -1372,10 +1318,7 @@ create_trial_account() {
     press_enter
 }
 
-# ================================================================
 # ========== DNSTT MTU FUNCTIONS ==========
-# ================================================================
-
 get_current_mtu() {
     if [ -f "$MTU_CONFIG" ]; then
         cat "$MTU_CONFIG"
@@ -1445,10 +1388,7 @@ dnstt_mtu_menu() {
     done
 }
 
-# ================================================================
 # ========== DNSTT FIREWALL FIX ==========
-# ================================================================
-
 configure_dnstt_firewall() {
     echo -e "\n${C_BLUE}🔥 Configuring firewall for DNSTT...${C_RESET}"
     
@@ -1479,10 +1419,7 @@ configure_dnstt_firewall() {
     echo -e "${C_CYAN}📌 Port 53 → 5300 redirect active${C_RESET}"
 }
 
-# ================================================================
 # ========== SSH OPTIMIZATIONS ==========
-# ================================================================
-
 apply_ssh_optimizations() {
     echo -e "\n${C_BLUE}🔧 Applying SSH Optimizations (System-wide)...${C_RESET}"
     
@@ -1530,10 +1467,7 @@ EOF
     echo -e "${C_CYAN}📌 SSH Compression: Level 9${C_RESET}"
 }
 
-# ================================================================
 # ========== DNSTT SPEED BOOSTERS ==========
-# ================================================================
-
 apply_booster_standard_ultimate() {
     echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
     echo -e "${C_BLUE}           ⚡ STANDARD BOOSTER ULTIMATE (512) - 1000x SPEED${C_RESET}"
@@ -1788,10 +1722,7 @@ apply_booster_extreme_ultimate() {
     sleep 1
 }
 
-# ================================================================
 # ========== DNSTT OPTIMIZATIONS ==========
-# ================================================================
-
 apply_multiplexing() {
     echo -e "\n${C_BLUE}🚀 Applying DNSTT Multiplexing...${C_RESET}"
     
@@ -1910,10 +1841,7 @@ EOF
     echo -e "${C_GREEN}✅ DNS Caching applied${C_RESET}"
 }
 
-# ================================================================
 # ========== DNSTT DOMAIN FUNCTIONS ==========
-# ================================================================
-
 set_custom_dnstt_domain() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 🌐 Set Custom DNSTT Domain ---${C_RESET}"
@@ -2046,10 +1974,7 @@ change_dnstt_domain() {
     press_enter
 }
 
-# ================================================================
 # ========== DNSTT PUBLIC KEY FUNCTIONS ==========
-# ================================================================
-
 set_custom_dnstt_public_key() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 🔑 Set Custom DNSTT Public Key ---${C_RESET}"
@@ -2210,10 +2135,7 @@ regenerate_dnstt_keys() {
     press_enter
 }
 
-# ================================================================
 # ========== DNSTT VIEW DETAILS ==========
-# ================================================================
-
 show_dnstt_full_details() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 📡 DNSTT Full Details ---${C_RESET}"
@@ -2261,10 +2183,7 @@ show_dnstt_full_details() {
     press_enter
 }
 
-# ================================================================
 # ========== DNSTT MAIN MANAGEMENT MENU ==========
-# ================================================================
-
 dnstt_main_menu() {
     while true; do
         clear; show_banner
@@ -2321,10 +2240,7 @@ dnstt_main_menu() {
     done
 }
 
-# ================================================================
 # ========== DNSTT SUB-MENUS ==========
-# ================================================================
-
 dnstt_domain_menu() {
     while true; do
         clear; show_banner
@@ -2417,10 +2333,7 @@ dnstt_speed_menu() {
     done
 }
 
-# ================================================================
 # ========== DNSTT INSTALLATION ==========
-# ================================================================
-
 download_dnstt_binary() {
     echo -e "\n${C_BLUE}📥 Downloading DNSTT binary...${C_RESET}"
     
@@ -2484,31 +2397,62 @@ setup_domain() {
     if [[ "$domain_option" == "2" ]]; then
         echo -e "\n${C_BLUE}🔄 Generating domain with deSEC...${C_RESET}"
         
+        # Generate random string ya HERUFI 3 TU
+        local rand=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 3)
+        
+        # Subdomains zote zinatumia random string ile ile
+        local ns_sub="ns-$rand"      # Mfano: ns-tx1
+        local tun_sub="tun-$rand"    # Mfano: tun-tx1
+        
+        local SERVER_IPV4=$(curl -s -4 icanhazip.com)
+        
+        echo -e "${C_CYAN}📌 Server IP: $SERVER_IPV4${C_RESET}"
+        echo -e "${C_CYAN}📌 NS subdomain: $ns_sub.voltrontechtx.shop.${C_RESET}"
+        echo -e "${C_CYAN}📌 Tunnel subdomain: $tun_sub.voltrontechtx.shop.${C_RESET}"
+        
+        # DELETE OLD RECORDS
         if [ -f "$DB_DIR/domain.txt" ]; then
             local old_domain=$(cat "$DB_DIR/domain.txt")
             local old_sub=$(echo "$old_domain" | cut -d. -f1)
-            curl -s -X DELETE "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/$old_sub/NS/" \
+            
+            curl -s -X DELETE "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/${old_sub}/NS/" \
                 -H "Authorization: Token $DESEC_TOKEN" > /dev/null 2>&1
-            echo -e "${C_CYAN}📌 Old domain removed${C_RESET}"
+            
+            local old_ns_sub=$(echo "$old_domain" | sed 's/tun/ns/')
+            curl -s -X DELETE "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/${old_ns_sub}/A/" \
+                -H "Authorization: Token $DESEC_TOKEN" > /dev/null 2>&1
+            echo -e "${C_CYAN}📌 Old records removed${C_RESET}"
         fi
         
-        local rand=$(head /dev/urandom | tr -dc a-z0-9 | head -c 8)
-        local tun="tun-$rand"
-        local SERVER_IPV4=$(curl -s -4 icanhazip.com)
+        # CREATE NS RECORD
+        local NS_API_DATA="[{\"subname\":\"$tun_sub\",\"type\":\"NS\",\"ttl\":3600,\"records\":[\"$ns_sub.$DESEC_DOMAIN.\"]}]"
         
-        local API_DATA="[{\"subname\":\"$tun\",\"type\":\"NS\",\"ttl\":3600,\"records\":[\"ns1.$DESEC_DOMAIN.\"]}]"
-        local RESPONSE=$(curl -s -w "%{http_code}" -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" \
-            -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$API_DATA")
-        local HTTP_CODE=${RESPONSE: -3}
+        local NS_RESPONSE=$(curl -s -w "%{http_code}" -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" \
+            -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$NS_API_DATA")
+        local NS_HTTP=${NS_RESPONSE: -3}
         
-        if [[ "$HTTP_CODE" -eq 201 ]]; then
-            DOMAIN="$tun.$DESEC_DOMAIN"
-            echo -e "${C_GREEN}✅ Domain generated: ${C_YELLOW}$DOMAIN${C_RESET}"
+        if [[ "$NS_HTTP" -eq 201 ]]; then
+            echo -e "${C_GREEN}✅ NS record created: ${C_YELLOW}$tun_sub.$DESEC_DOMAIN → $ns_sub.$DESEC_DOMAIN.${C_RESET}"
         else
-            echo -e "${C_RED}❌ Failed to generate domain. HTTP: $HTTP_CODE${C_RESET}"
-            echo -e "${C_YELLOW}Please enter domain manually:${C_RESET}"
-            read -p "👉 Enter domain: " DOMAIN
+            echo -e "${C_RED}❌ Failed to create NS record. HTTP: $NS_HTTP${C_RESET}"
         fi
+        
+        # CREATE A RECORD
+        local A_API_DATA="[{\"subname\":\"$ns_sub\",\"type\":\"A\",\"ttl\":3600,\"records\":[\"$SERVER_IPV4\"]}]"
+        
+        local A_RESPONSE=$(curl -s -w "%{http_code}" -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" \
+            -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$A_API_DATA")
+        local A_HTTP=${A_RESPONSE: -3}
+        
+        if [[ "$A_HTTP" -eq 201 ]]; then
+            echo -e "${C_GREEN}✅ A record created: ${C_YELLOW}$ns_sub.$DESEC_DOMAIN → $SERVER_IPV4${C_RESET}"
+        else
+            echo -e "${C_RED}❌ Failed to create A record. HTTP: $A_HTTP${C_RESET}"
+        fi
+        
+        DOMAIN="$tun_sub.$DESEC_DOMAIN"
+        echo -e "\n${C_GREEN}✅ Domain generated: ${C_YELLOW}$DOMAIN${C_RESET}"
+        
     else
         read -p "👉 Enter domain: " DOMAIN
     fi
@@ -2798,10 +2742,7 @@ EOF
     press_enter
 }
 
-# ================================================================
 # ========== PROTOCOLS ==========
-# ================================================================
-
 install_badvpn() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 🚀 Installing badvpn ---${C_RESET}"
@@ -3060,14 +3001,10 @@ uninstall_xui_panel() {
     press_enter
 }
 
-# ================================================================
 # ========== VPS DASHBOARD ==========
-# ================================================================
-
 show_vps_dashboard() {
     clear
     
-    # ========== SYSTEM INFO ==========
     local HOSTNAME=$(hostname)
     local OS=$(grep -oP 'PRETTY_NAME="\K[^"]+' /etc/os-release 2>/dev/null | cut -d' ' -f1-2)
     local KERNEL=$(uname -r)
@@ -3075,47 +3012,38 @@ show_vps_dashboard() {
     local UPTIME=$(uptime -p | sed 's/up //')
     local DATE=$(date '+%Y-%m-%d %H:%M:%S')
     
-    # ========== IP INFO ==========
     local IP=$(curl -s -4 icanhazip.com 2>/dev/null || echo "Unknown")
     local LOCATION=$(curl -s "http://ip-api.com/json/$IP" 2>/dev/null | grep -o '"city":"[^"]*"' | cut -d'"' -f4 2>/dev/null || echo "Unknown")
     local COUNTRY=$(curl -s "http://ip-api.com/json/$IP" 2>/dev/null | grep -o '"country":"[^"]*"' | cut -d'"' -f4 2>/dev/null || echo "Unknown")
     local ISP=$(curl -s "http://ip-api.com/json/$IP" 2>/dev/null | grep -o '"isp":"[^"]*"' | cut -d'"' -f4 2>/dev/null | cut -d' ' -f1-2)
     
-    # ========== CPU INFO ==========
     local CPU_MODEL=$(grep -m1 "model name" /proc/cpuinfo | cut -d: -f2 | sed 's/^[ \t]*//' | cut -c1-25)
     local CPU_CORES=$(grep -c "processor" /proc/cpuinfo)
     local CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d. -f1)
     [[ -z "$CPU_USAGE" ]] && CPU_USAGE=0
     
-    # ========== RAM INFO ==========
     local RAM_TOTAL=$(free -h | awk '/^Mem:/ {print $2}')
     local RAM_USED=$(free -h | awk '/^Mem:/ {print $3}')
     local RAM_PERCENT=$(free -m | awk '/^Mem:/ {printf "%.0f", $3*100/$2}')
     [[ -z "$RAM_PERCENT" ]] && RAM_PERCENT=0
     
-    # ========== DISK INFO ==========
     local DISK_TOTAL=$(df -h / | awk 'NR==2 {print $2}')
     local DISK_USED=$(df -h / | awk 'NR==2 {print $3}')
     local DISK_PERCENT=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')
     [[ -z "$DISK_PERCENT" ]] && DISK_PERCENT=0
     
-    # ========== NETWORK INFO ==========
     local IFACE=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
     local RX=$(cat "/sys/class/net/$IFACE/statistics/rx_bytes" 2>/dev/null | numfmt --to=iec 2>/dev/null || echo "0")
     local TX=$(cat "/sys/class/net/$IFACE/statistics/tx_bytes" 2>/dev/null | numfmt --to=iec 2>/dev/null || echo "0")
     
-    # ========== LOAD AVERAGE ==========
     local LOAD=$(awk '{print $1" "$2" "$3}' /proc/loadavg)
     
-    # ========== USERS ==========
     local TOTAL_USERS=$(grep -c . "$DB_FILE" 2>/dev/null || echo "0")
     local ONLINE_USERS=$(count_managed_online_sessions 2>/dev/null || echo "0")
     
-    # ========== SERVICES STATUS ==========
     local SSH_STATUS=$(systemctl is-active sshd 2>/dev/null || echo "inactive")
     local DNSTT_STATUS=$(systemctl is-active dnstt 2>/dev/null || echo "inactive")
     
-    # ========== CREATE PROGRESS BARS ==========
     make_bar() {
         local percent=$1
         local width=20
@@ -3125,11 +3053,11 @@ show_vps_dashboard() {
         
         local color=""
         if [[ $percent -lt 50 ]]; then
-            color="\033[38;5;46m"  # Green
+            color="\033[38;5;46m"
         elif [[ $percent -lt 75 ]]; then
-            color="\033[38;5;226m"  # Yellow
+            color="\033[38;5;226m"
         else
-            color="\033[38;5;196m"  # Red
+            color="\033[38;5;196m"
         fi
         
         printf "${color}["
@@ -3138,7 +3066,6 @@ show_vps_dashboard() {
         printf "]${C_RESET} ${percent}%%"
     }
     
-    # ========== DISPLAY DASHBOARD ==========
     echo ""
     echo -e "${C_BOLD}${C_PURPLE}╔═══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
     echo -e "${C_BOLD}${C_PURPLE}║${C_RESET}  ${C_BOLD}${C_WHITE}🖥️  VPS DASHBOARD${C_RESET}                                              ${C_BOLD}${C_PURPLE}║${C_RESET}"
@@ -3146,32 +3073,25 @@ show_vps_dashboard() {
     echo -e "${C_BOLD}${C_PURPLE}╚═══════════════════════════════════════════════════════════════════════════╝${C_RESET}"
     echo ""
     
-    # Row 1: IP + Location + ISP
     echo -e "${C_BOLD}${C_CYAN}┌─────────────────────────────────────────────────────────────────────────────┐${C_RESET}"
     printf "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_YELLOW}🌐 IP:${C_RESET} ${C_GREEN}%-15s${C_RESET}  ${C_YELLOW}📍 Location:${C_RESET} ${C_GREEN}%-20s${C_RESET}  ${C_YELLOW}🏢 ISP:${C_RESET} ${C_GREEN}%-15s${C_RESET}  ${C_BOLD}${C_CYAN}│${C_RESET}\n" "$IP" "$LOCATION, $COUNTRY" "$ISP"
     echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
     
-    # Row 2: OS + Kernel + Arch
     printf "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_YELLOW}💻 OS:${C_RESET} ${C_GREEN}%-12s${C_RESET}  ${C_YELLOW}⚙️ Kernel:${C_RESET} ${C_GREEN}%-18s${C_RESET}  ${C_YELLOW}📦 Arch:${C_RESET} ${C_GREEN}%-8s${C_RESET}  ${C_BOLD}${C_CYAN}│${C_RESET}\n" "$OS" "$KERNEL" "$ARCH"
     echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
     
-    # Row 3: Uptime + Load + Users
     printf "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_YELLOW}⏱️ Uptime:${C_RESET} ${C_GREEN}%-20s${C_RESET}  ${C_YELLOW}📊 Load:${C_RESET} ${C_GREEN}%-15s${C_RESET}  ${C_YELLOW}👥 Users:${C_RESET} ${C_GREEN}%2s/%2s${C_RESET}  ${C_BOLD}${C_CYAN}│${C_RESET}\n" "$UPTIME" "$LOAD" "$ONLINE_USERS" "$TOTAL_USERS"
     echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
     
-    # Row 4: CPU Model + Cores + RAM
     printf "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_YELLOW}🔹 CPU:${C_RESET} ${C_WHITE}%-20s${C_RESET} ${C_CYAN}%2s cores${C_RESET}  ${C_YELLOW}🔹 RAM:${C_RESET} ${C_WHITE}%5s / %5s${C_RESET}  ${C_BOLD}${C_CYAN}│${C_RESET}\n" "$CPU_MODEL" "$CPU_CORES" "$RAM_USED" "$RAM_TOTAL"
     echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
     
-    # Row 5: Progress Bars (CPU + RAM)
     printf "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_YELLOW}CPU:${C_RESET}  %-28s  ${C_YELLOW}RAM:${C_RESET}  %-28s  ${C_BOLD}${C_CYAN}│${C_RESET}\n" "$(make_bar $CPU_USAGE)" "$(make_bar $RAM_PERCENT)"
     echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
     
-    # Row 6: Disk + Network
     printf "${C_BOLD}${C_CYAN}│${C_RESET}  ${C_YELLOW}📀 Disk:${C_RESET} %4s / %4s  %-20s  ${C_YELLOW}📶 Net:${C_RESET} ↓ %6s  ↑ %6s  ${C_BOLD}${C_CYAN}│${C_RESET}\n" "$DISK_USED" "$DISK_TOTAL" "$(make_bar $DISK_PERCENT)" "$RX" "$TX"
     echo -e "${C_BOLD}${C_CYAN}├─────────────────────────────────────────────────────────────────────────────┤${C_RESET}"
     
-    # Row 7: Services Status (SSH + DNSTT)
     local ssh_color=""
     [[ "$SSH_STATUS" == "active" ]] && ssh_color="${C_GREEN}● RUNNING${C_RESET}" || ssh_color="${C_RED}● STOPPED${C_RESET}"
     local dnstt_color=""
@@ -3181,7 +3101,6 @@ show_vps_dashboard() {
     echo -e "${C_BOLD}${C_CYAN}└─────────────────────────────────────────────────────────────────────────────┘${C_RESET}"
     echo ""
     
-    # ========== FOOTER ==========
     echo -e "${C_DIM}─────────────────────────────────────────────────────────────────────────────────${C_RESET}"
     echo -e "${C_DIM}  💡 Press ${C_WHITE}[Enter]${C_DIM} to refresh  |  Press ${C_WHITE}[0]${C_DIM} to return${C_RESET}"
     echo -e "${C_DIM}─────────────────────────────────────────────────────────────────────────────────${C_RESET}"
@@ -3192,10 +3111,7 @@ show_vps_dashboard() {
     fi
 }
 
-# ================================================================
 # ========== PROTOCOL MENU ==========
-# ================================================================
-
 protocol_menu() {
     while true; do
         clear; show_banner
@@ -3248,8 +3164,6 @@ protocol_menu() {
         else
             xui_status="${C_DIM}● NOT INSTALLED${C_RESET}"
         fi
-        
-        local current_mtu=$(get_current_mtu)
         
         echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
         echo -e "${C_BOLD}${C_PURPLE}              🔌 PROTOCOL MANAGEMENT${C_RESET}"
@@ -3334,10 +3248,7 @@ protocol_menu() {
     done
 }
 
-# ================================================================
 # ========== VPN DATA USAGE ==========
-# ================================================================
-
 show_vpn_data_usage() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
@@ -3393,10 +3304,7 @@ show_vpn_data_usage() {
     press_enter
 }
 
-# ================================================================
 # ========== AUTO REBOOT ==========
-# ================================================================
-
 auto_reboot_menu() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 🔄 Auto-Reboot Management ---${C_RESET}"
@@ -3434,10 +3342,7 @@ auto_reboot_menu() {
     esac
 }
 
-# ================================================================
 # ========== TRAFFIC MONITOR ==========
-# ================================================================
-
 traffic_monitor_menu() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 📈 Network Traffic Monitor ---${C_RESET}"
@@ -3498,10 +3403,7 @@ traffic_monitor_menu() {
     esac
 }
 
-# ================================================================
 # ========== TORRENT BLOCKING ==========
-# ================================================================
-
 torrent_block_menu() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 🚫 Torrent Blocking ---${C_RESET}"
@@ -3545,10 +3447,7 @@ torrent_block_menu() {
     esac
 }
 
-# ================================================================
 # ========== BACKUP & RESTORE ==========
-# ================================================================
-
 backup_user_data() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 💾 Backup User Data ---${C_RESET}"
@@ -3606,10 +3505,7 @@ restore_user_data() {
     press_enter
 }
 
-# ================================================================
 # ========== DNS MENU ==========
-# ================================================================
-
 dns_menu() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 🌐 DNS Domain Management ---${C_RESET}"
@@ -3665,10 +3561,7 @@ EOF
     echo -e "\n${C_GREEN}✅ Domain: ${C_YELLOW}$FULL_DOMAIN${C_RESET}"
 }
 
-# ================================================================
 # ========== UNINSTALL SCRIPT ==========
-# ================================================================
-
 uninstall_script() {
     clear; show_banner
     echo -e "${C_RED}═══════════════════════════════════════════════════════════════${C_RESET}"
@@ -3736,10 +3629,7 @@ uninstall_script() {
     exit 0
 }
 
-# ================================================================
 # ========== UPDATE SSH BANNERS CONFIG ==========
-# ================================================================
-
 update_ssh_banners_config() {
     local tmp_conf
 
@@ -3777,15 +3667,13 @@ update_ssh_banners_config() {
         if ! grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null; then
             echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
         fi
-        systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null    else
+        systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+    else
         rm -f "$tmp_conf"
     fi
 }
 
-# ================================================================
 # ========== DYNAMIC BANNER FUNCTIONS ==========
-# ================================================================
-
 enable_dynamic_banner() {
     echo -e "\n${C_BLUE}═══════════════════════════════════════════════════════════════${C_RESET}"
     echo -e "${C_BLUE}           🎨 ENABLING DYNAMIC ACCOUNT BANNER${C_RESET}"
@@ -3888,10 +3776,7 @@ ssh_banner_menu() {
     done
 }
 
-# ================================================================
 # ========== APPLY SSH BOOSTER AUTO ==========
-# ================================================================
-
 apply_ssh_booster_auto() {
     echo -e "\n${C_BLUE}🔧 Applying SSH Speed Booster (Automatic)...${C_RESET}"
     
@@ -3920,10 +3805,7 @@ EOF
     echo -e "${C_GREEN}✅ SSH Speed Booster applied automatically!${C_RESET}"
 }
 
-# ================================================================
 # ========== APPLY UDP BOOSTER AUTO ==========
-# ================================================================
-
 apply_udp_booster_auto() {
     echo -e "\n${C_BLUE}🔧 Applying UDP Booster (Automatic)...${C_RESET}"
     
@@ -3947,10 +3829,7 @@ EOF
     echo -e "${C_GREEN}✅ UDP Booster applied automatically!${C_RESET}"
 }
 
-# ================================================================
 # ========== LIMITER SERVICE ==========
-# ================================================================
-
 create_limiter_service() {
     cat > "$LIMITER_SCRIPT" << 'EOF'
 #!/bin/bash
@@ -4143,7 +4022,7 @@ while true; do
         
         banner_content=""
         banner_content+="<br><br>"
-        banner_content+="<center><font color=\"#9B59B6\">‎▬▬▬ஜ۩</font><font color=\"#FF6B6B\" size=\"8\"><b> 🌍VOLTRON TECH ULTIMATE🌍</b></font><font color=\"#9B59B6\">‎۩ஜ▬▬▬</font></center><br>"
+        banner_content+="<center><font color=\"#9B59B6\">‎▬▬▬▬ஜ۩</font><font color=\"#FF6B6B\" size=\"8\"><b> 🌍VOLTRON TECH ULTIMATE🌍</b></font><font color=\"#9B59B6\">‎۩ஜ▬▬▬▬</font></center><br>"
         banner_content+="<br>"
         banner_content+="<center><font color=\"#4D96FF\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
         banner_content+="<br>"
@@ -4258,10 +4137,7 @@ EOF
     fi
 }
 
-# ================================================================
 # ========== INITIAL SETUP ==========
-# ================================================================
-
 initial_setup() {
     echo -e "\n${C_BLUE}🔧 Running initial system setup...${C_RESET}"
     
@@ -4288,10 +4164,7 @@ initial_setup() {
     echo -e "${C_GREEN}✅ Setup finished.${C_RESET}"
 }
 
-# ================================================================
 # ========== MAIN MENU ==========
-# ================================================================
-
 main_menu() {
     while true; do
         show_banner
@@ -4358,10 +4231,7 @@ main_menu() {
     done
 }
 
-# ================================================================
 # ========== SPEED OPTIMIZATION MENU ==========
-# ================================================================
-
 speed_optimization_menu() {
     while true; do
         clear; show_banner
@@ -4399,10 +4269,7 @@ speed_optimization_menu() {
     done
 }
 
-# ================================================================
 # ========== START ==========
-# ================================================================
-
 if [[ $EUID -ne 0 ]]; then
     echo -e "${C_RED}❌ This script must be run as root!${C_RESET}"
     exit 1
