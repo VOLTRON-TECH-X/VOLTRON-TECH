@@ -543,7 +543,7 @@ generate_user_banner() {
 <br>
 <center><font color="#6BCB77" size="4"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>
 <center><font color="#000000">📱 Telegram  : https://t.me/voltrontech</font></center><br>
-<center><font color="#000000">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>
+<center><font color="#000000">💬 WhatsApp  : https://chat.whatsapp.com/EZtAFt9dmS5DVKbNN5iSPz?s=cl&p=a&mlu=0&ilr=4</font></center><br>
 <br>
 <center><font color="#FF6B6B" size="4"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>
 <center><font color="#000000">• Account expires on: $expiry</font></center><br>
@@ -4042,7 +4042,7 @@ while true; do
         banner_content+="<br>"
         banner_content+="<center><font color=\"#6BCB77\" size=\"4\"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>"
         banner_content+="<center><font color=\"#000000\">📱 Telegram  : https://t.me/voltrontech</font></center><br>"
-        banner_content+="<center><font color=\"#000000\">💬 WhatsApp  : https://chat.whatsapp.com/JfxZ5Vif62JLKZc275Njl8</font></center><br>"
+        banner_content+="<center><font color=\"#000000\">💬 WhatsApp  : https://chat.whatsapp.com/EZtAFt9dmS5DVKbNN5iSPz?s=cl&p=a&mlu=0&ilr=4</font></center><br>"
         banner_content+="<br>"
         banner_content+="<center><font color=\"#FF6B6B\" size=\"4\"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>"
         banner_content+="<center><font color=\"#000000\">• Account expires on: $expiry</font></center><br>"
