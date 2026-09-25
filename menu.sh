@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================
-# VOLTRON TECH ULTIMATE v10.0 - COMPLETE WITH API
+# VOLTRON TECH ULTIMATE v11.0 - WITH API MANAGEMENT
 # ================================================================
 
 # ========== COLOR CODES ==========
@@ -145,7 +145,7 @@ show_banner() {
     refresh_banner_cache
     [[ -t 1 ]] && clear
     echo
-    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v10.0 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
+    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v11.0 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
     echo -e "${C_BLUE}   ─────────────────────────────────────────────────────────${C_RESET}"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "OS" "$BANNER_CACHE_OS_NAME" "Uptime: $BANNER_CACHE_UP_TIME"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "Memory" "${BANNER_CACHE_RAM_USAGE}% Used" "Online: ${C_WHITE}${BANNER_CACHE_ONLINE_USERS}${C_RESET}"
@@ -333,6 +333,7 @@ generate_user_banner() {
 <center><font color="#9B59B6">‎▬▬▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b>  🌍VOLTRON VPN🌍 </b></font><font color="#9B59B6">‎۩ஜ▬▬▬▬▬</font></center><br>
 EOF
 }
+
 
 # ========== CREATE USER ==========
 create_user() {
@@ -626,6 +627,7 @@ client_config_menu() {
     local pass=$(grep "^$u:" "$DB_FILE" | cut -d: -f2)
     generate_client_config "$u" "$pass"
 }
+
 
 # ========== TRIAL ACCOUNT ==========
 setup_trial_cleanup_script() {
@@ -922,6 +924,7 @@ no-resolv
 EOF
     systemctl restart dnsmasq 2>/dev/null
 }
+
 
 # ========== DNSTT DOMAIN ==========
 set_custom_dnstt_domain() {
@@ -1368,8 +1371,7 @@ uninstall_ssl_tunnel() {
     echo -e "${C_GREEN}✅ SSL uninstalled${C_RESET}"; press_enter
 }
 install_falcon_proxy() {
-    clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🦅 Installing Falcon Proxy ---${C_RESET}"
+    clear; show_banner    echo -e "${C_BOLD}${C_PURPLE}--- 🦅 Installing Falcon Proxy ---${C_RESET}"
     local arch=$(uname -m)
     if [[ "$arch" == "x86_64" ]]; then curl -sL -o "$FALCONPROXY_BINARY" "https://github.com/firewallfalcons/FirewallFalcon-Manager/releases/latest/download/falconproxy"
     else curl -sL -o "$FALCONPROXY_BINARY" "https://github.com/firewallfalcons/FirewallFalcon-Manager/releases/latest/download/falconproxyarm"; fi
@@ -1468,7 +1470,7 @@ show_vps_dashboard() {
     local LOAD=$(awk '{print $1" "$2" "$3}' /proc/loadavg)
     local TOTAL_USERS=$(grep -c . "$DB_FILE" 2>/dev/null || echo "0")
     local ONLINE_USERS=$(count_managed_online_sessions 2>/dev/null || echo "0")
-    local SSH_STATUS=$(systemctl is-active sshd 2>/dev/null || echo "inactive")
+    local SSH_STATUS=$(systemctl is-active sshd 2>/dev/null || systemctl is-active ssh 2>/dev/null || echo "inactive")
     local DNSTT_STATUS=$(systemctl is-active dnstt 2>/dev/null || echo "inactive")
     make_bar() {
         local p=$1; local w=20
@@ -1510,7 +1512,7 @@ show_vps_dashboard() {
     [[ "$rc" != "0" ]] && show_vps_dashboard
 }
 
-# ========== PROTOCOL MENU (UPDATED WITH API) ==========
+# ========== PROTOCOL MENU ==========
 protocol_menu() {
     while true; do
         clear; show_banner
@@ -1553,7 +1555,7 @@ protocol_menu() {
     done
 }
 
-# ========== API MANAGEMENT (FULL) ==========
+# ========== API MANAGEMENT ==========
 api_management_menu() {
     while true; do
         clear; show_banner
@@ -1567,7 +1569,7 @@ api_management_menu() {
             api_key=$(grep "API_KEY=" "$API_INFO_FILE" 2>/dev/null | cut -d= -f2-)
         fi
         local active_count=0
-        for svc in sshd dnstt haproxy badvpn udp-custom zivpn falconproxy; do
+        for svc in sshd ssh dnstt haproxy badvpn udp-custom zivpn falconproxy; do
             systemctl is-active --quiet "$svc" 2>/dev/null && ((active_count++))
         done
         echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
@@ -1630,9 +1632,10 @@ install_api_server() {
     echo -e "\n${C_BLUE}[4/6] Creating API code...${C_RESET}"
     create_api_code
     echo -e "\n${C_BLUE}[5/6] Systemd service...${C_RESET}"
+    local SERVER_HOST=$(cat "$DB_DIR/domain.txt" 2>/dev/null || echo "vpn.voltrontechtx.shop")
     cat > /etc/systemd/system/voltrontech-api.service << EOF
 [Unit]
-Description=Voltron Tech API Server
+Description=Voltron Tech API Server v11.0
 After=network.target
 
 [Service]
@@ -1641,8 +1644,9 @@ User=root
 WorkingDirectory=$API_DIR
 Environment="API_KEY=$API_KEY"
 Environment="DB_DIR=$DB_DIR"
-Environment="PATH=$API_DIR/venv/bin"
-ExecStart=$API_DIR/venv/bin/gunicorn --workers 4 --bind 0.0.0.0:$API_PORT api:app
+Environment="SERVER_HOST=$SERVER_HOST"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=$API_DIR/venv/bin/gunicorn --workers 4 --bind 0.0.0.0:$API_PORT --timeout 120 api:app
 Restart=always
 RestartSec=5
 
@@ -1682,97 +1686,165 @@ EOF
 create_api_code() {
     cat > "$API_DIR/api.py" << 'APIEOF'
 #!/usr/bin/env python3
-"""Voltron Tech API Server v10.0"""
+"""Voltron Tech API Server v11.0"""
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from functools import wraps
-import subprocess, os, secrets, string
+import subprocess, os, secrets, string, shutil
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
 API_KEY = os.environ.get('API_KEY', 'CHANGE_ME')
 DB_DIR = os.environ.get('DB_DIR', '/etc/voltrontech')
 DB_FILE = f'{DB_DIR}/users.db'
-SERVER_HOST = 'vpn.voltrontechtx.shop'
+SERVER_HOST = os.environ.get('SERVER_HOST', 'vpn.voltrontechtx.shop')
+
 
 def require_api_key(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         key = request.headers.get('X-API-Key') or request.args.get('api_key')
-        if key != API_KEY:
-            return jsonify({'error': 'Invalid API key'}), 401
+        if not key or key != API_KEY:
+            return jsonify({'success': False, 'error': 'Invalid API key'}), 401
         return f(*args, **kwargs)
     return decorated
 
-def run(cmd, timeout=60):
+
+def run(cmd, timeout=30):
     try:
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
-        return {'success': r.returncode == 0, 'stdout': r.stdout.strip(), 'stderr': r.stderr.strip()}
+        return {'success': r.returncode == 0, 'stdout': r.stdout.strip() if r.stdout else '', 'stderr': r.stderr.strip() if r.stderr else ''}
     except Exception as e:
-        return {'success': False, 'error': str(e)}
+        return {'success': False, 'stdout': '', 'stderr': str(e)}
+
+
+def service_active(name):
+    if not shutil.which('systemctl'):
+        return False
+    r = run(f'systemctl is-active {name} 2>/dev/null')
+    if r.get('stdout', '').strip() == 'active':
+        return True
+    r = run(f'systemctl show -p ActiveState --value {name} 2>/dev/null')
+    if r.get('stdout', '').strip() == 'active':
+        return True
+    return False
+
+
+def ssh_active():
+    return service_active('ssh') or service_active('sshd')
+
 
 def read_users():
     users = []
-    if not os.path.exists(DB_FILE): return users
-    with open(DB_FILE) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith('#'): continue
-            parts = line.split(':')
-            if len(parts) >= 4:
-                users.append({'username': parts[0], 'password': parts[1], 'expiry': parts[2], 'limit': parts[3], 'bandwidth': parts[4] if len(parts) > 4 else '0'})
+    if not os.path.exists(DB_FILE):
+        return users
+    try:
+        with open(DB_FILE) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                parts = line.split(':')
+                if len(parts) >= 4:
+                    users.append({'username': parts[0], 'password': parts[1], 'expiry': parts[2], 'limit': parts[3], 'bandwidth': parts[4] if len(parts) > 4 else '0'})
+    except Exception:
+        pass
     return users
 
-def service_active(name):
-    return run(f'systemctl is-active {name}')['stdout'] == 'active'
+
+def user_exists(username):
+    r = run(f'id {username} 2>/dev/null')
+    return r.get('success', False)
+
 
 def get_status(username):
-    try:
-        import pwd
-        pwd.getpwnam(username)
-    except KeyError: return 'not_found'
-    r = run(f'passwd -S {username}')
-    if ' L ' in r.get('stdout', ''): return 'locked'
+    if not user_exists(username):
+        return 'not_found'
+    r = run(f'passwd -S {username} 2>/dev/null')
+    if ' L ' in r.get('stdout', ''):
+        return 'locked'
     user = next((u for u in read_users() if u['username'] == username), None)
     if user and user.get('expiry'):
         try:
-            if datetime.strptime(user['expiry'], '%Y-%m-%d') < datetime.now(): return 'expired'
-        except: pass
+            if datetime.strptime(user['expiry'], '%Y-%m-%d') < datetime.now():
+                return 'expired'
+        except Exception:
+            pass
     return 'active'
 
-def get_active_protocols(username=None, password=None):
+
+def get_online(username):
+    r = run(f'pgrep -c -u {username} sshd 2>/dev/null')
+    try:
+        return int(r.get('stdout', '0') or '0')
+    except ValueError:
+        return 0
+
+
+def get_server_ip():
+    for cmd in ['curl -s -4 icanhazip.com', 'hostname -I | awk \'{print $1}\'']:
+        r = run(cmd, timeout=5)
+        ip = r.get('stdout', '').strip()
+        if ip and ip.count('.') == 3:
+            return ip
+    return 'unknown'
+
+
+def get_protocols(username=None, password=None):
     protocols = {}
-    server_ip = run('curl -s -4 icanhazip.com')['stdout']
-    if service_active('sshd'):
-        protocols['ssh'] = {'enabled': True, 'name': 'SSH Direct', 'icon': '🔐', 'color': '#6BCB77', 'host': SERVER_HOST, 'ip': server_ip, 'port': 22, 'username': username, 'password': password, 'info': 'Direct SSH connection'}
+    server_ip = get_server_ip()
+    
+    if ssh_active():
+        protocols['ssh'] = {'id': 'ssh', 'name': 'SSH Direct', 'icon': '🔐', 'color': '#6BCB77', 'host': SERVER_HOST, 'ip': server_ip, 'port': 22, 'username': username, 'password': password, 'info': 'Direct SSH connection', 'type': 'ssh'}
+    
     if service_active('haproxy'):
         port = 444
-        cfg = run('grep -oP "bind \\*:\\K\\d+" /etc/haproxy/haproxy.cfg 2>/dev/null | head -1')
-        if cfg['stdout']: port = int(cfg['stdout'])
-        protocols['ssl'] = {'enabled': True, 'name': 'SSL/TLS Tunnel', 'icon': '🔒', 'color': '#4D96FF', 'host': SERVER_HOST, 'ip': server_ip, 'port': port, 'username': username, 'password': password, 'info': f'SSL on port {port}'}
+        if os.path.exists('/etc/haproxy/haproxy.cfg'):
+            r = run('grep -oP "bind \\*:\\K\\d+" /etc/haproxy/haproxy.cfg 2>/dev/null | head -1')
+            try:
+                port = int(r.get('stdout', '444'))
+            except ValueError:
+                port = 444
+        protocols['ssl'] = {'id': 'ssl', 'name': 'SSL/TLS Tunnel', 'icon': '🔒', 'color': '#4D96FF', 'host': SERVER_HOST, 'ip': server_ip, 'port': port, 'username': username, 'password': password, 'info': f'SSL tunnel on port {port}', 'type': 'ssl'}
+    
     if service_active('dnstt'):
         domain = ''; pubkey = ''; mtu = 512
         if os.path.exists(f'{DB_DIR}/domain.txt'):
-            with open(f'{DB_DIR}/domain.txt') as f: domain = f.read().strip()
+            try:
+                with open(f'{DB_DIR}/domain.txt') as f: domain = f.read().strip()
+            except Exception: pass
         if os.path.exists(f'{DB_DIR}/dnstt/server.pub'):
-            with open(f'{DB_DIR}/dnstt/server.pub') as f: pubkey = f.read().strip()
+            try:
+                with open(f'{DB_DIR}/dnstt/server.pub') as f: pubkey = f.read().strip()
+            except Exception: pass
         if os.path.exists(f'{DB_DIR}/config/mtu'):
-            with open(f'{DB_DIR}/config/mtu') as f: mtu = int(f.read().strip())
-        protocols['dnstt'] = {'enabled': True, 'name': 'DNSTT (SlowDNS)', 'icon': '📡', 'color': '#9B59B6', 'domain': domain, 'pubkey': pubkey, 'mtu': mtu, 'dns': '8.8.8.8', 'dns_alt': '1.1.1.1', 'username': username, 'password': password, 'info': f'DNSTT MTU {mtu}'}
+            try:
+                with open(f'{DB_DIR}/config/mtu') as f: mtu = int(f.read().strip())
+            except Exception: mtu = 512
+        protocols['dnstt'] = {'id': 'dnstt', 'name': 'DNSTT (SlowDNS)', 'icon': '📡', 'color': '#9B59B6', 'domain': domain, 'pubkey': pubkey, 'mtu': mtu, 'dns': '8.8.8.8', 'dns_alt': '1.1.1.1', 'username': username, 'password': password, 'info': f'DNSTT with MTU {mtu}', 'type': 'dnstt'}
+    
     if service_active('udp-custom'):
-        protocols['udp_custom'] = {'enabled': True, 'name': 'UDP Custom', 'icon': '🚀', 'color': '#FF6B6B', 'host': SERVER_HOST, 'ip': server_ip, 'port_range': '1-65535', 'exclude': '53,5300', 'username': username, 'password': password, 'info': 'UDP any port except 53,5300'}
+        protocols['udp_custom'] = {'id': 'udp_custom', 'name': 'UDP Custom', 'icon': '🚀', 'color': '#FF6B6B', 'host': SERVER_HOST, 'ip': server_ip, 'port_range': '1-65535', 'exclude': '53,5300', 'username': username, 'password': password, 'info': 'UDP any port except 53,5300', 'type': 'udp'}
+    
     if service_active('badvpn'):
-        protocols['badvpn'] = {'enabled': True, 'name': 'badvpn UDPGW', 'icon': '⚡', 'color': '#FFD93D', 'host': SERVER_HOST, 'ip': server_ip, 'port': 7300, 'username': username, 'password': password, 'info': 'BadVPN UDP Gateway'}
+        protocols['badvpn'] = {'id': 'badvpn', 'name': 'BadVPN UDPGW', 'icon': '⚡', 'color': '#FFD93D', 'host': SERVER_HOST, 'ip': server_ip, 'port': 7300, 'username': username, 'password': password, 'info': 'BadVPN UDP Gateway', 'type': 'badvpn'}
+    
     if service_active('zivpn'):
-        protocols['zivpn'] = {'enabled': True, 'name': 'ZiVPN', 'icon': '🛡️', 'color': '#6BCB77', 'host': SERVER_HOST, 'ip': server_ip, 'port': 5667, 'username': username, 'password': password, 'info': 'ZiVPN server'}
+        protocols['zivpn'] = {'id': 'zivpn', 'name': 'ZiVPN', 'icon': '🛡️', 'color': '#6BCB77', 'host': SERVER_HOST, 'ip': server_ip, 'port': 5667, 'username': username, 'password': password, 'info': 'ZiVPN server', 'type': 'zivpn'}
+    
     if service_active('falconproxy'):
-        protocols['falconproxy'] = {'enabled': True, 'name': 'Falcon Proxy', 'icon': '🦅', 'color': '#E85555', 'host': SERVER_HOST, 'ip': server_ip, 'port': 8080, 'username': username, 'password': password, 'info': 'Falcon Proxy'}
+        protocols['falconproxy'] = {'id': 'falconproxy', 'name': 'Falcon Proxy', 'icon': '🦅', 'color': '#E85555', 'host': SERVER_HOST, 'ip': server_ip, 'port': 8080, 'username': username, 'password': password, 'info': 'Falcon Proxy', 'type': 'falconproxy'}
+    
     return protocols
+
 
 @app.route('/api/health')
 def health():
-    return jsonify({'status': 'ok', 'version': '10.0', 'timestamp': datetime.now().isoformat()})
+    protocols = get_protocols()
+    return jsonify({'success': True, 'status': 'ok', 'service': 'Voltron Tech API', 'version': '11.0', 'protocols_active': len(protocols), 'timestamp': datetime.now().isoformat()})
+
 
 @app.route('/api/trial/check', methods=['POST'])
 @require_api_key
@@ -1780,11 +1852,12 @@ def trial_check():
     data = request.get_json() or {}
     username = data.get('username', '').strip().lower()
     if not username: return jsonify({'available': False, 'error': 'Username required'}), 400
-    if not username.replace('-', '').replace('_', '').isalnum(): return jsonify({'available': False, 'error': 'Invalid chars'}), 400
-    if len(username) < 3 or len(username) > 20: return jsonify({'available': False, 'error': '3-20 chars'}), 400
-    if run(f'id {username} 2>/dev/null')['success']: return jsonify({'available': False, 'error': 'Taken'})
-    if any(u['username'] == username for u in read_users()): return jsonify({'available': False, 'error': 'Taken'})
-    return jsonify({'available': True})
+    if not username.replace('-', '').replace('_', '').isalnum(): return jsonify({'available': False, 'error': 'Only letters, numbers, - and _'}), 400
+    if len(username) < 3 or len(username) > 20: return jsonify({'available': False, 'error': 'Username must be 3-20 chars'}), 400
+    if user_exists(username): return jsonify({'available': False, 'error': 'Username taken'})
+    if any(u['username'] == username for u in read_users()): return jsonify({'available': False, 'error': 'Username taken'})
+    return jsonify({'available': True, 'username': username})
+
 
 @app.route('/api/trial/create', methods=['POST'])
 @require_api_key
@@ -1797,7 +1870,7 @@ def trial_create():
     if not username.replace('-', '').replace('_', '').isalnum(): return jsonify({'success': False, 'error': 'Invalid chars'}), 400
     if not password or len(password) < 4: return jsonify({'success': False, 'error': 'Password too short'}), 400
     if days not in [1, 3, 7]: return jsonify({'success': False, 'error': 'Days must be 1, 3, or 7'}), 400
-    if run(f'id {username} 2>/dev/null')['success']: return jsonify({'success': False, 'error': 'Taken'}), 400
+    if user_exists(username): return jsonify({'success': False, 'error': 'Username taken'}), 400
     try:
         run(f'useradd -m -s /usr/sbin/nologin {username}')
         run(f'usermod -aG ffusers {username} 2>/dev/null')
@@ -1806,42 +1879,70 @@ def trial_create():
         run(f'chage -E {expire_date} {username}')
         os.makedirs(DB_DIR, exist_ok=True)
         with open(DB_FILE, 'a') as f: f.write(f'{username}:{password}:{expire_date}:1:0\n')
-        protocols = get_active_protocols(username, password)
-        server_ip = run('curl -s -4 icanhazip.com')['stdout']
-        return jsonify({'success': True, 'message': f'Trial created ({days} days)',
-            'account': {'username': username, 'password': password, 'expiry': expire_date, 'days': days, 'bandwidth': 'Unlimited', 'server': SERVER_HOST, 'server_ip': server_ip},
-            'protocols': protocols, 'protocol_count': len(protocols)})
+        protocols = get_protocols(username, password)
+        server_ip = get_server_ip()
+        return jsonify({'success': True, 'message': f'Trial created ({days} days)', 'account': {'username': username, 'password': password, 'expiry': expire_date, 'days': days, 'bandwidth': 'Unlimited', 'server': SERVER_HOST, 'server_ip': server_ip}, 'protocols': protocols, 'protocol_count': len(protocols)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/api/trial/status/<username>')
 @require_api_key
 def trial_status(username):
     user = next((u for u in read_users() if u['username'] == username), None)
     if not user: return jsonify({'success': False, 'error': 'Not found'}), 404
-    expiry = datetime.strptime(user['expiry'], '%Y-%m-%d')
-    days_left = (expiry - datetime.now()).days
-    return jsonify({'success': True, 'account': {'username': username, 'status': get_status(username), 'expiry': user['expiry'], 'days_left': max(0, days_left), 'online': int(run(f'pgrep -c -u {username} sshd 2>/dev/null || echo 0')['stdout'] or 0)}})
+    try:
+        expiry = datetime.strptime(user['expiry'], '%Y-%m-%d')
+        days_left = (expiry - datetime.now()).days
+    except Exception:
+        days_left = 0
+    return jsonify({'success': True, 'account': {'username': username, 'status': get_status(username), 'expiry': user['expiry'], 'days_left': max(0, days_left), 'online': get_online(username)}})
+
 
 @app.route('/api/dashboard/info')
 @require_api_key
 def dashboard_info():
     try:
-        ip = run('curl -s -4 icanhazip.com')['stdout']
-        with open('/proc/uptime') as f: uptime_sec = float(f.read().split()[0])
-        days = int(uptime_sec // 86400); hours = int((uptime_sec % 86400) // 3600)
-        mem = run('free -m')['stdout'].split('\n')[1].split()
-        ram_total, ram_used = int(mem[1]), int(mem[2])
-        disk = run('df -h / | tail -1')['stdout'].split()
+        ip = get_server_ip()
+        try:
+            with open('/proc/uptime') as f: uptime_sec = float(f.read().split()[0])
+            days = int(uptime_sec // 86400); hours = int((uptime_sec % 86400) // 3600); minutes = int((uptime_sec % 3600) // 60)
+            uptime_str = f'{days}d {hours}h {minutes}m'
+        except Exception: uptime_str = 'unknown'
+        try:
+            with open('/proc/cpuinfo') as f: cpu_cores = f.read().count('processor')
+        except Exception: cpu_cores = 1
+        ram_total = ram_used = ram_percent = 0
+        try:
+            with open('/proc/meminfo') as f:
+                mem = {}
+                for line in f:
+                    parts = line.split(':')
+                    if len(parts) == 2:
+                        mem[parts[0].strip()] = int(parts[1].split()[0])
+                ram_total = mem.get('MemTotal', 0) // 1024
+                ram_avail = mem.get('MemAvailable', 0) // 1024
+                ram_used = ram_total - ram_avail
+                ram_percent = int(ram_used * 100 / ram_total) if ram_total else 0
+        except Exception: pass
+        disk_total = disk_used = disk_percent = 0
+        try:
+            r = run('df -k / | tail -1')
+            parts = r.get('stdout', '').split()
+            if len(parts) >= 4:
+                disk_total = int(parts[1]) // 1024
+                disk_used = int(parts[2]) // 1024
+                disk_percent = int(parts[4].replace('%', ''))
+        except Exception: pass
+        try:
+            with open('/proc/loadavg') as f: load_str = ' '.join(f.read().split()[:3])
+        except Exception: load_str = '0.00 0.00 0.00'
         users = read_users()
-        online = sum(int(run(f'pgrep -c -u {u["username"]} sshd 2>/dev/null || echo 0')['stdout'] or 0) for u in users)
-        return jsonify({'success': True, 'info': {'ip': ip, 'uptime': f'{days}d {hours}h',
-            'ram': {'total': ram_total, 'used': ram_used, 'percent': int(ram_used * 100 / ram_total) if ram_total else 0},
-            'disk': {'total': disk[1], 'used': disk[2], 'percent': int(disk[4].replace('%', ''))},
-            'users': {'total': len(users), 'online': online},
-            'services': {'ssh': service_active('sshd'), 'dnstt': service_active('dnstt'), 'haproxy': service_active('haproxy'), 'badvpn': service_active('badvpn'), 'udp_custom': service_active('udp-custom'), 'zivpn': service_active('zivpn')}}})
+        online = sum(get_online(u['username']) for u in users)
+        return jsonify({'success': True, 'info': {'ip': ip, 'uptime': uptime_str, 'cpu': {'cores': cpu_cores}, 'ram': {'total': ram_total, 'used': ram_used, 'percent': ram_percent}, 'disk': {'total': disk_total, 'used': disk_used, 'percent': disk_percent}, 'load': load_str, 'users': {'total': len(users), 'online': online}, 'services': {'ssh': ssh_active(), 'dnstt': service_active('dnstt'), 'haproxy': service_active('haproxy'), 'badvpn': service_active('badvpn'), 'udp_custom': service_active('udp-custom'), 'zivpn': service_active('zivpn'), 'falconproxy': service_active('falconproxy')}}})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 @app.route('/api/users/list')
 @require_api_key
@@ -1849,9 +1950,15 @@ def users_list():
     users = read_users()
     result = []
     for u in users:
-        online = int(run(f'pgrep -c -u {u["username"]} sshd 2>/dev/null || echo 0')['stdout'] or 0)
-        result.append({'username': u['username'], 'expiry': u['expiry'], 'limit': int(u['limit']), 'bandwidth_limit': float(u['bandwidth']), 'status': get_status(u['username']), 'online': online})
+        used_bytes = 0
+        usage_file = f'{DB_DIR}/bandwidth/{u["username"]}.usage'
+        if os.path.exists(usage_file):
+            try:
+                with open(usage_file) as f: used_bytes = int(f.read().strip() or 0)
+            except Exception: used_bytes = 0
+        result.append({'username': u['username'], 'expiry': u['expiry'], 'limit': int(u['limit']), 'bandwidth_limit': float(u['bandwidth']), 'bandwidth_used_gb': round(used_bytes / 1073741824, 2), 'status': get_status(u['username']), 'online': get_online(u['username'])})
     return jsonify({'success': True, 'users': result, 'total': len(result)})
+
 
 @app.route('/api/users/delete', methods=['POST'])
 @require_api_key
@@ -1865,7 +1972,8 @@ def users_delete():
         with open(DB_FILE, 'w') as f:
             for line in lines:
                 if not line.startswith(f'{username}:'): f.write(line)
-    return jsonify({'success': True, 'message': f'{username} deleted'})
+    return jsonify({'success': True, 'message': f'User {username} deleted'})
+
 
 @app.route('/api/users/lock', methods=['POST'])
 @require_api_key
@@ -1876,6 +1984,7 @@ def users_lock():
     run(f'killall -u {username} -9 2>/dev/null')
     return jsonify({'success': True, 'message': f'{username} locked'})
 
+
 @app.route('/api/users/unlock', methods=['POST'])
 @require_api_key
 def users_unlock():
@@ -1884,14 +1993,46 @@ def users_unlock():
     run(f'usermod -U {username}')
     return jsonify({'success': True, 'message': f'{username} unlocked'})
 
+
 @app.route('/api/protocols/status')
 @require_api_key
 def protocols_status():
-    protocols = get_active_protocols()
-    return jsonify({'success': True, 'protocols': protocols, 'count': len(protocols)})
+    protocols = get_protocols()
+    return jsonify({'success': True, 'protocols': protocols, 'count': len(protocols), 'active_list': list(protocols.keys())})
+
+
+@app.route('/api/protocols/start/<service>', methods=['POST'])
+@require_api_key
+def protocols_start(service):
+    allowed = ['badvpn', 'udp-custom', 'haproxy', 'dnstt', 'zivpn', 'falconproxy', 'ssh']
+    if service not in allowed: return jsonify({'success': False, 'error': 'Invalid service'}), 400
+    r = run(f'systemctl start {service}')
+    return jsonify({'success': r['success'], 'message': f'{service} started'})
+
+
+@app.route('/api/protocols/stop/<service>', methods=['POST'])
+@require_api_key
+def protocols_stop(service):
+    allowed = ['badvpn', 'udp-custom', 'haproxy', 'dnstt', 'zivpn', 'falconproxy']
+    if service not in allowed: return jsonify({'success': False, 'error': 'Invalid service'}), 400
+    r = run(f'systemctl stop {service}')
+    return jsonify({'success': r['success'], 'message': f'{service} stopped'})
+
+
+@app.route('/api/debug/services')
+@require_api_key
+def debug_services():
+    services = ['ssh', 'sshd', 'haproxy', 'dnstt', 'badvpn', 'udp-custom', 'zivpn', 'falconproxy']
+    results = {}
+    for svc in services:
+        r1 = run(f'systemctl is-active {svc} 2>/dev/null')
+        r2 = run(f'systemctl show -p ActiveState --value {svc} 2>/dev/null')
+        results[svc] = {'is_active': r1.get('stdout', ''), 'show': r2.get('stdout', ''), 'final': service_active(svc)}
+    return jsonify({'success': True, 'debug': results})
+
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=False)
 APIEOF
     chmod +x "$API_DIR/api.py"
 }
@@ -1939,6 +2080,7 @@ view_api_endpoints() {
     echo -e "  POST /api/users/unlock"
     echo -e "\n${C_PURPLE}🔌 PROTOCOLS:${C_RESET}\n  GET /api/protocols/status"
     echo -e "\n${C_GREEN}❤️  HEALTH:${C_RESET}\n  GET /api/health"
+    echo -e "\n${C_YELLOW}🐛 DEBUG:${C_RESET}\n  GET /api/debug/services"
     press_enter
 }
 copy_for_lovable_ai() {
@@ -1948,7 +2090,7 @@ copy_for_lovable_ai() {
     local api_url=$(grep "API_URL=" "$API_INFO_FILE" | cut -d= -f2-)
     local api_key=$(grep "API_KEY=" "$API_INFO_FILE" | cut -d= -f2-)
     local active_protocols=""
-    for svc in sshd haproxy dnstt udp-custom badvpn zivpn falconproxy; do
+    for svc in ssh sshd haproxy dnstt udp-custom badvpn zivpn falconproxy; do
         systemctl is-active --quiet "$svc" 2>/dev/null && active_protocols+="$svc "
     done
     echo -e "${C_YELLOW}═══════════════════════════════════════════════════════════════${C_RESET}"
@@ -2152,7 +2294,7 @@ EOF
 update_ssh_banners_config() {
     local tmp_conf
     if [[ ! -f "$BANNER_ENABLED_FILE" ]]; then
-        [ -f "$SSHD_FF_CONFIG" ] && { rm -f "$SSHD_FF_CONFIG"; systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null; }
+        [ -f "$SSHD_FF_CONFIG" ] && { rm -f "$SSHD_FF_CONFIG"; systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null; }
         return
     fi
     mkdir -p "$BANNER_DIR" /etc/ssh/sshd_config.d
@@ -2183,14 +2325,14 @@ enable_dynamic_banner() {
     done < "$DB_FILE"
     update_ssh_banners_config
     grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null || echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
-    systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null
+    systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
     systemctl restart voltrontech-limiter 2>/dev/null
     echo -e "${C_GREEN}✅ Dynamic banner enabled${C_RESET}"; press_enter
 }
 disable_dynamic_banner() {
     rm -f "$BANNER_ENABLED_FILE" "$SSHD_FF_CONFIG"
     rm -rf "$BANNER_DIR"
-    systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null
+    systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
     echo -e "${C_GREEN}✅ Disabled${C_RESET}"; press_enter
 }
 preview_dynamic_ssh_banner() {
@@ -2334,8 +2476,7 @@ while true; do
                 if (( d_l == 0 )); then days_left="${h_l}h left"; else days_left="${d_l}d ${h_l}h"; fi
             fi
         fi
-        bw_info="Unlimited"
-        bw_display=""
+        bw_info="Unlimited"; bw_display=""
         if [[ "$bandwidth_gb" != "0" && -n "$bandwidth_gb" ]]; then
             used_gb=$(awk "BEGIN {printf \"%.2f\", $accum_disp / 1073741824}")
             remain_gb=$(awk "BEGIN {r=$bandwidth_gb - $used_gb; if(r<0) r=0; printf \"%.2f\", r}")
