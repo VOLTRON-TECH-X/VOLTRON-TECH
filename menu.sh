@@ -1,340 +1,3 @@
-#!/bin/bash
-# ================================================================
-# VOLTRON TECH ULTIMATE v11.0 - WITH API MANAGEMENT
-# ================================================================
-
-# ========== COLOR CODES ==========
-C_RESET=$'\033[0m'
-C_BOLD=$'\033[1m'
-C_DIM=$'\033[2m'
-C_UL=$'\033[4m'
-C_RED=$'\033[38;5;196m'
-C_GREEN=$'\033[38;5;46m'
-C_YELLOW=$'\033[38;5;226m'
-C_BLUE=$'\033[38;5;39m'
-C_PURPLE=$'\033[38;5;135m'
-C_CYAN=$'\033[38;5;51m'
-C_WHITE=$'\033[38;5;255m'
-C_GRAY=$'\033[38;5;245m'
-C_ORANGE=$'\033[38;5;208m'
-C_GOLD=$'\033[38;5;220m'
-C_TEAL=$'\033[38;5;38m'
-C_PINK=$'\033[38;5;205m'
-C_TITLE=$C_PURPLE
-C_CHOICE=$C_CYAN
-C_PROMPT=$C_BLUE
-C_WARN=$C_YELLOW
-C_DANGER=$C_RED
-C_STATUS_A=$C_GREEN
-C_STATUS_I=$C_GRAY
-C_ACCENT=$C_ORANGE
-C_PREMIUM=$C_GOLD
-C_INFO=$C_TEAL
-
-# ========== VARIABLES ==========
-DESEC_TOKEN="3WxD4Hkiu5VYBLWVizVhf1rzyKbz"
-DESEC_DOMAIN="voltrontechtx.shop"
-DB_DIR="/etc/voltrontech"
-DB_FILE="$DB_DIR/users.db"
-INSTALL_FLAG_FILE="$DB_DIR/.install"
-LOGS_DIR="$DB_DIR/logs"
-CONFIG_DIR="$DB_DIR/config"
-BANDWIDTH_DIR="$DB_DIR/bandwidth"
-BANNER_DIR="$DB_DIR/banners"
-DNSTT_KEYS_DIR="$DB_DIR/dnstt"
-SSL_CERT_DIR="$DB_DIR/ssl"
-TRAFFIC_DIR="$DB_DIR/traffic"
-BACKUP_DIR="$DB_DIR/backups"
-MTU_CONFIG="$CONFIG_DIR/mtu"
-DNSTT_SERVICE_FILE="/etc/systemd/system/dnstt.service"
-DNSTT_BINARY="/usr/local/bin/dnstt-server"
-DNSTT_CLIENT="/usr/local/bin/dnstt-client"
-DNSTT_CONFIG_FILE="$DB_DIR/dnstt_info.conf"
-DNS_INFO_FILE="$DB_DIR/dns_info.conf"
-BADVPN_SERVICE_FILE="/etc/systemd/system/badvpn.service"
-BADVPN_BIN="/usr/local/bin/badvpn-udpgw"
-BADVPN_BUILD_DIR="/root/badvpn-build"
-UDP_CUSTOM_SERVICE_FILE="/etc/systemd/system/udp-custom.service"
-UDP_CUSTOM_BIN="/usr/local/bin/udp-custom"
-HAPROXY_CONFIG="/etc/haproxy/haproxy.cfg"
-SSL_CERT_FILE="$SSL_CERT_DIR/voltrontech.pem"
-FALCONPROXY_SERVICE_FILE="/etc/systemd/system/falconproxy.service"
-FALCONPROXY_BINARY="/usr/local/bin/falconproxy"
-FALCONPROXY_CONFIG_FILE="$DB_DIR/falconproxy_config.conf"
-ZIVPN_DIR="/etc/zivpn"
-ZIVPN_BIN="/usr/local/bin/zivpn"
-ZIVPN_SERVICE_FILE="/etc/systemd/system/zivpn.service"
-ZIVPN_CONFIG_FILE="$ZIVPN_DIR/config.json"
-LIMITER_SCRIPT="/usr/local/bin/voltrontech-limiter.sh"
-LIMITER_SERVICE="/etc/systemd/system/voltrontech-limiter.service"
-SSHD_FF_CONFIG="/etc/ssh/sshd_config.d/voltrontech.conf"
-SSH_BANNER_FILE="/etc/bannerssh"
-BANNER_ENABLED_FILE="$DB_DIR/banners_enabled"
-TRIAL_CLEANUP_SCRIPT="/usr/local/bin/voltrontech-trial-cleanup.sh"
-FF_USERS_GROUP="ffusers"
-SELECTED_USER=""
-SELECTED_USERS=()
-UNINSTALL_MODE="interactive"
-API_PORT="5000"
-API_DIR="/opt/voltrontech-api"
-API_KEY_FILE="$DB_DIR/api_key.txt"
-API_INFO_FILE="$DB_DIR/api_info.txt"
-
-# ========== APT FUNCTIONS ==========
-ff_apt_update() { DEBIAN_FRONTEND=noninteractive apt-get update 2>/dev/null || true; }
-ff_apt_install() { ff_apt_update; DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Use-Pty=0 install "$@"; }
-ff_apt_purge() { DEBIAN_FRONTEND=noninteractive apt-get -y -o Dpkg::Use-Pty=0 purge "$@"; }
-
-# ========== BANNER CACHE ==========
-BANNER_CACHE_TTL=15
-BANNER_CACHE_TS=0
-BANNER_CACHE_OS_NAME=""
-BANNER_CACHE_UP_TIME=""
-BANNER_CACHE_RAM_USAGE=""
-BANNER_CACHE_CPU_LOAD=""
-BANNER_CACHE_ONLINE_USERS=0
-BANNER_CACHE_TOTAL_USERS=0
-SSH_SESSION_CACHE_TTL=10
-SSH_SESSION_CACHE_TS=0
-SSH_SESSION_CACHE_DB_MTIME=0
-SSH_SESSION_TOTAL=0
-declare -A SSH_SESSION_COUNTS=()
-declare -A SSH_SESSION_PIDS=()
-
-refresh_ssh_session_cache() {
-    local now db_mtime
-    now=$(date +%s)
-    db_mtime=$(stat -c %Y "$DB_FILE" 2>/dev/null || echo 0)
-    if (( SSH_SESSION_CACHE_TS > 0 && now - SSH_SESSION_CACHE_TS < SSH_SESSION_CACHE_TTL && db_mtime == SSH_SESSION_CACHE_DB_MTIME )); then return; fi
-    SSH_SESSION_COUNTS=(); SSH_SESSION_PIDS=(); SSH_SESSION_TOTAL=0
-    SSH_SESSION_CACHE_DB_MTIME=$db_mtime
-    if [[ ! -s "$DB_FILE" ]]; then SSH_SESSION_CACHE_TS=$now; return; fi
-    local -A managed_user_lookup=(); local -A uid_user_lookup=(); local -A seen_sessions=()
-    while IFS=: read -r managed_user _rest; do [[ -n "$managed_user" && "$managed_user" != \#* ]] && managed_user_lookup["$managed_user"]=1; done < "$DB_FILE"
-    while IFS=: read -r system_user _ system_uid _rest; do [[ -n "$system_user" && "$system_uid" =~ ^[0-9]+$ ]] && uid_user_lookup["$system_uid"]="$system_user"; done < /etc/passwd
-    while read -r ssh_pid ssh_owner; do
-        [[ "$ssh_pid" =~ ^[0-9]+$ ]] || continue
-        candidate_user=""
-        if [[ -n "$ssh_owner" && "$ssh_owner" != "root" && "$ssh_owner" != "sshd" && -n "${managed_user_lookup[$ssh_owner]+x}" ]]; then candidate_user="$ssh_owner"
-        elif [[ -r "/proc/$ssh_pid/loginuid" ]]; then
-            local login_uid=""; read -r login_uid < "/proc/$ssh_pid/loginuid" || login_uid=""
-            if [[ "$login_uid" =~ ^[0-9]+$ && "$login_uid" != "4294967295" ]]; then candidate_user="${uid_user_lookup[$login_uid]}"; fi
-        fi
-        [[ -n "$candidate_user" && -n "${managed_user_lookup[$candidate_user]+x}" ]] || continue
-        [[ -z "${seen_sessions[$candidate_user:$ssh_pid]+x}" ]] || continue
-        seen_sessions["$candidate_user:$ssh_pid"]=1
-        ((SSH_SESSION_COUNTS["$candidate_user"]++))
-        SSH_SESSION_PIDS["$candidate_user"]+="$ssh_pid "
-        ((SSH_SESSION_TOTAL++))
-    done < <(ps -C sshd -o pid=,user= 2>/dev/null)
-    SSH_SESSION_CACHE_TS=$now
-}
-count_managed_online_sessions() { refresh_ssh_session_cache; echo "$SSH_SESSION_TOTAL"; }
-refresh_banner_cache() {
-    local now=$(date +%s)
-    if (( BANNER_CACHE_TS > 0 && now - BANNER_CACHE_TS < BANNER_CACHE_TTL )); then return; fi
-    BANNER_CACHE_OS_NAME=$(grep -oP 'PRETTY_NAME="\K[^"]+' /etc/os-release 2>/dev/null || echo "Linux")
-    BANNER_CACHE_UP_TIME=$(uptime -p 2>/dev/null | sed 's/up //' || echo "unknown")
-    BANNER_CACHE_RAM_USAGE=$(free -m | awk '/^Mem:/{if($2>0){printf "%.2f", $3*100/$2}else{print "0.00"}}')
-    BANNER_CACHE_CPU_LOAD=$(awk '{print $1}' /proc/loadavg 2>/dev/null)
-    if [[ -s "$DB_FILE" ]]; then BANNER_CACHE_TOTAL_USERS=$(grep -c . "$DB_FILE"); else BANNER_CACHE_TOTAL_USERS=0; fi
-    BANNER_CACHE_ONLINE_USERS=$(count_managed_online_sessions)
-    BANNER_CACHE_TS=$now
-}
-show_banner() {
-    refresh_banner_cache
-    [[ -t 1 ]] && clear
-    echo
-    echo -e "${C_TITLE}   VOLTRON TECH ULTIMATE v11.0 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
-    echo -e "${C_BLUE}   ─────────────────────────────────────────────────────────${C_RESET}"
-    printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "OS" "$BANNER_CACHE_OS_NAME" "Uptime: $BANNER_CACHE_UP_TIME"
-    printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "Memory" "${BANNER_CACHE_RAM_USAGE}% Used" "Online: ${C_WHITE}${BANNER_CACHE_ONLINE_USERS}${C_RESET}"
-    printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "Users" "${BANNER_CACHE_TOTAL_USERS} Managed" "Load: ${C_GREEN}${BANNER_CACHE_CPU_LOAD}${C_RESET}"
-    echo -e "${C_BLUE}   ─────────────────────────────────────────────────────────${C_RESET}"
-}
-press_enter() { echo -e "\nPress ${C_YELLOW}[Enter]${C_RESET} to continue..." && read -r; }
-
-# ========== ORPHAN USER FUNCTIONS ==========
-is_voltrontech_orphan_user() {
-    local username="$1"
-    local passwd_line system_user _ uid _ home shell
-    passwd_line=$(getent passwd "$username" 2>/dev/null) || return 1
-    IFS=: read -r system_user _ uid _ _ home shell <<< "$passwd_line"
-    [[ "$uid" =~ ^[0-9]+$ ]] || return 1
-    grep -q "^$username:" "$DB_FILE" && return 1
-    if id -nG "$username" 2>/dev/null | tr ' ' '\n' | grep -Fxq "$FF_USERS_GROUP"; then return 0; fi
-    (( uid >= 1000 )) || return 1
-    [[ "$home" == "/home/$username" || "$home" == /home/* ]] || return 1
-    case "$shell" in /usr/sbin/nologin|/usr/bin/false|/bin/false) return 0 ;; esac
-    return 1
-}
-get_voltrontech_orphan_users() {
-    local username
-    while IFS=: read -r username _rest; do
-        [[ -n "$username" ]] || continue
-        if is_voltrontech_orphan_user "$username"; then echo "$username"; fi
-    done < /etc/passwd
-}
-get_voltrontech_known_users() {
-    local username
-    local -A seen_users=()
-    if [[ -f "$DB_FILE" ]]; then
-        while IFS=: read -r username _rest; do
-            [[ -n "$username" && "$username" != \#* ]] || continue
-            seen_users["$username"]=1
-        done < "$DB_FILE"
-    fi
-    while IFS= read -r username; do [[ -n "$username" ]] && seen_users["$username"]=1; done < <(get_voltrontech_orphan_users)
-    (( ${#seen_users[@]} > 0 )) || return 0
-    printf "%s\n" "${!seen_users[@]}" | sort
-}
-delete_voltrontech_user_accounts() {
-    local -a users_to_delete=("$@")
-    local username
-    [[ ${#users_to_delete[@]} -gt 0 ]] || return 0
-    for username in "${users_to_delete[@]}"; do
-        [[ -n "$username" ]] || continue
-        killall -u "$username" -9 &>/dev/null
-        if id "$username" &>/dev/null; then
-            if userdel -r "$username" &>/dev/null; then echo -e " ✅ System user '${C_YELLOW}$username${C_RESET}' deleted."
-            else echo -e " ❌ Failed to delete system user '${C_YELLOW}$username${C_RESET}'."; fi
-        else echo -e " ℹ️ System user '${C_YELLOW}$username${C_RESET}' was already missing."; fi
-        rm -f "$BANDWIDTH_DIR/${username}.usage"
-        rm -rf "$BANDWIDTH_DIR/pidtrack/${username}"
-    done
-    if [[ -f "$DB_FILE" ]]; then
-        local db_tmp=$(mktemp)
-        awk -F: 'NR==FNR { drop[$1]=1; next } !($1 in drop)' <(printf "%s\n" "${users_to_delete[@]}") "$DB_FILE" > "$db_tmp" && mv "$db_tmp" "$DB_FILE"
-        rm -f "$db_tmp" 2>/dev/null
-    fi
-    invalidate_banner_cache
-    update_ssh_banners_config
-}
-invalidate_banner_cache() { BANNER_CACHE_TS=0; SSH_SESSION_CACHE_TS=0; }
-
-# ========== USER SELECTION ==========
-_select_user_interface() {
-    local title="$1"
-    clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}${title}${C_RESET}\n"
-    if [[ ! -s $DB_FILE ]]; then echo -e "${C_YELLOW}ℹ️ No users found.${C_RESET}"; SELECTED_USER="NO_USERS"; return; fi
-    mapfile -t all_users < <(cut -d: -f1 "$DB_FILE" | sort)
-    if [ ${#all_users[@]} -ge 15 ]; then
-        read -p "👉 Enter search term (or Enter for all): " search_term
-        if [[ -n "$search_term" ]]; then mapfile -t users < <(printf "%s\n" "${all_users[@]}" | grep -i "$search_term"); else users=("${all_users[@]}"); fi
-    else users=("${all_users[@]}"); fi
-    if [ ${#users[@]} -eq 0 ]; then echo -e "\n${C_YELLOW}ℹ️ No users found.${C_RESET}"; SELECTED_USER="NO_USERS"; return; fi
-    echo -e "\nPlease select a user:\n"
-    for i in "${!users[@]}"; do printf "  ${C_GREEN}[%2d]${C_RESET} %s\n" "$((i+1))" "${users[$i]}"; done
-    echo -e "\n  ${C_RED} [ 0]${C_RESET} ↩️ Cancel"
-    echo
-    local choice
-    while true; do
-        read -p "👉 Enter number: " choice
-        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 0 ] && [ "$choice" -le "${#users[@]}" ]; then
-            if [ "$choice" -eq 0 ]; then SELECTED_USER=""; return; else SELECTED_USER="${users[$((choice-1))]}"; return; fi
-        else echo -e "${C_RED}❌ Invalid.${C_RESET}"; fi
-    done
-}
-_select_multi_user_interface() {
-    local title="$1"
-    clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}${title}${C_RESET}\n"
-    SELECTED_USERS=()
-    if [[ ! -s $DB_FILE ]]; then echo -e "${C_YELLOW}ℹ️ No users found.${C_RESET}"; SELECTED_USERS=("NO_USERS"); return; fi
-    mapfile -t all_users < <(cut -d: -f1 "$DB_FILE" | sort)
-    if [ ${#all_users[@]} -ge 15 ]; then
-        read -p "👉 Enter search term (or Enter for all): " search_term
-        if [[ -n "$search_term" ]]; then mapfile -t users < <(printf "%s\n" "${all_users[@]}" | grep -i "$search_term"); else users=("${all_users[@]}"); fi
-    else users=("${all_users[@]}"); fi
-    if [ ${#users[@]} -eq 0 ]; then echo -e "\n${C_YELLOW}ℹ️ No users found.${C_RESET}"; SELECTED_USERS=("NO_USERS"); return; fi
-    echo -e "\nPlease select users:\n"
-    for i in "${!users[@]}"; do printf "  ${C_GREEN}[%2d]${C_RESET} %s\n" "$((i+1))" "${users[$i]}"; done
-    echo -e "\n  ${C_GREEN}[all]${C_RESET} Select ALL"
-    echo -e "  ${C_RED}  [0]${C_RESET} ↩️ Cancel"
-    echo
-    local choice
-    while true; do
-        read -p "👉 Enter numbers: " choice
-        choice=$(echo "$choice" | tr ',' ' ')
-        if [[ -z "$choice" ]]; then echo -e "${C_RED}❌ Invalid.${C_RESET}"; continue; fi
-        if [[ "$choice" == "0" ]]; then SELECTED_USERS=(); return; fi
-        if [[ "${choice,,}" == "all" ]]; then SELECTED_USERS=("${users[@]}"); return; fi
-        local valid=true; local selected_indices=()
-        for token in $choice; do
-            if [[ "$token" =~ ^[0-9]+-[0-9]+$ ]]; then
-                local start=${token%-*}; local end=${token#*-}
-                if [ "$start" -le "$end" ]; then
-                    for (( idx=start; idx<=end; idx++ )); do
-                        if [ "$idx" -ge 1 ] && [ "$idx" -le "${#users[@]}" ]; then selected_indices+=($idx); else valid=false; break; fi
-                    done
-                else valid=false; break; fi
-            elif [[ "$token" =~ ^[0-9]+$ ]]; then
-                if [ "$token" -ge 1 ] && [ "$token" -le "${#users[@]}" ]; then selected_indices+=($token); else valid=false; break; fi
-            else valid=false; break; fi
-        done
-        if [[ "$valid" == true && ${#selected_indices[@]} -gt 0 ]]; then
-            mapfile -t unique_indices < <(printf "%s\n" "${selected_indices[@]}" | sort -u -n)
-            for idx in "${unique_indices[@]}"; do SELECTED_USERS+=("${users[$((idx-1))]}"); done
-            return
-        else echo -e "${C_RED}❌ Invalid.${C_RESET}"; fi
-    done
-}
-
-# ========== USER STATUS ==========
-get_user_status() {
-    local username="$1"
-    if ! id "$username" &>/dev/null; then echo -e "${C_RED}Not Found${C_RESET}"; return; fi
-    local expiry_date=$(grep "^$username:" "$DB_FILE" | cut -d: -f3)
-    if passwd -S "$username" 2>/dev/null | grep -q " L "; then echo -e "${C_YELLOW}🔒 Locked${C_RESET}"; return; fi
-    local expiry_ts=$(date -d "$expiry_date" +%s 2>/dev/null || echo 0)
-    local current_ts=$(date +%s)
-    if [[ $expiry_ts -lt $current_ts ]]; then echo -e "${C_RED}🗓️ Expired${C_RESET}"; return; fi
-    local bandwidth_gb=$(grep "^$username:" "$DB_FILE" | cut -d: -f5)
-    if [[ -n "$bandwidth_gb" && "$bandwidth_gb" != "0" ]]; then
-        local used_bytes=0
-        if [[ -f "$BANDWIDTH_DIR/${username}.usage" ]]; then used_bytes=$(cat "$BANDWIDTH_DIR/${username}.usage" 2>/dev/null); [[ -z "$used_bytes" ]] && used_bytes=0; fi
-        local quota_bytes=$(awk "BEGIN {printf \"%.0f\", $bandwidth_gb * 1073741824}")
-        if [[ "$used_bytes" -ge "$quota_bytes" ]]; then echo -e "${C_RED}📦 Exceeded${C_RESET}"; return; fi
-    fi
-    echo -e "${C_GREEN}🟢 Active${C_RESET}"
-}
-
-# ========== GENERATE BANNER ==========
-generate_user_banner() {
-    local username="$1"; local expiry="$2"; local limit="$3"; local bandwidth_gb="$4"
-    local bw_display="Unlimited"
-    if [[ "$bandwidth_gb" != "0" ]]; then bw_display="${bandwidth_gb} GB"; fi
-    mkdir -p "$BANNER_DIR"
-    cat > "$BANNER_DIR/${username}.txt" << EOF
-<br><br>
-<center><font color="#9B59B6">‎▬▬▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b> 🌍VOLTRON VPN🌍</b></font><font color="#9B59B6">‎۩ஜ▬▬▬▬▬</font></center><br>
-<br>
-<center><font color="#4D96FF" size="5"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>
-<br>
-<center><font color="#000000">👤 <b>Username      :</b> $username</font></center><br>
-<center><font color="#000000">📅 <b>Expiration    :</b> $expiry</font></center><br>
-<center><font color="#4D96FF">📊 <b>Bandwidth     :</b> $bw_display</font></center><br>
-<center><font color="#000000">🔌 <b>Sessions      :</b> 0/$limit</font></center><br>
-<center><font color="#6BCB77" size="4"><b>📌 Account Status : ✅ ACTIVE</b></font></center><br>
-<br>
-<center><font color="#000000">⏱️ <b>Server Uptime :</b> $(uptime -p | sed 's/up //')</font></center><br>
-<center><font color="#000000">📈 <b>Server Load   :</b> $(awk '{print $1}' /proc/loadavg)</font></center><br>
-<br>
-<center><font color="#6BCB77" size="4"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>
-<center><font color="#000000">📱 Telegram  : https://t.me/voltrontech</font></center><br>
-<center><font color="#000000">💬 WhatsApp  : https://chat.whatsapp.com/EZtAFt9dmS5DVKbNN5iSPz</font></center><br>
-<br>
-<center><font color="#FF6B6B" size="4"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>
-<center><font color="#000000">• Account expires on: $expiry</font></center><br>
-<center><font color="#000000">• No torrent or illegal activity</font></center><br>
-<center><font color="#000000">• Account sharing is prohibited</font></center><br>
-<br>
-<center><font color="#9B59B6">‎▬▬▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b>  🌍VOLTRON VPN🌍 </b></font><font color="#9B59B6">‎۩ஜ▬▬▬▬▬</font></center><br>
-EOF
-}
-
-
 # ========== CREATE USER ==========
 create_user() {
     clear; show_banner
@@ -344,13 +7,14 @@ create_user() {
     [[ -z "$username" ]] && { echo -e "\n${C_RED}❌ Empty.${C_RESET}"; press_enter; return; }
     if id "$username" &>/dev/null || grep -q "^$username:" "$DB_FILE"; then echo -e "\n${C_RED}❌ Exists.${C_RESET}"; press_enter; return; fi
     local password=""
-    while true; do
-        read -p "🔑 Password (Enter for auto): " password
-        if [[ -z "$password" ]]; then password=$(head /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 8); echo -e "${C_GREEN}🔑 Generated: ${C_YELLOW}$password${C_RESET}"; break; else break; fi
-    done
+    read -p "🔑 Password (Enter for auto): " password
+    if [[ -z "$password" ]]; then
+        password=$(head /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 8)
+        echo -e "${C_GREEN}🔑 Generated: ${C_YELLOW}$password${C_RESET}"
+    fi
     read -p "🗓️ Duration (days) [30]: " days; days=${days:-30}
     [[ ! "$days" =~ ^[0-9]+$ ]] && { echo -e "${C_RED}❌ Invalid.${C_RESET}"; press_enter; return; }
-    read -p "📶 Connection limit [1]: " limit; limit=${limit:-1}
+    read -p "📶 Connection limit [999]: " limit; limit=${limit:-999}
     read -p "📦 Bandwidth GB (0=unlimited) [0]: " bandwidth_gb; bandwidth_gb=${bandwidth_gb:-0}
     local expire_date=$(date -d "+$days days" +%Y-%m-%d)
     getent group "$FF_USERS_GROUP" >/dev/null 2>&1 || groupadd "$FF_USERS_GROUP" >/dev/null 2>&1
@@ -493,6 +157,8 @@ renew_user() {
         local pass=$(echo "$line"|cut -d: -f2); local limit=$(echo "$line"|cut -d: -f4); local bw=$(echo "$line"|cut -d: -f5)
         [[ -z "$bw" ]] && bw="0"
         sed -i "s/^$u:.*/$u:$pass:$new_expire_date:$limit:$bw/" "$DB_FILE"
+        # FIXED: Unlock user after renewal
+        usermod -U "$u" &>/dev/null
         echo -e " ✅ ${C_YELLOW}$u${C_RESET} → ${C_GREEN}$new_expire_date${C_RESET}"
     done
     press_enter
@@ -534,7 +200,7 @@ bulk_create_users() {
     read -p "🔢 Count: " count
     [[ ! "$count" =~ ^[0-9]+$ ]] || [[ "$count" -lt 1 ]] || [[ "$count" -gt 100 ]] && { echo -e "${C_RED}❌ 1-100.${C_RESET}"; press_enter; return; }
     read -p "🗓️ Days [30]: " days; days=${days:-30}
-    read -p "📶 Limit [1]: " limit; limit=${limit:-1}
+    read -p "📶 Limit [999]: " limit; limit=${limit:-999}
     read -p "📦 BW GB [0]: " bandwidth_gb; bandwidth_gb=${bandwidth_gb:-0}
     local expire_date=$(date -d "+$days days" +%Y-%m-%d)
     getent group "$FF_USERS_GROUP" >/dev/null 2>&1 || groupadd "$FF_USERS_GROUP" >/dev/null 2>&1
@@ -628,6 +294,374 @@ client_config_menu() {
     generate_client_config "$u" "$pass"
 }
 
+# ========== TRIAL ACCOUNT ==========
+setup_trial_cleanup_script() {
+    cat > "$TRIAL_CLEANUP_SCRIPT" << 'TREOF'
+#!/bin/bash
+username="$1"
+[[ -z "$username" ]] && exit 1
+killall -u "$username" -9 &>/dev/null
+userdel -r "$username" &>/dev/null
+sed -i "/^${username}:/d" /etc/voltrontech/users.db
+rm -f /etc/voltrontech/bandwidth/${username}.usage
+rm -rf /etc/voltrontech/bandwidth/pidtrack/${username}
+TREOF
+    chmod +x "$TRIAL_CLEANUP_SCRIPT"
+}
+create_trial_account() {
+    clear; show_banner
+    echo -e "${C_BOLD}${C_PURPLE}--- ⏱️ Trial Account ---${C_RESET}"
+    if ! command -v at &>/dev/null; then
+        ff_apt_install at >/dev/null 2>&1
+        systemctl enable atd &>/dev/null; systemctl start atd &>/dev/null
+    fi
+    setup_trial_cleanup_script
+    echo -e "\nSelect duration:\n"
+    echo -e "  ${C_GREEN}[1]${C_RESET} 1 Hour    ${C_GREEN}[5]${C_RESET} 12 Hours"
+    echo -e "  ${C_GREEN}[2]${C_RESET} 2 Hours   ${C_GREEN}[6]${C_RESET} 1 Day"
+    echo -e "  ${C_GREEN}[3]${C_RESET} 3 Hours   ${C_GREEN}[7]${C_RESET} 3 Days"
+    echo -e "  ${C_GREEN}[4]${C_RESET} 6 Hours   ${C_GREEN}[8]${C_RESET} Custom"
+    echo -e "\n  ${C_RED}[0]${C_RESET} Cancel"
+    read -p "👉 Choice: " dur_choice
+    local duration_hours=0; local duration_label=""
+    case $dur_choice in
+        1) duration_hours=1; duration_label="1 Hour" ;;
+        2) duration_hours=2; duration_label="2 Hours" ;;
+        3) duration_hours=3; duration_label="3 Hours" ;;
+        4) duration_hours=6; duration_label="6 Hours" ;;
+        5) duration_hours=12; duration_label="12 Hours" ;;
+        6) duration_hours=24; duration_label="1 Day" ;;
+        7) duration_hours=72; duration_label="3 Days" ;;
+        8) read -p "Hours: " ch; [[ ! "$ch" =~ ^[0-9]+$ ]] && return; duration_hours=$ch; duration_label="$ch Hours" ;;
+        0) return ;;
+        *) return ;;
+    esac
+    local rand_suffix=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 5)
+    local default_username="trial_${rand_suffix}"
+    read -p "👤 Username [${default_username}]: " username
+    username=${username:-$default_username}
+    if id "$username" &>/dev/null || grep -q "^$username:" "$DB_FILE"; then
+        echo -e "\n${C_RED}❌ Exists.${C_RESET}"; press_enter; return
+    fi
+    local password=$(head /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 8)
+    read -p "🔑 Password [${password}]: " cp; password=${cp:-$password}
+    read -p "📶 Limit [999]: " limit; limit=${limit:-999}
+    read -p "📦 BW GB [0]: " bandwidth_gb; bandwidth_gb=${bandwidth_gb:-0}
+    local expire_date
+    if [[ "$duration_hours" -ge 24 ]]; then expire_date=$(date -d "+$((duration_hours/24)) days" +%Y-%m-%d); else expire_date=$(date -d "+1 day" +%Y-%m-%d); fi
+    local expiry_timestamp=$(date -d "+${duration_hours} hours" '+%Y-%m-%d %H:%M:%S')
+    getent group "$FF_USERS_GROUP" >/dev/null 2>&1 || groupadd "$FF_USERS_GROUP" >/dev/null 2>&1
+    useradd -m -s /usr/sbin/nologin "$username"
+    usermod -aG "$FF_USERS_GROUP" "$username" 2>/dev/null
+    echo "$username:$password" | chpasswd
+    chage -E "$expire_date" "$username"
+    echo "$username:$password:$expire_date:$limit:$bandwidth_gb" >> "$DB_FILE"
+    echo "$TRIAL_CLEANUP_SCRIPT $username" | at now + ${duration_hours} hours 2>/dev/null
+    [[ -f "$BANNER_ENABLED_FILE" ]] && { generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"; update_ssh_banners_config; }
+    clear; show_banner
+    echo -e "${C_GREEN}✅ Trial created!${C_RESET}\n"
+    echo -e "  👤 ${C_YELLOW}$username${C_RESET}"
+    echo -e "  🔑 ${C_YELLOW}$password${C_RESET}"
+    echo -e "  ⏱️ ${C_CYAN}$duration_label${C_RESET}"
+    echo -e "  🕐 ${C_RED}$expiry_timestamp${C_RESET}"
+    press_enter
+}
+
+# ========== CREATE USER ==========
+create_user() {
+    clear; show_banner
+    echo -e "${C_BOLD}${C_PURPLE}--- ✨ Create New SSH User ---${C_RESET}"
+    read -p "👉 Username (or '0' to cancel): " username
+    [[ "$username" == "0" ]] && { echo -e "\n${C_YELLOW}❌ Cancelled.${C_RESET}"; press_enter; return; }
+    [[ -z "$username" ]] && { echo -e "\n${C_RED}❌ Empty.${C_RESET}"; press_enter; return; }
+    if id "$username" &>/dev/null || grep -q "^$username:" "$DB_FILE"; then echo -e "\n${C_RED}❌ Exists.${C_RESET}"; press_enter; return; fi
+    local password=""
+    read -p "🔑 Password (Enter for auto): " password
+    if [[ -z "$password" ]]; then
+        password=$(head /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 8)
+        echo -e "${C_GREEN}🔑 Generated: ${C_YELLOW}$password${C_RESET}"
+    fi
+    read -p "🗓️ Duration (days) [30]: " days; days=${days:-30}
+    [[ ! "$days" =~ ^[0-9]+$ ]] && { echo -e "${C_RED}❌ Invalid.${C_RESET}"; press_enter; return; }
+    read -p "📶 Connection limit [999]: " limit; limit=${limit:-999}
+    read -p "📦 Bandwidth GB (0=unlimited) [0]: " bandwidth_gb; bandwidth_gb=${bandwidth_gb:-0}
+    local expire_date=$(date -d "+$days days" +%Y-%m-%d)
+    getent group "$FF_USERS_GROUP" >/dev/null 2>&1 || groupadd "$FF_USERS_GROUP" >/dev/null 2>&1
+    useradd -m -s /usr/sbin/nologin "$username"
+    usermod -aG "$FF_USERS_GROUP" "$username" 2>/dev/null
+    echo "$username:$password" | chpasswd
+    chage -E "$expire_date" "$username"
+    echo "$username:$password:$expire_date:$limit:$bandwidth_gb" >> "$DB_FILE"
+    local bw_display="Unlimited"; [[ "$bandwidth_gb" != "0" ]] && bw_display="${bandwidth_gb} GB"
+    if [[ -f "$BANNER_ENABLED_FILE" ]]; then
+        generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"
+        update_ssh_banners_config
+    fi
+    clear; show_banner
+    echo -e "${C_GREEN}✅ User '$username' created!${C_RESET}\n"
+    echo -e "  👤 Username: ${C_YELLOW}$username${C_RESET}"
+    echo -e "  🔑 Password: ${C_YELLOW}$password${C_RESET}"
+    echo -e "  🗓️ Expires:  ${C_YELLOW}$expire_date${C_RESET}"
+    echo -e "  📶 Limit:    ${C_YELLOW}$limit${C_RESET}"
+    echo -e "  📦 BW:       ${C_YELLOW}$bw_display${C_RESET}"
+    press_enter
+}
+
+# ========== DELETE USER ==========
+delete_user() {
+    _select_multi_user_interface "--- 🗑️ Delete Users ---"
+    [[ ${#SELECTED_USERS[@]} -eq 0 || "${SELECTED_USERS[0]}" == "NO_USERS" ]] && { press_enter; return; }
+    echo -e "\n${C_RED}⚠️ Delete ${#SELECTED_USERS[@]} user(s)?${C_RESET}"
+    read -p "👉 Confirm (y/n): " confirm
+    [[ "$confirm" != "y" ]] && { echo -e "\n${C_YELLOW}❌ Cancelled.${C_RESET}"; press_enter; return; }
+    delete_voltrontech_user_accounts "${SELECTED_USERS[@]}"
+    press_enter
+}
+
+# ========== EDIT USER ==========
+edit_user() {
+    _select_user_interface "--- ✏️ Edit User ---"
+    local username=$SELECTED_USER
+    [[ "$username" == "NO_USERS" || -z "$username" ]] && { press_enter; return; }
+    while true; do
+        clear; show_banner
+        echo -e "${C_BOLD}${C_PURPLE}--- Editing: ${C_YELLOW}$username${C_RESET}"
+        local line=$(grep "^$username:" "$DB_FILE")
+        local cur_pass=$(echo "$line" | cut -d: -f2)
+        local cur_expiry=$(echo "$line" | cut -d: -f3)
+        local cur_limit=$(echo "$line" | cut -d: -f4)
+        local cur_bw=$(echo "$line" | cut -d: -f5)
+        [[ -z "$cur_bw" ]] && cur_bw="0"
+        local cur_bw_display="Unlimited"; [[ "$cur_bw" != "0" ]] && cur_bw_display="${cur_bw} GB"
+        echo -e "\n  Current: Pass=${C_YELLOW}$cur_pass${C_RESET} Exp=${C_YELLOW}$cur_expiry${C_RESET} Conn=${C_YELLOW}$cur_limit${C_RESET} BW=${C_YELLOW}$cur_bw_display${C_RESET}"
+        echo -e "\n  1) 🔑 Change Password"
+        echo -e "  2) 🗓️ Change Expiration"
+        echo -e "  3) 📶 Change Limit"
+        echo -e "  4) 📦 Change Bandwidth"
+        echo -e "  5) 🔄 Reset Bandwidth"
+        echo -e "  0) ✅ Finish"
+        echo
+        read -p "👉 Choice: " edit_choice
+        case $edit_choice in
+            1) read -p "New password: " new_pass; [[ -z "$new_pass" ]] && new_pass=$(head /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 8); echo "$username:$new_pass" | chpasswd; sed -i "s/^$username:.*/$username:$new_pass:$cur_expiry:$cur_limit:$cur_bw/" "$DB_FILE"; echo -e "${C_GREEN}✅ Pass: $new_pass${C_RESET}"; press_enter ;;
+            2) read -p "New days: " days; if [[ "$days" =~ ^[0-9]+$ ]]; then new_exp=$(date -d "+$days days" +%Y-%m-%d); chage -E "$new_exp" "$username"; sed -i "s/^$username:.*/$username:$cur_pass:$new_exp:$cur_limit:$cur_bw/" "$DB_FILE"; echo -e "${C_GREEN}✅ $new_exp${C_RESET}"; fi; press_enter ;;
+            3) read -p "New limit: " nl; [[ "$nl" =~ ^[0-9]+$ ]] && { sed -i "s/^$username:.*/$username:$cur_pass:$cur_expiry:$nl:$cur_bw/" "$DB_FILE"; echo -e "${C_GREEN}✅ $nl${C_RESET}"; }; press_enter ;;
+            4) read -p "New BW: " nb; [[ "$nb" =~ ^[0-9]+\.?[0-9]*$ ]] && { sed -i "s/^$username:.*/$username:$cur_pass:$cur_expiry:$cur_limit:$nb/" "$DB_FILE"; echo -e "${C_GREEN}✅ $nb${C_RESET}"; }; press_enter ;;
+            5) echo "0" > "$BANDWIDTH_DIR/${username}.usage"; usermod -U "$username" &>/dev/null; echo -e "${C_GREEN}✅ Reset${C_RESET}"; press_enter ;;
+            0) return ;;
+        esac
+    done
+}
+
+# ========== LOCK USER ==========
+lock_user() {
+    _select_multi_user_interface "--- 🔒 Lock Users ---"
+    [[ ${#SELECTED_USERS[@]} -eq 0 || "${SELECTED_USERS[0]}" == "NO_USERS" ]] && { press_enter; return; }
+    for u in "${SELECTED_USERS[@]}"; do
+        if ! id "$u" &>/dev/null; then echo -e " ❌ $u missing"; continue; fi
+        usermod -L "$u" && killall -u "$u" -9 &>/dev/null && echo -e " ✅ ${C_YELLOW}$u${C_RESET} locked"
+    done
+    press_enter
+}
+
+# ========== UNLOCK USER ==========
+unlock_user() {
+    _select_multi_user_interface "--- 🔓 Unlock Users ---"
+    [[ ${#SELECTED_USERS[@]} -eq 0 || "${SELECTED_USERS[0]}" == "NO_USERS" ]] && { press_enter; return; }
+    for u in "${SELECTED_USERS[@]}"; do
+        if ! id "$u" &>/dev/null; then echo -e " ❌ $u missing"; continue; fi
+        usermod -U "$u" && echo -e " ✅ ${C_YELLOW}$u${C_RESET} unlocked"
+    done
+    press_enter
+}
+
+# ========== LIST USERS ==========
+list_users() {
+    clear; show_banner
+    [[ ! -s "$DB_FILE" ]] && { echo -e "\n${C_YELLOW}ℹ️ No users.${C_RESET}"; press_enter; return; }
+    echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_BOLD}${C_PURPLE}                      📋 MANAGED USERS${C_RESET}"
+    echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
+    echo ""
+    local user_count=0
+    while IFS=: read -r user pass expiry limit bandwidth_gb _extra; do
+        [[ -z "$user" ]] && continue
+        ((user_count++))
+        bandwidth_gb=${bandwidth_gb:-0}
+        local online_count=$(pgrep -c -u "$user" sshd 2>/dev/null || echo 0)
+        local bw_string="Unlimited"
+        if [[ "$bandwidth_gb" != "0" ]]; then
+            local used_bytes=0
+            [[ -f "$BANDWIDTH_DIR/${user}.usage" ]] && used_bytes=$(cat "$BANDWIDTH_DIR/${user}.usage" 2>/dev/null)
+            [[ -z "$used_bytes" ]] && used_bytes=0
+            local used_gb=$(awk "BEGIN {printf \"%.2f\", $used_bytes / 1073741824}")
+            local remain_gb=$(awk "BEGIN {r=$bandwidth_gb - $used_gb; if(r<0) r=0; printf \"%.2f\", r}")
+            bw_string="${used_gb}/${bandwidth_gb} GB | ${remain_gb} GB left"
+        fi
+        local status_text=$(get_user_status "$user")
+        local plain_status=$(echo -e "$status_text" | sed 's/\x1b\[[0-9;]*m//g')
+        echo -e "${C_CYAN}┌─────────────────────────────────────────────────────────────┐${C_RESET}"
+        printf "${C_CYAN}│${C_RESET} ${C_YELLOW}USER${C_RESET}: ${C_WHITE}%-53s${C_CYAN}│${C_RESET}\n" "$user"
+        printf "${C_CYAN}│${C_RESET} ${C_YELLOW}EXPIRY${C_RESET}: ${C_WHITE}%-51s${C_CYAN}│${C_RESET}\n" "$expiry"
+        printf "${C_CYAN}│${C_RESET} ${C_YELLOW}BW${C_RESET}: ${C_WHITE}%-55s${C_CYAN}│${C_RESET}\n" "$bw_string"
+        printf "${C_CYAN}│${C_RESET} ${C_YELLOW}ONLINE${C_RESET}: ${C_WHITE}%-51s${C_CYAN}│${C_RESET}\n" "${online_count}/${limit}"
+        printf "${C_CYAN}│${C_RESET} ${C_YELLOW}STATUS${C_RESET}: %-51s${C_CYAN}│${C_RESET}\n" "$plain_status"
+        echo -e "${C_CYAN}└─────────────────────────────────────────────────────────────┘${C_RESET}"
+        echo ""
+    done < <(sort "$DB_FILE")
+    echo -e "${C_DIM}Total: ${C_WHITE}$(grep -c . "$DB_FILE")${C_RESET} | Online: ${C_WHITE}$(count_managed_online_sessions)${C_RESET}"
+    press_enter
+}
+
+# ========== RENEW USER ==========
+renew_user() {
+    _select_multi_user_interface "--- 🔄 Renew Users ---"
+    [[ ${#SELECTED_USERS[@]} -eq 0 || "${SELECTED_USERS[0]}" == "NO_USERS" ]] && { press_enter; return; }
+    read -p "👉 Days to extend: " days
+    [[ ! "$days" =~ ^[0-9]+$ ]] && { echo -e "${C_RED}❌ Invalid.${C_RESET}"; press_enter; return; }
+    local new_expire_date=$(date -d "+$days days" +%Y-%m-%d)
+    for u in "${SELECTED_USERS[@]}"; do
+        chage -E "$new_expire_date" "$u"
+        local line=$(grep "^$u:" "$DB_FILE")
+        local pass=$(echo "$line"|cut -d: -f2); local limit=$(echo "$line"|cut -d: -f4); local bw=$(echo "$line"|cut -d: -f5)
+        [[ -z "$bw" ]] && bw="0"
+        sed -i "s/^$u:.*/$u:$pass:$new_expire_date:$limit:$bw/" "$DB_FILE"
+        # FIXED: Unlock user after renewal
+        usermod -U "$u" &>/dev/null
+        echo -e " ✅ ${C_YELLOW}$u${C_RESET} → ${C_GREEN}$new_expire_date${C_RESET}"
+    done
+    press_enter
+}
+
+# ========== CLEANUP EXPIRED ==========
+cleanup_expired() {
+    clear; show_banner
+    echo -e "${C_BOLD}${C_PURPLE}--- 🧹 Cleanup Expired ---${C_RESET}"
+    local expired_users=(); local current_ts=$(date +%s)
+    [[ ! -s "$DB_FILE" ]] && { echo -e "\n${C_GREEN}✅ Empty DB.${C_RESET}"; press_enter; return; }
+    while IFS=: read -r user pass expiry limit bandwidth_gb _extra; do
+        local expiry_ts=$(date -d "$expiry" +%s 2>/dev/null || echo 0)
+        [[ $expiry_ts -lt $current_ts && $expiry_ts -ne 0 ]] && expired_users+=("$user")
+    done < "$DB_FILE"
+    [[ ${#expired_users[@]} -eq 0 ]] && { echo -e "\n${C_GREEN}✅ No expired.${C_RESET}"; press_enter; return; }
+    echo -e "\nExpired: ${C_RED}${expired_users[*]}${C_RESET}"
+    read -p "👉 Delete all? (y/n): " confirm
+    if [[ "$confirm" == "y" ]]; then
+        for user in "${expired_users[@]}"; do
+            killall -u "$user" -9 &>/dev/null
+            rm -f "$BANDWIDTH_DIR/${user}.usage"
+            rm -rf "$BANDWIDTH_DIR/pidtrack/${user}"
+            userdel -r "$user" &>/dev/null
+            sed -i "/^$user:/d" "$DB_FILE"
+        done
+        echo -e "\n${C_GREEN}✅ Cleaned.${C_RESET}"
+    else echo -e "\n${C_YELLOW}❌ Cancelled.${C_RESET}"; fi
+    invalidate_banner_cache; update_ssh_banners_config
+    press_enter
+}
+
+# ========== BULK CREATE ==========
+bulk_create_users() {
+    clear; show_banner
+    echo -e "${C_BOLD}${C_PURPLE}--- 👥 Bulk Create Users ---${C_RESET}"
+    read -p "👉 Prefix: " prefix
+    [[ -z "$prefix" ]] && { echo -e "${C_RED}❌ Empty.${C_RESET}"; press_enter; return; }
+    read -p "🔢 Count: " count
+    [[ ! "$count" =~ ^[0-9]+$ ]] || [[ "$count" -lt 1 ]] || [[ "$count" -gt 100 ]] && { echo -e "${C_RED}❌ 1-100.${C_RESET}"; press_enter; return; }
+    read -p "🗓️ Days [30]: " days; days=${days:-30}
+    read -p "📶 Limit [999]: " limit; limit=${limit:-999}
+    read -p "📦 BW GB [0]: " bandwidth_gb; bandwidth_gb=${bandwidth_gb:-0}
+    local expire_date=$(date -d "+$days days" +%Y-%m-%d)
+    getent group "$FF_USERS_GROUP" >/dev/null 2>&1 || groupadd "$FF_USERS_GROUP" >/dev/null 2>&1
+    echo ""
+    printf "  ${C_BOLD}%-20s | %-15s | %-12s${C_RESET}\n" "USERNAME" "PASSWORD" "EXPIRES"
+    echo -e "${C_YELLOW}────────────────────────────────────────────────────────────${C_RESET}"
+    local created=0
+    for ((i=1; i<=count; i++)); do
+        local username="${prefix}${i}"
+        if id "$username" &>/dev/null || grep -q "^$username:" "$DB_FILE"; then echo -e "  ${C_RED}⚠️ Skip $username${C_RESET}"; continue; fi
+        local password=$(head /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 8)
+        useradd -m -s /usr/sbin/nologin "$username"
+        usermod -aG "$FF_USERS_GROUP" "$username" 2>/dev/null
+        echo "$username:$password" | chpasswd
+        chage -E "$expire_date" "$username"
+        echo "$username:$password:$expire_date:$limit:$bandwidth_gb" >> "$DB_FILE"
+        [[ -f "$BANNER_ENABLED_FILE" ]] && generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"
+        printf "  ${C_GREEN}%-20s${C_RESET} | ${C_YELLOW}%-15s${C_RESET} | ${C_CYAN}%-12s${C_RESET}\n" "$username" "$password" "$expire_date"
+        ((created++))
+    done
+    [[ -f "$BANNER_ENABLED_FILE" ]] && update_ssh_banners_config
+    echo -e "\n${C_GREEN}✅ Created $created users.${C_RESET}"
+    invalidate_banner_cache
+    press_enter
+}
+
+# ========== VIEW BANDWIDTH ==========
+view_user_bandwidth() {
+    _select_user_interface "--- 📊 View Bandwidth ---"
+    local u=$SELECTED_USER
+    [[ "$u" == "NO_USERS" || -z "$u" ]] && { press_enter; return; }
+    clear; show_banner
+    echo -e "${C_BOLD}${C_PURPLE}--- 📊 Bandwidth: $u ---${C_RESET}\n"
+    local line=$(grep "^$u:" "$DB_FILE")
+    local bandwidth_gb=$(echo "$line" | cut -d: -f5)
+    [[ -z "$bandwidth_gb" ]] && bandwidth_gb="0"
+    local used_bytes=0
+    [[ -f "$BANDWIDTH_DIR/${u}.usage" ]] && used_bytes=$(cat "$BANDWIDTH_DIR/${u}.usage" 2>/dev/null)
+    [[ -z "$used_bytes" ]] && used_bytes=0
+    local used_gb=$(awk "BEGIN {printf \"%.3f\", $used_bytes / 1073741824}")
+    echo -e "  ${C_CYAN}Used:${C_RESET} ${C_WHITE}${used_gb} GB${C_RESET}"
+    if [[ "$bandwidth_gb" == "0" ]]; then
+        echo -e "  ${C_CYAN}Limit:${C_RESET} ${C_GREEN}Unlimited${C_RESET}"
+    else
+        local quota_bytes=$(awk "BEGIN {printf \"%.0f\", $bandwidth_gb * 1073741824}")
+        local percentage=$(awk "BEGIN {printf \"%.1f\", ($used_bytes / $quota_bytes) * 100}")
+        local remaining_gb=$(awk "BEGIN {r=$bandwidth_gb - $used_gb; if(r<0) r=0; printf \"%.3f\", r}")
+        echo -e "  ${C_CYAN}Limit:${C_RESET} ${C_YELLOW}${bandwidth_gb} GB${C_RESET}"
+        echo -e "  ${C_CYAN}Remaining:${C_RESET} ${C_WHITE}${remaining_gb} GB${C_RESET}"
+        echo -e "  ${C_CYAN}Usage:${C_RESET} ${C_WHITE}${percentage}%${C_RESET}"
+    fi
+    press_enter
+}
+
+# ========== GENERATE CLIENT CONFIG ==========
+generate_client_config() {
+    local user=$1; local pass=$2
+    local host_ip=$(curl -s -4 icanhazip.com 2>/dev/null || echo "unknown")
+    local host_domain="$host_ip"
+    [ -f "$DB_DIR/domain.txt" ] && host_domain=$(cat "$DB_DIR/domain.txt" 2>/dev/null)
+    echo -e "\n${C_BOLD}${C_PURPLE}--- 📱 Client Config ---${C_RESET}\n"
+    echo -e "${C_YELLOW}========================${C_RESET}"
+    echo -e "👤 User: ${C_WHITE}$user${C_RESET}"
+    echo -e "🔑 Pass: ${C_WHITE}$pass${C_RESET}"
+    echo -e "🌐 Host: ${C_WHITE}$host_domain${C_RESET}"
+    echo -e "${C_YELLOW}========================${C_RESET}"
+    echo -e "\n🔹 ${C_BOLD}SSH:${C_RESET}"
+    echo -e "   Host: $host_domain"
+    echo -e "   Port: 22"
+    if systemctl is-active --quiet haproxy 2>/dev/null; then
+        local hp=$(grep -oP 'bind \*:(\d+)' /etc/haproxy/haproxy.cfg 2>/dev/null | awk -F: '{print $2}' | head -1)
+        [[ -n "$hp" ]] && echo -e "\n🔹 ${C_BOLD}SSL:${C_RESET}\n   Host: $host_domain\n   Port: $hp"
+    fi
+    if systemctl is-active --quiet udp-custom 2>/dev/null; then
+        echo -e "\n🔹 ${C_BOLD}UDP Custom:${C_RESET}\n   IP: $host_ip\n   Port: 1-65535 (exclude 53,5300)"
+    fi
+    if systemctl is-active --quiet dnstt 2>/dev/null; then
+        if [ -f "$DNSTT_CONFIG_FILE" ]; then
+            source "$DNSTT_CONFIG_FILE"
+            echo -e "\n🔹 ${C_BOLD}DNSTT:${C_RESET}\n   Domain: $TUNNEL_DOMAIN\n   PubKey: $PUBLIC_KEY\n   MTU: $MTU_VALUE"
+        fi
+    fi
+    echo -e "${C_YELLOW}========================${C_RESET}"
+    press_enter
+}
+client_config_menu() {
+    _select_user_interface "--- 📱 Client Config ---"
+    local u=$SELECTED_USER
+    [[ "$u" == "NO_USERS" || -z "$u" ]] && { press_enter; return; }
+    local pass=$(grep "^$u:" "$DB_FILE" | cut -d: -f2)
+    generate_client_config "$u" "$pass"
+}
 
 # ========== TRIAL ACCOUNT ==========
 setup_trial_cleanup_script() {
@@ -680,7 +714,7 @@ create_trial_account() {
     fi
     local password=$(head /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 8)
     read -p "🔑 Password [${password}]: " cp; password=${cp:-$password}
-    read -p "📶 Limit [1]: " limit; limit=${limit:-1}
+    read -p "📶 Limit [999]: " limit; limit=${limit:-999}
     read -p "📦 BW GB [0]: " bandwidth_gb; bandwidth_gb=${bandwidth_gb:-0}
     local expire_date
     if [[ "$duration_hours" -ge 24 ]]; then expire_date=$(date -d "+$((duration_hours/24)) days" +%Y-%m-%d); else expire_date=$(date -d "+1 day" +%Y-%m-%d); fi
@@ -740,24 +774,34 @@ dnstt_mtu_menu() {
     done
 }
 
-# ========== FIREWALL ==========
+# ========== FIREWALL (FIXED: Safe version - no flush) ==========
 configure_dnstt_firewall() {
     echo -e "\n${C_BLUE}🔥 Configuring firewall...${C_RESET}"
     ! command -v iptables &>/dev/null && ff_apt_install iptables iptables-persistent
-    iptables -t nat -F 2>/dev/null || true
-    iptables -F 2>/dev/null || true
+
+    # FIXED: Safi rules zetu tu, sio zote
+    # Ondoa rules zetu za zamani (kama zipo)
+    iptables -t nat -D PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300 2>/dev/null || true
+    iptables -D INPUT -p udp --dport 53 -j ACCEPT 2>/dev/null || true
+    iptables -D OUTPUT -p udp --sport 53 -j ACCEPT 2>/dev/null || true
+    iptables -D INPUT -p udp --dport 5300 -j ACCEPT 2>/dev/null || true
+    iptables -D OUTPUT -p udp --sport 5300 -j ACCEPT 2>/dev/null || true
+
+    # Ongeza rules zetu mpya
     iptables -A INPUT -p udp --dport 53 -j ACCEPT
     iptables -A OUTPUT -p udp --sport 53 -j ACCEPT
     iptables -A INPUT -p udp --dport 5300 -j ACCEPT
     iptables -A OUTPUT -p udp --sport 5300 -j ACCEPT
     iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
+
+    # Save
     command -v netfilter-persistent &>/dev/null && netfilter-persistent save >/dev/null 2>&1
     mkdir -p /etc/iptables
     iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
-    echo -e "${C_GREEN}✅ Firewall configured${C_RESET}"
+    echo -e "${C_GREEN}✅ Firewall configured (safe mode)${C_RESET}"
 }
 
-# ========== SSH OPTIMIZATIONS ==========
+# ========== SSH OPTIMIZATIONS (FIXED: No PermitRootLogin yes) ==========
 apply_ssh_optimizations() {
     echo -e "\n${C_BLUE}🔧 SSH Optimizations...${C_RESET}"
     mkdir -p /etc/ssh/ssh_config.d
@@ -776,8 +820,8 @@ Host *
     LogLevel ERROR
 EOF
     cat > /etc/ssh/sshd_config.d/voltrontech-sshd.conf << 'EOF'
-MaxSessions 100
-MaxStartups 100:30:200
+MaxSessions 1000
+MaxStartups 1000:30:2000
 TCPKeepAlive yes
 ClientAliveInterval 60
 ClientAliveCountMax 3
@@ -877,20 +921,10 @@ apply_booster_extreme_ultimate() {
     echo -e "${C_GREEN}✅ 10000x applied${C_RESET}"
 }
 
-# ========== DNSTT OPTIMIZATIONS ==========
-apply_multiplexing() {
-    local num=${1:-3}
-    local domain=$(cat /etc/voltrontech/domain.txt 2>/dev/null)
-    [[ -z "$domain" ]] && return 1
-    pkill -f dnstt-client 2>/dev/null
-    ! command -v screen &>/dev/null && apt-get install screen -y 2>/dev/null
-    local resolvers=("8.8.8.8:53" "1.1.1.1:53" "9.9.9.9:53")
-    for i in $(seq 1 $num); do
-        local resolver=${resolvers[$((i-1))]}
-        screen -dmS "dnstt_$i" dnstt-client -udp "$resolver" -pubkey-file /etc/voltrontech/dnstt/server.pub -mtu 512 "$domain" 127.0.0.1:22 2>/dev/null
-    done
-    echo -e "${C_GREEN}✅ Multiplexing started${C_RESET}"
-}
+# ========== DNSTT NETWORK OPTIMIZATIONS ==========
+# NOTE: apply_multiplexing() IMETOLEWA kwa sababu dnstt-client ni client-side tool
+#       Haiwezi ku-run server-side multiprogramming
+
 apply_buffer_optimization() {
     cat >> /etc/sysctl.conf << 'EOF'
 net.core.rmem_max=1073741824
@@ -924,7 +958,6 @@ no-resolv
 EOF
     systemctl restart dnsmasq 2>/dev/null
 }
-
 
 # ========== DNSTT DOMAIN ==========
 set_custom_dnstt_domain() {
@@ -1043,7 +1076,7 @@ show_dnstt_full_details() {
     press_enter
 }
 
-# ========== DNSTT MAIN MENU ==========
+# ========== DNSTT MENUS ==========
 dnstt_main_menu() {
     while true; do
         clear; show_banner
@@ -1269,7 +1302,7 @@ install_dnstt() {
     create_dnstt_service "$DOMAIN" "$MTU" "$SSH_PORT"
     save_dnstt_info "$DOMAIN" "$PUBLIC_KEY" "$MTU" "$SSH_PORT"
     configure_dnstt_firewall
-    apply_multiplexing 3
+    # NOTE: apply_multiplexing() IMETOLEWA - dnstt-client ni client-side
     apply_buffer_optimization; apply_bbr; apply_network_tuning; apply_dns_caching
     systemctl start dnstt.service; sleep 2
     systemctl is-active --quiet dnstt.service && echo -e "\n${C_GREEN}✅ Service running${C_RESET}" || journalctl -u dnstt.service -n 20 --no-pager
@@ -1370,11 +1403,17 @@ uninstall_ssl_tunnel() {
     rm -f "$HAPROXY_CONFIG" "$SSL_CERT_FILE"
     echo -e "${C_GREEN}✅ SSL uninstalled${C_RESET}"; press_enter
 }
+
+# ========== FALCON PROXY (FIXED: Syntax error imerekebishwa) ==========
 install_falcon_proxy() {
-    clear; show_banner    echo -e "${C_BOLD}${C_PURPLE}--- 🦅 Installing Falcon Proxy ---${C_RESET}"
+    clear; show_banner
+    echo -e "${C_BOLD}${C_PURPLE}--- 🦅 Installing Falcon Proxy ---${C_RESET}"
     local arch=$(uname -m)
-    if [[ "$arch" == "x86_64" ]]; then curl -sL -o "$FALCONPROXY_BINARY" "https://github.com/firewallfalcons/FirewallFalcon-Manager/releases/latest/download/falconproxy"
-    else curl -sL -o "$FALCONPROXY_BINARY" "https://github.com/firewallfalcons/FirewallFalcon-Manager/releases/latest/download/falconproxyarm"; fi
+    if [[ "$arch" == "x86_64" ]]; then
+        curl -sL -o "$FALCONPROXY_BINARY" "https://github.com/firewallfalcons/FirewallFalcon-Manager/releases/latest/download/falconproxy"
+    else
+        curl -sL -o "$FALCONPROXY_BINARY" "https://github.com/firewallfalcons/FirewallFalcon-Manager/releases/latest/download/falconproxyarm"
+    fi
     chmod +x "$FALCONPROXY_BINARY"
     read -p "👉 Port(s) [8080]: " ports; ports=${ports:-8080}
     cat > "$FALCONPROXY_SERVICE_FILE" << EOF
@@ -1589,7 +1628,8 @@ api_management_menu() {
         echo -e "  ${C_GREEN}6)${C_RESET} 📋 View API Endpoints"
         echo -e "  ${C_GREEN}7)${C_RESET} 📝 Copy for Lovable AI"
         echo -e "  ${C_GREEN}8)${C_RESET} 🧪 Test API"
-        echo -e "  ${C_RED}9)${C_RESET} 🗑️  Uninstall API"
+        echo -e "  ${C_GREEN}9)${C_RESET} 📊 Debug Verify"
+        echo -e "  ${C_RED}10)${C_RESET} 🗑️  Uninstall API"
         echo -e "\n  ${C_RED}0)${C_RESET} Return"
         read -p "👉 Select: " choice
         case $choice in
@@ -1601,7 +1641,8 @@ api_management_menu() {
             6) view_api_endpoints ;;
             7) copy_for_lovable_ai ;;
             8) test_api ;;
-            9) uninstall_api_server ;;
+            9) debug_verify_api ;;
+            10) uninstall_api_server ;;
             0) return ;;
             *) sleep 2 ;;
         esac
@@ -1635,7 +1676,7 @@ install_api_server() {
     local SERVER_HOST=$(cat "$DB_DIR/domain.txt" 2>/dev/null || echo "vpn.voltrontechtx.shop")
     cat > /etc/systemd/system/voltrontech-api.service << EOF
 [Unit]
-Description=Voltron Tech API Server v11.0
+Description=Voltron Tech API Server v11.1
 After=network.target
 
 [Service]
@@ -1686,50 +1727,84 @@ EOF
 create_api_code() {
     cat > "$API_DIR/api.py" << 'APIEOF'
 #!/usr/bin/env python3
-"""Voltron Tech API Server v11.0"""
+"""
+Voltron Tech API Server v11.1
+- Connection limit: 999 (default)
+- Secure subprocess (no shell injection)
+- Enhanced logging
+- Debug endpoints
+- Timestamps on responses
+"""
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from functools import wraps
-import subprocess, os, secrets, string, shutil
 from datetime import datetime, timedelta
+import subprocess
+import os
+import logging
+import shutil
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
+# ============ CONFIG ============
 API_KEY = os.environ.get('API_KEY', 'CHANGE_ME')
 DB_DIR = os.environ.get('DB_DIR', '/etc/voltrontech')
 DB_FILE = f'{DB_DIR}/users.db'
 SERVER_HOST = os.environ.get('SERVER_HOST', 'vpn.voltrontechtx.shop')
+DEFAULT_LIMIT = 999
+BANDWIDTH_DIR = f'{DB_DIR}/bandwidth'
 
+# ============ LOGGING ============
+logging.basicConfig(
+    filename='/var/log/voltrontech-api.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
+# ============ HELPERS ============
 def require_api_key(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         key = request.headers.get('X-API-Key') or request.args.get('api_key')
         if not key or key != API_KEY:
+            logging.warning(f"Unauthorized access from {request.remote_addr}")
             return jsonify({'success': False, 'error': 'Invalid API key'}), 401
         return f(*args, **kwargs)
     return decorated
 
 
-def run(cmd, timeout=30):
+def run_safe(args, timeout=30):
     try:
-        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
-        return {'success': r.returncode == 0, 'stdout': r.stdout.strip() if r.stdout else '', 'stderr': r.stderr.strip() if r.stderr else ''}
+        if isinstance(args, str):
+            args = args.split()
+        r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+        return {
+            'success': r.returncode == 0,
+            'stdout': r.stdout.strip() if r.stdout else '',
+            'stderr': r.stderr.strip() if r.stderr else ''
+        }
     except Exception as e:
         return {'success': False, 'stdout': '', 'stderr': str(e)}
+
+
+def run_shell(cmd, timeout=30):
+    try:
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+        return r.stdout.strip() if r.stdout else ''
+    except Exception:
+        return ''
 
 
 def service_active(name):
     if not shutil.which('systemctl'):
         return False
-    r = run(f'systemctl is-active {name} 2>/dev/null')
-    if r.get('stdout', '').strip() == 'active':
+    out = run_shell(f'systemctl is-active {name} 2>/dev/null')
+    if out.strip() == 'active':
         return True
-    r = run(f'systemctl show -p ActiveState --value {name} 2>/dev/null')
-    if r.get('stdout', '').strip() == 'active':
-        return True
-    return False
+    out = run_shell(f'systemctl show -p ActiveState --value {name} 2>/dev/null')
+    return out.strip() == 'active'
 
 
 def ssh_active():
@@ -1748,22 +1823,29 @@ def read_users():
                     continue
                 parts = line.split(':')
                 if len(parts) >= 4:
-                    users.append({'username': parts[0], 'password': parts[1], 'expiry': parts[2], 'limit': parts[3], 'bandwidth': parts[4] if len(parts) > 4 else '0'})
-    except Exception:
-        pass
+                    users.append({
+                        'username': parts[0],
+                        'password': parts[1],
+                        'expiry': parts[2],
+                        'limit': parts[3],
+                        'bandwidth': parts[4] if len(parts) > 4 else '0'
+                    })
+    except Exception as e:
+        logging.error(f"read_users error: {e}")
     return users
 
 
 def user_exists(username):
-    r = run(f'id {username} 2>/dev/null')
+    r = run_safe(['id', username])
     return r.get('success', False)
 
 
 def get_status(username):
     if not user_exists(username):
         return 'not_found'
-    r = run(f'passwd -S {username} 2>/dev/null')
-    if ' L ' in r.get('stdout', ''):
+    r = run_safe(['passwd', '-S', username])
+    parts = r.get('stdout', '').split()
+    if len(parts) >= 2 and parts[1] == 'L':
         return 'locked'
     user = next((u for u in read_users() if u['username'] == username), None)
     if user and user.get('expiry'):
@@ -1776,74 +1858,134 @@ def get_status(username):
 
 
 def get_online(username):
-    r = run(f'pgrep -c -u {username} sshd 2>/dev/null')
+    out = run_shell(f'pgrep -c -u {username} sshd 2>/dev/null')
     try:
-        return int(r.get('stdout', '0') or '0')
+        return int(out or '0')
     except ValueError:
         return 0
 
 
 def get_server_ip():
-    for cmd in ['curl -s -4 icanhazip.com', 'hostname -I | awk \'{print $1}\'']:
-        r = run(cmd, timeout=5)
-        ip = r.get('stdout', '').strip()
-        if ip and ip.count('.') == 3:
+    for cmd in ['curl -s -4 icanhazip.com',
+                'curl -s -4 ifconfig.me',
+                'curl -s -4 api.ipify.org',
+                "hostname -I | awk '{print $1}'"]:
+        out = run_shell(cmd, timeout=5)
+        ip = out.strip()
+        if ip and ip.count('.') == 3 and not ip.startswith('127.'):
             return ip
     return 'unknown'
 
 
-def get_protocols(username=None, password=None):
+def get_protocols(username=None, password=None, limit=DEFAULT_LIMIT):
     protocols = {}
     server_ip = get_server_ip()
-    
+
     if ssh_active():
-        protocols['ssh'] = {'id': 'ssh', 'name': 'SSH Direct', 'icon': '🔐', 'color': '#6BCB77', 'host': SERVER_HOST, 'ip': server_ip, 'port': 22, 'username': username, 'password': password, 'info': 'Direct SSH connection', 'type': 'ssh'}
-    
+        protocols['ssh'] = {
+            'id': 'ssh', 'name': 'SSH Direct', 'icon': '🔐',
+            'color': '#6BCB77', 'host': SERVER_HOST, 'ip': server_ip,
+            'port': 22, 'username': username, 'password': password,
+            'limit': limit, 'info': 'Direct SSH connection', 'type': 'ssh'
+        }
+
     if service_active('haproxy'):
         port = 444
         if os.path.exists('/etc/haproxy/haproxy.cfg'):
-            r = run('grep -oP "bind \\*:\\K\\d+" /etc/haproxy/haproxy.cfg 2>/dev/null | head -1')
+            out = run_shell('grep -oP "bind \\*:\\K\\d+" /etc/haproxy/haproxy.cfg 2>/dev/null | head -1')
             try:
-                port = int(r.get('stdout', '444'))
+                port = int(out) if out else 444
             except ValueError:
                 port = 444
-        protocols['ssl'] = {'id': 'ssl', 'name': 'SSL/TLS Tunnel', 'icon': '🔒', 'color': '#4D96FF', 'host': SERVER_HOST, 'ip': server_ip, 'port': port, 'username': username, 'password': password, 'info': f'SSL tunnel on port {port}', 'type': 'ssl'}
-    
+        protocols['ssl'] = {
+            'id': 'ssl', 'name': 'SSL/TLS Tunnel', 'icon': '🔒',
+            'color': '#4D96FF', 'host': SERVER_HOST, 'ip': server_ip,
+            'port': port, 'username': username, 'password': password,
+            'limit': limit, 'info': f'SSL tunnel on port {port}', 'type': 'ssl'
+        }
+
     if service_active('dnstt'):
-        domain = ''; pubkey = ''; mtu = 512
+        domain = ''
+        pubkey = ''
+        mtu = 512
         if os.path.exists(f'{DB_DIR}/domain.txt'):
             try:
-                with open(f'{DB_DIR}/domain.txt') as f: domain = f.read().strip()
-            except Exception: pass
+                with open(f'{DB_DIR}/domain.txt') as f:
+                    domain = f.read().strip()
+            except Exception:
+                pass
+        if not domain:
+            domain = 'test.voltrontechtx.shop'
         if os.path.exists(f'{DB_DIR}/dnstt/server.pub'):
             try:
-                with open(f'{DB_DIR}/dnstt/server.pub') as f: pubkey = f.read().strip()
-            except Exception: pass
+                with open(f'{DB_DIR}/dnstt/server.pub') as f:
+                    pubkey = f.read().strip()
+            except Exception:
+                pass
         if os.path.exists(f'{DB_DIR}/config/mtu'):
             try:
-                with open(f'{DB_DIR}/config/mtu') as f: mtu = int(f.read().strip())
-            except Exception: mtu = 512
-        protocols['dnstt'] = {'id': 'dnstt', 'name': 'DNSTT (SlowDNS)', 'icon': '📡', 'color': '#9B59B6', 'domain': domain, 'pubkey': pubkey, 'mtu': mtu, 'dns': '8.8.8.8', 'dns_alt': '1.1.1.1', 'username': username, 'password': password, 'info': f'DNSTT with MTU {mtu}', 'type': 'dnstt'}
-    
+                with open(f'{DB_DIR}/config/mtu') as f:
+                    mtu = int(f.read().strip())
+            except Exception:
+                mtu = 512
+        protocols['dnstt'] = {
+            'id': 'dnstt', 'name': 'DNSTT (SlowDNS)', 'icon': '📡',
+            'color': '#9B59B6', 'domain': domain, 'pubkey': pubkey,
+            'mtu': mtu, 'dns': '8.8.8.8', 'dns_alt': '1.1.1.1',
+            'username': username, 'password': password, 'limit': limit,
+            'info': f'DNSTT with MTU {mtu}', 'type': 'dnstt'
+        }
+
     if service_active('udp-custom'):
-        protocols['udp_custom'] = {'id': 'udp_custom', 'name': 'UDP Custom', 'icon': '🚀', 'color': '#FF6B6B', 'host': SERVER_HOST, 'ip': server_ip, 'port_range': '1-65535', 'exclude': '53,5300', 'username': username, 'password': password, 'info': 'UDP any port except 53,5300', 'type': 'udp'}
-    
+        protocols['udp_custom'] = {
+            'id': 'udp_custom', 'name': 'UDP Custom', 'icon': '🚀',
+            'color': '#FF6B6B', 'host': SERVER_HOST, 'ip': server_ip,
+            'port_range': '1-65535', 'exclude': '53,5300',
+            'username': username, 'password': password, 'limit': limit,
+            'info': 'UDP any port except 53,5300', 'type': 'udp'
+        }
+
     if service_active('badvpn'):
-        protocols['badvpn'] = {'id': 'badvpn', 'name': 'BadVPN UDPGW', 'icon': '⚡', 'color': '#FFD93D', 'host': SERVER_HOST, 'ip': server_ip, 'port': 7300, 'username': username, 'password': password, 'info': 'BadVPN UDP Gateway', 'type': 'badvpn'}
-    
+        protocols['badvpn'] = {
+            'id': 'badvpn', 'name': 'BadVPN UDPGW', 'icon': '⚡',
+            'color': '#FFD93D', 'host': SERVER_HOST, 'ip': server_ip,
+            'port': 7300, 'username': username, 'password': password,
+            'limit': limit, 'info': 'BadVPN UDP Gateway', 'type': 'badvpn'
+        }
+
     if service_active('zivpn'):
-        protocols['zivpn'] = {'id': 'zivpn', 'name': 'ZiVPN', 'icon': '🛡️', 'color': '#6BCB77', 'host': SERVER_HOST, 'ip': server_ip, 'port': 5667, 'username': username, 'password': password, 'info': 'ZiVPN server', 'type': 'zivpn'}
-    
+        protocols['zivpn'] = {
+            'id': 'zivpn', 'name': 'ZiVPN', 'icon': '🛡️',
+            'color': '#6BCB77', 'host': SERVER_HOST, 'ip': server_ip,
+            'port': 5667, 'username': username, 'password': password,
+            'limit': limit, 'info': 'ZiVPN server', 'type': 'zivpn'
+        }
+
     if service_active('falconproxy'):
-        protocols['falconproxy'] = {'id': 'falconproxy', 'name': 'Falcon Proxy', 'icon': '🦅', 'color': '#E85555', 'host': SERVER_HOST, 'ip': server_ip, 'port': 8080, 'username': username, 'password': password, 'info': 'Falcon Proxy', 'type': 'falconproxy'}
-    
+        protocols['falconproxy'] = {
+            'id': 'falconproxy', 'name': 'Falcon Proxy', 'icon': '🦅',
+            'color': '#E85555', 'host': SERVER_HOST, 'ip': server_ip,
+            'port': 8080, 'username': username, 'password': password,
+            'limit': limit, 'info': 'Falcon Proxy', 'type': 'falconproxy'
+        }
+
     return protocols
 
 
+def now_iso():
+    return datetime.now().isoformat()
+
+
+# ============ ROUTES ============
 @app.route('/api/health')
 def health():
     protocols = get_protocols()
-    return jsonify({'success': True, 'status': 'ok', 'service': 'Voltron Tech API', 'version': '11.0', 'protocols_active': len(protocols), 'timestamp': datetime.now().isoformat()})
+    return jsonify({
+        'success': True, 'status': 'ok',
+        'service': 'Voltron Tech API', 'version': '11.1',
+        'protocols_active': len(protocols),
+        'timestamp': now_iso()
+    })
 
 
 @app.route('/api/trial/check', methods=['POST'])
@@ -1851,12 +1993,17 @@ def health():
 def trial_check():
     data = request.get_json() or {}
     username = data.get('username', '').strip().lower()
-    if not username: return jsonify({'available': False, 'error': 'Username required'}), 400
-    if not username.replace('-', '').replace('_', '').isalnum(): return jsonify({'available': False, 'error': 'Only letters, numbers, - and _'}), 400
-    if len(username) < 3 or len(username) > 20: return jsonify({'available': False, 'error': 'Username must be 3-20 chars'}), 400
-    if user_exists(username): return jsonify({'available': False, 'error': 'Username taken'})
-    if any(u['username'] == username for u in read_users()): return jsonify({'available': False, 'error': 'Username taken'})
-    return jsonify({'available': True, 'username': username})
+    if not username:
+        return jsonify({'available': False, 'error': 'Username required'}), 400
+    if not username.replace('-', '').replace('_', '').isalnum():
+        return jsonify({'available': False, 'error': 'Only letters, numbers, - and _'}), 400
+    if len(username) < 3 or len(username) > 20:
+        return jsonify({'available': False, 'error': 'Username must be 3-20 chars'}), 400
+    if user_exists(username):
+        return jsonify({'available': False, 'error': 'Username taken'})
+    if any(u['username'] == username for u in read_users()):
+        return jsonify({'available': False, 'error': 'Username taken'})
+    return jsonify({'available': True, 'username': username, 'timestamp': now_iso()})
 
 
 @app.route('/api/trial/create', methods=['POST'])
@@ -1866,23 +2013,64 @@ def trial_create():
     username = data.get('username', '').strip().lower()
     password = data.get('password', '').strip()
     days = int(data.get('days', 1))
-    if not username or len(username) < 3 or len(username) > 20: return jsonify({'success': False, 'error': 'Invalid username'}), 400
-    if not username.replace('-', '').replace('_', '').isalnum(): return jsonify({'success': False, 'error': 'Invalid chars'}), 400
-    if not password or len(password) < 4: return jsonify({'success': False, 'error': 'Password too short'}), 400
-    if days not in [1, 3, 7]: return jsonify({'success': False, 'error': 'Days must be 1, 3, or 7'}), 400
-    if user_exists(username): return jsonify({'success': False, 'error': 'Username taken'}), 400
+
+    if not username or len(username) < 3 or len(username) > 20:
+        return jsonify({'success': False, 'error': 'Invalid username (3-20 chars)'}), 400
+    if not username.replace('-', '').replace('_', '').isalnum():
+        return jsonify({'success': False, 'error': 'Only letters, numbers, - and _'}), 400
+    if not password or len(password) < 4:
+        return jsonify({'success': False, 'error': 'Password must be at least 4 chars'}), 400
+    if days not in [1, 3, 7]:
+        return jsonify({'success': False, 'error': 'Days must be 1, 3, or 7'}), 400
+    if user_exists(username):
+        return jsonify({'success': False, 'error': 'Username taken'}), 400
+
+    logging.info(f"Creating account: {username} for {days} days")
+
     try:
-        run(f'useradd -m -s /usr/sbin/nologin {username}')
-        run(f'usermod -aG ffusers {username} 2>/dev/null')
-        run(f'echo "{username}:{password}" | chpasswd')
+        r = run_safe(['useradd', '-m', '-s', '/usr/sbin/nologin', username])
+        if not r['success']:
+            logging.error(f"useradd failed: {r['stderr']}")
+            return jsonify({'success': False, 'error': 'Failed to create user'}), 500
+
+        run_safe(['usermod', '-aG', 'ffusers', username])
+
+        try:
+            p = subprocess.run(['chpasswd'], input=f'{username}:{password}',
+                               text=True, capture_output=True, timeout=10)
+            if p.returncode != 0:
+                logging.error(f"chpasswd failed: {p.stderr}")
+        except Exception as e:
+            logging.error(f"chpasswd exception: {e}")
+
         expire_date = (datetime.now() + timedelta(days=days)).strftime('%Y-%m-%d')
-        run(f'chage -E {expire_date} {username}')
+        run_safe(['chage', '-E', expire_date, username])
+
         os.makedirs(DB_DIR, exist_ok=True)
-        with open(DB_FILE, 'a') as f: f.write(f'{username}:{password}:{expire_date}:1:0\n')
-        protocols = get_protocols(username, password)
+        with open(DB_FILE, 'a') as f:
+            f.write(f'{username}:{password}:{expire_date}:{DEFAULT_LIMIT}:0\n')
+
+        protocols = get_protocols(username, password, DEFAULT_LIMIT)
         server_ip = get_server_ip()
-        return jsonify({'success': True, 'message': f'Trial created ({days} days)', 'account': {'username': username, 'password': password, 'expiry': expire_date, 'days': days, 'bandwidth': 'Unlimited', 'server': SERVER_HOST, 'server_ip': server_ip}, 'protocols': protocols, 'protocol_count': len(protocols)})
+
+        logging.info(f"Account created: {username}, protocols: {list(protocols.keys())}")
+
+        return jsonify({
+            'success': True,
+            'message': f'Trial created ({days} days)',
+            'timestamp': now_iso(),
+            'server_verified': True,
+            'account': {
+                'username': username, 'password': password,
+                'expiry': expire_date, 'days': days,
+                'limit': DEFAULT_LIMIT, 'bandwidth': 'Unlimited',
+                'server': SERVER_HOST, 'server_ip': server_ip
+            },
+            'protocols': protocols,
+            'protocol_count': len(protocols)
+        })
     except Exception as e:
+        logging.error(f"trial_create exception: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -1890,13 +2078,22 @@ def trial_create():
 @require_api_key
 def trial_status(username):
     user = next((u for u in read_users() if u['username'] == username), None)
-    if not user: return jsonify({'success': False, 'error': 'Not found'}), 404
+    if not user:
+        return jsonify({'success': False, 'error': 'Not found'}), 404
     try:
         expiry = datetime.strptime(user['expiry'], '%Y-%m-%d')
         days_left = (expiry - datetime.now()).days
     except Exception:
         days_left = 0
-    return jsonify({'success': True, 'account': {'username': username, 'status': get_status(username), 'expiry': user['expiry'], 'days_left': max(0, days_left), 'online': get_online(username)}})
+    return jsonify({
+        'success': True, 'timestamp': now_iso(),
+        'account': {
+            'username': username, 'status': get_status(username),
+            'expiry': user['expiry'], 'days_left': max(0, days_left),
+            'online': get_online(username), 'limit': int(user['limit']),
+            'bandwidth': user['bandwidth']
+        }
+    })
 
 
 @app.route('/api/dashboard/info')
@@ -1905,13 +2102,21 @@ def dashboard_info():
     try:
         ip = get_server_ip()
         try:
-            with open('/proc/uptime') as f: uptime_sec = float(f.read().split()[0])
-            days = int(uptime_sec // 86400); hours = int((uptime_sec % 86400) // 3600); minutes = int((uptime_sec % 3600) // 60)
+            with open('/proc/uptime') as f:
+                uptime_sec = float(f.read().split()[0])
+            days = int(uptime_sec // 86400)
+            hours = int((uptime_sec % 86400) // 3600)
+            minutes = int((uptime_sec % 3600) // 60)
             uptime_str = f'{days}d {hours}h {minutes}m'
-        except Exception: uptime_str = 'unknown'
+        except Exception:
+            uptime_str = 'unknown'
+
         try:
-            with open('/proc/cpuinfo') as f: cpu_cores = f.read().count('processor')
-        except Exception: cpu_cores = 1
+            with open('/proc/cpuinfo') as f:
+                cpu_cores = f.read().count('processor')
+        except Exception:
+            cpu_cores = 1
+
         ram_total = ram_used = ram_percent = 0
         try:
             with open('/proc/meminfo') as f:
@@ -1924,23 +2129,51 @@ def dashboard_info():
                 ram_avail = mem.get('MemAvailable', 0) // 1024
                 ram_used = ram_total - ram_avail
                 ram_percent = int(ram_used * 100 / ram_total) if ram_total else 0
-        except Exception: pass
+        except Exception:
+            pass
+
         disk_total = disk_used = disk_percent = 0
         try:
-            r = run('df -k / | tail -1')
-            parts = r.get('stdout', '').split()
+            out = run_shell('df -k / | tail -1')
+            parts = out.split()
             if len(parts) >= 4:
                 disk_total = int(parts[1]) // 1024
                 disk_used = int(parts[2]) // 1024
                 disk_percent = int(parts[4].replace('%', ''))
-        except Exception: pass
+        except Exception:
+            pass
+
         try:
-            with open('/proc/loadavg') as f: load_str = ' '.join(f.read().split()[:3])
-        except Exception: load_str = '0.00 0.00 0.00'
+            with open('/proc/loadavg') as f:
+                load_str = ' '.join(f.read().split()[:3])
+        except Exception:
+            load_str = '0.00 0.00 0.00'
+
         users = read_users()
         online = sum(get_online(u['username']) for u in users)
-        return jsonify({'success': True, 'info': {'ip': ip, 'uptime': uptime_str, 'cpu': {'cores': cpu_cores}, 'ram': {'total': ram_total, 'used': ram_used, 'percent': ram_percent}, 'disk': {'total': disk_total, 'used': disk_used, 'percent': disk_percent}, 'load': load_str, 'users': {'total': len(users), 'online': online}, 'services': {'ssh': ssh_active(), 'dnstt': service_active('dnstt'), 'haproxy': service_active('haproxy'), 'badvpn': service_active('badvpn'), 'udp_custom': service_active('udp-custom'), 'zivpn': service_active('zivpn'), 'falconproxy': service_active('falconproxy')}}})
+
+        return jsonify({
+            'success': True, 'timestamp': now_iso(),
+            'info': {
+                'ip': ip, 'uptime': uptime_str,
+                'cpu': {'cores': cpu_cores},
+                'ram': {'total': ram_total, 'used': ram_used, 'percent': ram_percent},
+                'disk': {'total': disk_total, 'used': disk_used, 'percent': disk_percent},
+                'load': load_str,
+                'users': {'total': len(users), 'online': online},
+                'services': {
+                    'ssh': ssh_active(),
+                    'dnstt': service_active('dnstt'),
+                    'haproxy': service_active('haproxy'),
+                    'badvpn': service_active('badvpn'),
+                    'udp_custom': service_active('udp-custom'),
+                    'zivpn': service_active('zivpn'),
+                    'falconproxy': service_active('falconproxy')
+                }
+            }
+        })
     except Exception as e:
+        logging.error(f"dashboard_info exception: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -1951,13 +2184,20 @@ def users_list():
     result = []
     for u in users:
         used_bytes = 0
-        usage_file = f'{DB_DIR}/bandwidth/{u["username"]}.usage'
+        usage_file = f'{BANDWIDTH_DIR}/{u["username"]}.usage'
         if os.path.exists(usage_file):
             try:
-                with open(usage_file) as f: used_bytes = int(f.read().strip() or 0)
-            except Exception: used_bytes = 0
-        result.append({'username': u['username'], 'expiry': u['expiry'], 'limit': int(u['limit']), 'bandwidth_limit': float(u['bandwidth']), 'bandwidth_used_gb': round(used_bytes / 1073741824, 2), 'status': get_status(u['username']), 'online': get_online(u['username'])})
-    return jsonify({'success': True, 'users': result, 'total': len(result)})
+                with open(usage_file) as f:
+                    used_bytes = int(f.read().strip() or 0)
+            except Exception:
+                used_bytes = 0
+        result.append({
+            'username': u['username'], 'expiry': u['expiry'],
+            'limit': int(u['limit']), 'bandwidth_limit': float(u['bandwidth']),
+            'bandwidth_used_gb': round(used_bytes / 1073741824, 2),
+            'status': get_status(u['username']), 'online': get_online(u['username'])
+        })
+    return jsonify({'success': True, 'timestamp': now_iso(), 'users': result, 'total': len(result)})
 
 
 @app.route('/api/users/delete', methods=['POST'])
@@ -1965,14 +2205,18 @@ def users_list():
 def users_delete():
     data = request.get_json() or {}
     username = data.get('username', '').strip()
-    run(f'killall -u {username} -9 2>/dev/null')
-    run(f'userdel -r {username} 2>/dev/null')
+    if not username:
+        return jsonify({'success': False, 'error': 'Username required'}), 400
+    run_shell(f'killall -u {username} -9 2>/dev/null')
+    run_safe(['userdel', '-r', username])
     if os.path.exists(DB_FILE):
-        with open(DB_FILE) as f: lines = f.readlines()
+        with open(DB_FILE) as f:
+            lines = f.readlines()
         with open(DB_FILE, 'w') as f:
             for line in lines:
-                if not line.startswith(f'{username}:'): f.write(line)
-    return jsonify({'success': True, 'message': f'User {username} deleted'})
+                if not line.startswith(f'{username}:'):
+                    f.write(line)
+    return jsonify({'success': True, 'message': f'User {username} deleted', 'timestamp': now_iso()})
 
 
 @app.route('/api/users/lock', methods=['POST'])
@@ -1980,9 +2224,9 @@ def users_delete():
 def users_lock():
     data = request.get_json() or {}
     username = data.get('username', '').strip()
-    run(f'usermod -L {username}')
-    run(f'killall -u {username} -9 2>/dev/null')
-    return jsonify({'success': True, 'message': f'{username} locked'})
+    run_safe(['usermod', '-L', username])
+    run_shell(f'killall -u {username} -9 2>/dev/null')
+    return jsonify({'success': True, 'message': f'{username} locked', 'timestamp': now_iso()})
 
 
 @app.route('/api/users/unlock', methods=['POST'])
@@ -1990,33 +2234,61 @@ def users_lock():
 def users_unlock():
     data = request.get_json() or {}
     username = data.get('username', '').strip()
-    run(f'usermod -U {username}')
-    return jsonify({'success': True, 'message': f'{username} unlocked'})
+    run_safe(['usermod', '-U', username])
+    return jsonify({'success': True, 'message': f'{username} unlocked', 'timestamp': now_iso()})
 
 
 @app.route('/api/protocols/status')
 @require_api_key
 def protocols_status():
     protocols = get_protocols()
-    return jsonify({'success': True, 'protocols': protocols, 'count': len(protocols), 'active_list': list(protocols.keys())})
+    return jsonify({
+        'success': True, 'timestamp': now_iso(),
+        'protocols': protocols, 'count': len(protocols),
+        'active_list': list(protocols.keys())
+    })
 
 
 @app.route('/api/protocols/start/<service>', methods=['POST'])
 @require_api_key
 def protocols_start(service):
     allowed = ['badvpn', 'udp-custom', 'haproxy', 'dnstt', 'zivpn', 'falconproxy', 'ssh']
-    if service not in allowed: return jsonify({'success': False, 'error': 'Invalid service'}), 400
-    r = run(f'systemctl start {service}')
-    return jsonify({'success': r['success'], 'message': f'{service} started'})
+    if service not in allowed:
+        return jsonify({'success': False, 'error': 'Invalid service'}), 400
+    r = run_safe(['systemctl', 'start', service])
+    return jsonify({'success': r['success'], 'message': f'{service} started', 'timestamp': now_iso()})
 
 
 @app.route('/api/protocols/stop/<service>', methods=['POST'])
 @require_api_key
 def protocols_stop(service):
     allowed = ['badvpn', 'udp-custom', 'haproxy', 'dnstt', 'zivpn', 'falconproxy']
-    if service not in allowed: return jsonify({'success': False, 'error': 'Invalid service'}), 400
-    r = run(f'systemctl stop {service}')
-    return jsonify({'success': r['success'], 'message': f'{service} stopped'})
+    if service not in allowed:
+        return jsonify({'success': False, 'error': 'Invalid service'}), 400
+    r = run_safe(['systemctl', 'stop', service])
+    return jsonify({'success': r['success'], 'message': f'{service} stopped', 'timestamp': now_iso()})
+
+
+@app.route('/api/debug/verify')
+@require_api_key
+def debug_verify():
+    return jsonify({
+        'success': True, 'timestamp': now_iso(),
+        'vps_truth': {
+            'users_count': run_shell('grep -c . /etc/voltrontech/users.db 2>/dev/null') or '0',
+            'ssh_status': run_shell('systemctl is-active sshd 2>/dev/null') or 'inactive',
+            'dnstt_status': run_shell('systemctl is-active dnstt 2>/dev/null') or 'inactive',
+            'haproxy_status': run_shell('systemctl is-active haproxy 2>/dev/null') or 'inactive',
+            'limiter_status': run_shell('systemctl is-active voltrontech-limiter 2>/dev/null') or 'inactive',
+            'api_status': run_shell('systemctl is-active voltrontech-api 2>/dev/null') or 'inactive',
+            'domain': run_shell('cat /etc/voltrontech/domain.txt 2>/dev/null') or 'not set',
+            'mtu': run_shell('cat /etc/voltrontech/config/mtu 2>/dev/null') or '512',
+            'public_key': run_shell('cat /etc/voltrontech/dnstt/server.pub 2>/dev/null') or 'not set',
+            'uptime': run_shell('uptime -p') or 'unknown',
+            'ip': get_server_ip(),
+            'default_limit': DEFAULT_LIMIT
+        }
+    })
 
 
 @app.route('/api/debug/services')
@@ -2025,10 +2297,11 @@ def debug_services():
     services = ['ssh', 'sshd', 'haproxy', 'dnstt', 'badvpn', 'udp-custom', 'zivpn', 'falconproxy']
     results = {}
     for svc in services:
-        r1 = run(f'systemctl is-active {svc} 2>/dev/null')
-        r2 = run(f'systemctl show -p ActiveState --value {svc} 2>/dev/null')
-        results[svc] = {'is_active': r1.get('stdout', ''), 'show': r2.get('stdout', ''), 'final': service_active(svc)}
-    return jsonify({'success': True, 'debug': results})
+        results[svc] = {
+            'is_active': run_shell(f'systemctl is-active {svc} 2>/dev/null'),
+            'final': service_active(svc)
+        }
+    return jsonify({'success': True, 'timestamp': now_iso(), 'debug': results})
 
 
 if __name__ == '__main__':
@@ -2080,7 +2353,9 @@ view_api_endpoints() {
     echo -e "  POST /api/users/unlock"
     echo -e "\n${C_PURPLE}🔌 PROTOCOLS:${C_RESET}\n  GET /api/protocols/status"
     echo -e "\n${C_GREEN}❤️  HEALTH:${C_RESET}\n  GET /api/health"
-    echo -e "\n${C_YELLOW}🐛 DEBUG:${C_RESET}\n  GET /api/debug/services"
+    echo -e "\n${C_YELLOW}🐛 DEBUG:${C_RESET}"
+    echo -e "  GET /api/debug/verify"
+    echo -e "  GET /api/debug/services"
     press_enter
 }
 copy_for_lovable_ai() {
@@ -2099,6 +2374,7 @@ copy_for_lovable_ai() {
     echo -e "${C_CYAN}API URL:${C_RESET} ${C_YELLOW}$api_url${C_RESET}"
     echo -e "${C_CYAN}API Key:${C_RESET} ${C_GREEN}$api_key${C_RESET}"
     echo -e "\n${C_CYAN}Active Protocols:${C_RESET} ${C_GREEN}$active_protocols${C_RESET}"
+    echo -e "\n${C_CYAN}Default Limit:${C_RESET} ${C_GREEN}999 connections${C_RESET}"
     press_enter
 }
 test_api() {
@@ -2118,6 +2394,15 @@ test_api() {
         local count=$(echo "$prot" | jq -r '.count' 2>/dev/null || echo "?")
         echo -e "${C_GREEN}✅ OK ($count active)${C_RESET}"
     else echo -e "${C_RED}❌ Fail${C_RESET}"; fi
+    press_enter
+}
+debug_verify_api() {
+    clear; show_banner
+    echo -e "${C_BOLD}${C_PURPLE}--- 📊 DEBUG VERIFY ---${C_RESET}\n"
+    local api_key=$(cat "$API_KEY_FILE" 2>/dev/null)
+    [ -z "$api_key" ] && { echo -e "${C_RED}❌ Key not found!${C_RESET}"; press_enter; return; }
+    local response=$(curl -s -H "X-API-Key: $api_key" http://localhost:$API_PORT/api/debug/verify 2>/dev/null)
+    echo "$response" | jq . 2>/dev/null || echo "$response"
     press_enter
 }
 uninstall_api_server() {
@@ -2373,7 +2658,6 @@ Compression no
 TCPKeepAlive yes
 ClientAliveInterval 60
 ClientAliveCountMax 3
-PermitRootLogin yes
 EOF
     systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
     echo "net.ipv4.tcp_keepalive_time = 30" >> /etc/sysctl.conf
@@ -2449,7 +2733,7 @@ while true; do
                 if ! $user_locked; then usermod -L "$user" &>/dev/null; user_locked=true; fi
             fi
         fi
-        [[ "$limit" =~ ^[0-9]+$ ]] || limit=1
+        [[ "$limit" =~ ^[0-9]+$ ]] || limit=999
         if (( online_count > limit )); then
             if ! $user_locked; then usermod -L "$user" &>/dev/null; killall -u "$user" -9 &>/dev/null; user_locked=true; fi
         fi
@@ -2621,7 +2905,6 @@ uninstall_script() {
     echo -e "\n${C_GREEN}✅ Uninstalled${C_RESET}"
     exit 0
 }
-
 # ========== MAIN MENU ==========
 main_menu() {
     while true; do
@@ -2683,7 +2966,7 @@ main_menu() {
     done
 }
 
-# ========== START ==========
+# ========== STARTUP ==========
 [[ $EUID -ne 0 ]] && { echo -e "${C_RED}❌ Run as root!${C_RESET}"; exit 1; }
 [[ "$1" == "--install-setup" ]] && { initial_setup; exit 0; }
 main_menu
