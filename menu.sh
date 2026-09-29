@@ -1,13 +1,12 @@
 #!/bin/bash
 # ================================================================
-# VOLTRON TECH ULTIMATE v10.13 — COMPLETE (FINAL FIXED)
+# VOLTRON TECH ULTIMATE v10.13 — COMPLETE
 # ================================================================
 
 C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_UL=$'\033[4m'
 C_RED=$'\033[38;5;196m'; C_GREEN=$'\033[38;5;46m'; C_YELLOW=$'\033[38;5;226m'
 C_BLUE=$'\033[38;5;39m'; C_PURPLE=$'\033[38;5;135m'; C_CYAN=$'\033[38;5;51m'
 C_WHITE=$'\033[38;5;255m'; C_GRAY=$'\033[38;5;245m'; C_ORANGE=$'\033[38;5;208m'
-C_GOLD=$'\033[38;5;220m'; C_TEAL=$'\033[38;5;38m'; C_PINK=$'\033[38;5;205m'
 
 DESEC_TOKEN="3WxD4Hkiu5VYBLWVizVhf1rzyKbz"
 DESEC_DOMAIN="voltrontechtx.shop"
@@ -114,8 +113,8 @@ delete_voltrontech_user_accounts() {
         [[ -n "$username" ]] || continue
         killall -u "$username" -9 &>/dev/null
         if id "$username" &>/dev/null; then
-            userdel -r "$username" &>/dev/null && echo -e " ✅ ${C_YELLOW}$username${C_RESET} deleted" || echo -e " ❌ Failed $username"
-        else echo -e " ℹ️ $username missing"; fi
+            userdel -r "$username" &>/dev/null && echo -e " ✅ ${C_YELLOW}$username${C_RESET} deleted" || echo -e " ❌ Failed"
+        else echo -e " ℹ️ missing"; fi
         rm -f "$BANDWIDTH_DIR/${username}.usage"
         rm -rf "$BANDWIDTH_DIR/pidtrack/${username}"
         rm -f "$BANNER_DIR/${username}.txt"
@@ -514,89 +513,38 @@ create_trial_account() {
     press_enter
 }
 
-# ========== CLIENT CONFIG (SSH MANAGER) ==========
+# ========== CLIENT CONFIG ==========
 client_config_menu() {
     clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_BOLD}${C_PURPLE}              📱 SSH MANAGER CONFIG${C_RESET}"
-    echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}\n"
-
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_PURPLE}              📱 SSH MANAGER CONFIG${C_RESET}"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
     local ip=$(curl -s -4 icanhazip.com 2>/dev/null)
-    local ssh_port=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1)
-    ssh_port=${ssh_port:-22}
+    local ssh_port=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1); ssh_port=${ssh_port:-22}
     local domain=""
     [ -f "$DB_DIR/domain.txt" ] && domain=$(cat "$DB_DIR/domain.txt" 2>/dev/null)
-    local pubkey=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null)
-    local mtu=$(get_current_mtu)
-
     echo -e "${C_CYAN}═══ Server Info ═══${C_RESET}"
-    echo -e "  ${C_YELLOW}IP${C_RESET}         : $ip"
-    echo -e "  ${C_YELLOW}SSH Port${C_RESET}   : $ssh_port"
-    echo -e "  ${C_YELLOW}SNI/Host${C_RESET}   : ${domain:-$ip}"
-    echo -e "  ${C_YELLOW}MTU${C_RESET}        : $mtu"
-    [[ -n "$domain" ]] && echo -e "  ${C_YELLOW}DNSTT NS${C_RESET}   : $domain"
-    [[ -n "$pubkey" ]] && echo -e "  ${C_YELLOW}DNSTT Key${C_RESET}  : ${pubkey:0:30}..."
-    echo ""
-    echo -e "${C_PURPLE}───────────────────────────────────────────────────────────────${C_RESET}"
+    echo -e "  ${C_YELLOW}IP${C_RESET}       : $ip"
+    echo -e "  ${C_YELLOW}SSH Port${C_RESET} : $ssh_port"
+    echo -e "  ${C_YELLOW}SNI/Host${C_RESET} : ${domain:-$ip}\n"
     echo -e "  ${C_GREEN}1)${C_RESET} 📋 Select user — Show config"
     echo -e "  ${C_GREEN}2)${C_RESET} 📊 List all users — Bulk config"
-    echo -e "  ${C_GREEN}3)${C_RESET} 📄 JSON export (NapsternetV / HTTP Injector)"
-    echo -e "  ${C_GREEN}4)${C_RESET} 📄 JSON export (ALL users)"
-    echo ""
+    echo -e "  ${C_GREEN}3)${C_RESET} 📄 JSON export (NapsternetV)"
     echo -e "  ${C_RED}0)${C_RESET} Return"
-    echo ""
     read -p "👉 Choice: " c
     case $c in
-        1)
-            _select_user_interface "--- Select User ---"
-            local u=$SELECTED_USER
-            [[ "$u" == "NO_USERS" || -z "$u" ]] && return
-            local p=$(grep "^$u:" "$DB_FILE" | cut -d: -f2)
-            generate_client_config "$u" "$p"
-            ;;
+        1) _select_user_interface "--- Select User ---"; local u=$SELECTED_USER; [[ "$u" == "NO_USERS" || -z "$u" ]] && return; local p=$(grep "^$u:" "$DB_FILE" | cut -d: -f2); generate_client_config "$u" "$p" ;;
         2)
             clear; show_banner
-            echo -e "${C_BOLD}${C_PURPLE}═══ 📋 ALL USERS — SSH MANAGER CONFIG ═══${C_RESET}\n"
-            [[ ! -s "$DB_FILE" ]] && { echo -e "${C_YELLOW}No users.${C_RESET}"; press_enter; return; }
+            echo -e "${C_PURPLE}═══ 📋 ALL USERS CONFIG ═══${C_RESET}\n"
             echo -e "${C_CYAN}Server:${C_RESET} $ip:$ssh_port   ${C_CYAN}SNI:${C_RESET} ${domain:-$ip}\n"
-            echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
             printf "${C_BOLD}%-15s | %-15s | %-12s | %-8s${C_RESET}\n" "USERNAME" "PASSWORD" "EXPIRY" "LIMIT"
-            echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
             while IFS=: read -r user pass expiry limit bw _extra; do
                 [[ -z "$user" ]] && continue
                 printf "${C_GREEN}%-15s${C_RESET} | ${C_YELLOW}%-15s${C_RESET} | ${C_CYAN}%-12s${C_RESET} | ${C_WHITE}%-8s${C_RESET}\n" "$user" "$pass" "$expiry" "$limit"
             done < <(sort "$DB_FILE")
-            echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-            press_enter
-            ;;
-        3)
-            _select_user_interface "--- JSON Export ---"
-            local u=$SELECTED_USER
-            [[ "$u" == "NO_USERS" || -z "$u" ]] && return
-            local p=$(grep "^$u:" "$DB_FILE" | cut -d: -f2)
-            generate_client_json "$u" "$p"
-            ;;
-        4)
-            clear; show_banner
-            echo -e "${C_BOLD}${C_PURPLE}═══ 📄 ALL USERS JSON ═══${C_RESET}\n"
-            [[ ! -s "$DB_FILE" ]] && { echo -e "${C_YELLOW}No users.${C_RESET}"; press_enter; return; }
-            local ip=$(curl -s -4 icanhazip.com 2>/dev/null)
-            local ssh_port=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1); ssh_port=${ssh_port:-22}
-            local domain=""
-            [ -f "$DB_DIR/domain.txt" ] && domain=$(cat "$DB_DIR/domain.txt" 2>/dev/null)
-            echo "["
-            local first=1
-            while IFS=: read -r user pass expiry limit bw _extra; do
-                [[ -z "$user" ]] && continue
-                [[ $first -eq 0 ]] && echo ","
-                first=0
-                printf '  {"name":"Voltron_%s","server":"%s","server_port":%s,"username":"%s","password":"%s","sni":"%s","expiry":"%s","limit":%s}' \
-                    "$user" "$ip" "$ssh_port" "$user" "$pass" "${domain:-$ip}" "$expiry" "$limit"
-            done < <(sort "$DB_FILE")
-            echo ""
-            echo "]"
-            press_enter
-            ;;
+            press_enter ;;
+        3) _select_user_interface "--- JSON Export ---"; local u=$SELECTED_USER; [[ "$u" == "NO_USERS" || -z "$u" ]] && return; local p=$(grep "^$u:" "$DB_FILE" | cut -d: -f2); generate_client_json "$u" "$p" ;;
         0) return ;;
     esac
 }
@@ -605,110 +553,61 @@ generate_client_config() {
     local u=$1 p=$2
     clear; show_banner
     local line=$(grep "^$u:" "$DB_FILE")
-    local expiry=$(echo "$line"|cut -d: -f3); local limit=$(echo "$line"|cut -d: -f4); local bw=$(echo "$line"|cut -d: -f5)
-    [[ -z "$bw" ]] && bw="0"
+    local expiry=$(echo "$line"|cut -d: -f3); local limit=$(echo "$line"|cut -d: -f4)
     local ip=$(curl -s -4 icanhazip.com 2>/dev/null)
-    local domain=""
-    [ -f "$DB_DIR/domain.txt" ] && domain=$(cat "$DB_DIR/domain.txt" 2>/dev/null)
+    local domain=""; [ -f "$DB_DIR/domain.txt" ] && domain=$(cat "$DB_DIR/domain.txt" 2>/dev/null)
     local ssh_port=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1); ssh_port=${ssh_port:-22}
-    local pubkey=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null)
-    local mtu=$(get_current_mtu)
-
-    echo -e "${C_BOLD}${C_PURPLE}═══ 📱 CONFIG FOR: $u ═══${C_RESET}\n"
-
-    echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-    echo -e "${C_BOLD}${C_WHITE}🔐 SSH DIRECT${C_RESET}"
-    echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-    echo -e "  ${C_YELLOW}Host / Server${C_RESET}   : $ip"
-    echo -e "  ${C_YELLOW}Port${C_RESET}            : $ssh_port"
-    echo -e "  ${C_YELLOW}Username${C_RESET}        : $u"
-    echo -e "  ${C_YELLOW}Password${C_RESET}        : $p"
-    echo -e "  ${C_YELLOW}SNI / Host Header${C_RESET}: ${domain:-$ip}"
-    echo -e "  ${C_YELLOW}Expiry${C_RESET}          : $expiry"
-    echo -e "  ${C_YELLOW}Limit${C_RESET}           : $limit"
-    echo ""
-
+    local pubkey=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null); local mtu=$(get_current_mtu)
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_PURPLE}                 📱 CLIENT CONFIG: $u${C_RESET}"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+    echo -e "${C_GREEN}🔐 SSH DIRECT${C_RESET}"
+    echo -e "  Host/Server : $ip"
+    echo -e "  Port        : $ssh_port"
+    echo -e "  Username    : $u"
+    echo -e "  Password    : $p"
+    echo -e "  SNI         : ${domain:-$ip}"
+    echo -e "  Expiry      : $expiry"
+    echo -e "  Limit       : $limit\n"
     if systemctl is-active --quiet haproxy 2>/dev/null; then
-        echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-        echo -e "${C_BOLD}${C_WHITE}🔒 SSL/TLS TUNNEL${C_RESET}"
-        echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-        echo -e "  ${C_YELLOW}Host${C_RESET}            : $ip"
-        echo -e "  ${C_YELLOW}SSL Port${C_RESET}        : 444"
-        echo -e "  ${C_YELLOW}SNI / Host${C_RESET}      : ${domain:-$ip}"
-        echo -e "  ${C_YELLOW}Username${C_RESET}        : $u"
-        echo -e "  ${C_YELLOW}Password${C_RESET}        : $p"
-        echo ""
+        echo -e "${C_GREEN}🔒 SSL/TLS TUNNEL${C_RESET}"
+        echo -e "  Host : $ip"
+        echo -e "  SSL  : 444"
+        echo -e "  SNI  : ${domain:-$ip}"
+        echo -e "  User : $u"
+        echo -e "  Pass : $p\n"
     fi
-
     if systemctl is-active --quiet dnstt 2>/dev/null && [ -n "$domain" ]; then
-        echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-        echo -e "${C_BOLD}${C_WHITE}📡 DNSTT / SLOWDNS${C_RESET}"
-        echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-        echo -e "  ${C_YELLOW}Nameserver${C_RESET}      : $domain"
-        echo -e "  ${C_YELLOW}Public Key${C_RESET}      : $pubkey"
-        echo -e "  ${C_YELLOW}DNS IP${C_RESET}          : 1.1.1.1  /  8.8.8.8"
-        echo -e "  ${C_YELLOW}MTU${C_RESET}             : $mtu"
-        echo -e "  ${C_YELLOW}Username${C_RESET}        : $u"
-        echo -e "  ${C_YELLOW}Password${C_RESET}        : $p"
-        echo ""
+        echo -e "${C_GREEN}📡 DNSTT / SLOWDNS${C_RESET}"
+        echo -e "  Nameserver : $domain"
+        echo -e "  PubKey     : $pubkey"
+        echo -e "  DNS IP     : 1.1.1.1"
+        echo -e "  MTU        : $mtu"
+        echo -e "  User       : $u"
+        echo -e "  Pass       : $p\n"
     fi
-
     if systemctl is-active --quiet badvpn 2>/dev/null; then
-        echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-        echo -e "${C_BOLD}${C_WHITE}⚡ BADVPN UDPGW${C_RESET}"
-        echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-        echo -e "  ${C_YELLOW}UDPGW Host${C_RESET}      : $ip"
-        echo -e "  ${C_YELLOW}UDPGW Port${C_RESET}      : 7300"
-        echo ""
+        echo -e "${C_GREEN}⚡ BADVPN UDPGW${C_RESET}"
+        echo -e "  Host : $ip"
+        echo -e "  Port : 7300\n"
     fi
-
-    if systemctl is-active --quiet udp-custom 2>/dev/null; then
-        echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-        echo -e "${C_BOLD}${C_WHITE}🚀 UDP CUSTOM${C_RESET}"
-        echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-        echo -e "  ${C_YELLOW}UDP Host${C_RESET}        : $ip"
-        echo -e "  ${C_YELLOW}Port Range${C_RESET}      : 1-65535"
-        echo -e "  ${C_YELLOW}Exclude${C_RESET}         : 53, 5300"
-        echo ""
-    fi
-
     if systemctl is-active --quiet zivpn 2>/dev/null; then
-        echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-        echo -e "${C_BOLD}${C_WHITE}🛡️  ZiVPN${C_RESET}"
-        echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-        echo -e "  ${C_YELLOW}Host${C_RESET}            : $ip"
-        echo -e "  ${C_YELLOW}UDP Port${C_RESET}        : 5667"
-        echo ""
+        echo -e "${C_GREEN}🛡️ ZiVPN${C_RESET}"
+        echo -e "  Host : $ip"
+        echo -e "  UDP  : 5667\n"
     fi
-
-    if systemctl is-active --quiet falconproxy 2>/dev/null; then
-        echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-        echo -e "${C_BOLD}${C_WHITE}🦅 FALCON PROXY${C_RESET}"
-        echo -e "${C_GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${C_RESET}"
-        echo -e "  ${C_YELLOW}Host${C_RESET}            : $ip"
-        echo -e "  ${C_YELLOW}Port${C_RESET}            : 8080"
-        echo -e "  ${C_YELLOW}Username${C_RESET}        : $u"
-        echo -e "  ${C_YELLOW}Password${C_RESET}        : $p"
-        echo ""
-    fi
-
     press_enter
 }
 
 generate_client_json() {
     local u=$1 p=$2
     clear; show_banner
-    local line=$(grep "^$u:" "$DB_FILE")
-    local expiry=$(echo "$line"|cut -d: -f3); local limit=$(echo "$line"|cut -d: -f4)
-    local ip=$(curl -s -4 icanhazip.com 2>/dev/null)
-    local domain=""
-    [ -f "$DB_DIR/domain.txt" ] && domain=$(cat "$DB_DIR/domain.txt" 2>/dev/null)
+    local line=$(grep "^$u:" "$DB_FILE"); local expiry=$(echo "$line"|cut -d: -f3); local limit=$(echo "$line"|cut -d: -f4)
+    local ip=$(curl -s -4 icanhazip.com 2>/dev/null); local domain=""; [ -f "$DB_DIR/domain.txt" ] && domain=$(cat "$DB_DIR/domain.txt" 2>/dev/null)
     local ssh_port=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1); ssh_port=${ssh_port:-22}
-    local pubkey=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null)
-    local mtu=$(get_current_mtu)
-
-    echo -e "${C_BOLD}${C_PURPLE}═══ 📄 JSON — $u ═══${C_RESET}\n"
-    echo -e "${C_CYAN}Copy hii kwenye NapsternetV / HTTP Injector (JSON mode):${C_RESET}\n"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_PURPLE}                 📄 JSON EXPORT: $u${C_RESET}"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
     cat << JSONEOF
 {
   "name": "Voltron_$u",
@@ -719,23 +618,15 @@ generate_client_json() {
   "password": "$p",
   "sni": "${domain:-$ip}",
   "expiry": "$expiry",
-  "limit": $limit,
-  "extra": {
-    "ssh": { "host": "$ip", "port": $ssh_port }
-$(systemctl is-active --quiet haproxy 2>/dev/null && printf ',\n    "ssl": { "host": "%s", "port": 444, "sni": "%s" }' "$ip" "${domain:-$ip}")
-$(systemctl is-active --quiet dnstt 2>/dev/null && [ -n "$domain" ] && printf ',\n    "dnstt": { "nameserver": "%s", "pubkey": "%s", "mtu": %s, "dns": "1.1.1.1" }' "$domain" "$pubkey" "$mtu")
-$(systemctl is-active --quiet badvpn 2>/dev/null && printf ',\n    "badvpn": { "host": "%s", "port": 7300 }' "$ip")
-$(systemctl is-active --quiet udp-custom 2>/dev/null && printf ',\n    "udp_custom": { "host": "%s", "range": "1-65535", "exclude": "53,5300" }' "$ip")
-  }
+  "limit": $limit
 }
 JSONEOF
-    echo ""
-    press_enter
+    echo ""; press_enter
 }
 
-# ========== SPEED BOOSTERS (7 — BUFFER VALUES SAHIHI) ==========
+# ========== SPEED BOOSTERS (BUFFER SAHIHI) ==========
 apply_booster_standard_ultimate() {
-    echo -e "\n${C_BLUE}⚡ STANDARD BOOSTER (1000x)${C_RESET}"
+    echo -e "\n${C_BLUE}⚡ STANDARD (1000x) — buffer 512${C_RESET}"
     modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null
     sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
@@ -745,13 +636,12 @@ apply_booster_standard_ultimate() {
     sysctl -w net.core.wmem_max=1073741824 >/dev/null 2>&1
     sysctl -w net.core.netdev_max_backlog=1000000 >/dev/null 2>&1
     sysctl -w net.core.somaxconn=524288 >/dev/null 2>&1
-    sysctl -w net.ipv4.tcp_fastopen=3 >/dev/null 2>&1
     ulimit -n 10485760 2>/dev/null
-    echo -e "${C_GREEN}✅ 1000x applied (buffer 512)${C_RESET}"
+    echo -e "${C_GREEN}✅ 1000x${C_RESET}"
 }
 
 apply_booster_medium_ultimate() {
-    echo -e "\n${C_BLUE}⚡ MEDIUM BOOSTER (2000x)${C_RESET}"
+    echo -e "\n${C_BLUE}⚡ MEDIUM (2000x) — buffer 5120${C_RESET}"
     modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null
     sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
@@ -762,12 +652,12 @@ apply_booster_medium_ultimate() {
     sysctl -w net.core.netdev_max_backlog=2000000 >/dev/null 2>&1
     sysctl -w net.core.somaxconn=1048576 >/dev/null 2>&1
     ulimit -n 20971520 2>/dev/null
-    echo -e "${C_GREEN}✅ 2000x applied (buffer 5120)${C_RESET}"
+    echo -e "${C_GREEN}✅ 2000x${C_RESET}"
 }
 
 apply_booster_high_ultimate() {
-    echo -e "\n${C_BLUE}⚡ HIGH BOOSTER (3000x)${C_RESET}"
-    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null; modprobe sch_htb 2>/dev/null
+    echo -e "\n${C_BLUE}⚡ HIGH (3000x) — buffer 51200${C_RESET}"
+    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null
     sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
     sysctl -w net.ipv4.udp_rmem_min=51200 >/dev/null 2>&1
@@ -776,15 +666,14 @@ apply_booster_high_ultimate() {
     sysctl -w net.core.wmem_max=4294967296 >/dev/null 2>&1
     sysctl -w net.core.netdev_max_backlog=4000000 >/dev/null 2>&1
     sysctl -w net.core.somaxconn=2097152 >/dev/null 2>&1
-    sysctl -w net.core.dev_weight=1024 >/dev/null 2>&1
     sysctl -w net.netfilter.nf_conntrack_max=160000000 >/dev/null 2>&1
     ulimit -n 41943040 2>/dev/null
-    echo -e "${C_GREEN}✅ 3000x applied (buffer 51200)${C_RESET}"
+    echo -e "${C_GREEN}✅ 3000x${C_RESET}"
 }
 
 apply_booster_ultra_ultimate() {
-    echo -e "\n${C_BLUE}🚀 ULTRA BOOSTER (5000x)${C_RESET}"
-    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null; modprobe sch_htb 2>/dev/null
+    echo -e "\n${C_BLUE}🚀 ULTRA (5000x) — buffer 512000${C_RESET}"
+    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null
     sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
     sysctl -w net.ipv4.udp_rmem_min=512000 >/dev/null 2>&1
@@ -796,14 +685,12 @@ apply_booster_ultra_ultimate() {
     sysctl -w net.netfilter.nf_conntrack_max=320000000 >/dev/null 2>&1
     ulimit -n 83886080 2>/dev/null
     for i in /sys/class/net/*/queues/*/rps_cpus; do [[ -f "$i" ]] && echo ffffffff > "$i" 2>/dev/null; done
-    sysctl -w net.core.busy_read=1000 >/dev/null 2>&1
-    sysctl -w net.core.busy_poll=1000 >/dev/null 2>&1
-    echo -e "${C_GREEN}✅ 5000x applied (buffer 512000)${C_RESET}"
+    echo -e "${C_GREEN}✅ 5000x${C_RESET}"
 }
 
 apply_booster_extreme_ultimate() {
-    echo -e "\n${C_BLUE}💥 EXTREME BOOSTER (10000x)${C_RESET}"
-    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null; modprobe sch_htb 2>/dev/null
+    echo -e "\n${C_BLUE}💥 EXTREME (10000x) — buffer 5120000${C_RESET}"
+    modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null; modprobe sch_fq 2>/dev/null
     sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
     sysctl -w net.core.default_qdisc=cake >/dev/null 2>&1
     sysctl -w net.ipv4.udp_rmem_min=5120000 >/dev/null 2>&1
@@ -815,97 +702,92 @@ apply_booster_extreme_ultimate() {
     sysctl -w net.netfilter.nf_conntrack_max=640000000 >/dev/null 2>&1
     ulimit -n 167772160 2>/dev/null
     for i in /sys/class/net/*/queues/*/rps_cpus; do [[ -f "$i" ]] && echo ffffffff > "$i" 2>/dev/null; done
-    for i in /sys/class/net/*/queues/*/rps_flow_cnt; do [[ -f "$i" ]] && echo 4096 > "$i" 2>/dev/null; done
-    sysctl -w net.core.busy_read=1000 >/dev/null 2>&1
-    sysctl -w net.core.busy_poll=1000 >/dev/null 2>&1
     command -v irqbalance &>/dev/null && systemctl restart irqbalance 2>/dev/null
-    echo -e "${C_GREEN}✅ 10000x applied (buffer 5120000)${C_RESET}"
+    echo -e "${C_GREEN}✅ 10000x${C_RESET}"
 }
 
 apply_booster_ultra_plus() {
-    echo -e "\n${C_BLUE}🚀 ULTRA PLUS BOOSTER (768MB)${C_RESET}"
-    modprobe tcp_bbr 2>/dev/null
+    echo -e "\n${C_BLUE}🚀 ULTRA PLUS — buffer 6291456${C_RESET}"
     sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
     sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
     sysctl -w net.ipv4.udp_rmem_min=6291456 >/dev/null 2>&1
     sysctl -w net.ipv4.udp_wmem_min=6291456 >/dev/null 2>&1
     sysctl -w net.core.rmem_max=805306368 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=805306368 >/dev/null 2>&1
-    ulimit -n 6291456 2>/dev/null
-    echo -e "${C_GREEN}✅ Ultra Plus applied (buffer 6291456)${C_RESET}"
+    echo -e "${C_GREEN}✅ Ultra+${C_RESET}"
 }
 
 apply_booster_extreme_plus() {
-    echo -e "\n${C_BLUE}💥 EXTREME PLUS BOOSTER (1GB)${C_RESET}"
-    modprobe tcp_bbr 2>/dev/null
+    echo -e "\n${C_BLUE}💥 EXTREME PLUS — buffer 12582912${C_RESET}"
     sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
     sysctl -w net.core.default_qdisc=fq >/dev/null 2>&1
     sysctl -w net.ipv4.udp_rmem_min=12582912 >/dev/null 2>&1
     sysctl -w net.ipv4.udp_wmem_min=12582912 >/dev/null 2>&1
     sysctl -w net.core.rmem_max=1073741824 >/dev/null 2>&1
     sysctl -w net.core.wmem_max=1073741824 >/dev/null 2>&1
-    ulimit -n 12582912 2>/dev/null
-    echo -e "${C_GREEN}✅ Extreme Plus applied (buffer 12582912)${C_RESET}"
+    echo -e "${C_GREEN}✅ Extreme+${C_RESET}"
 }
 
-# ========== DNSTT FUNCTIONS ==========
+# ========== DNSTT ==========
 download_dnstt_binary() {
-    local arch=$(uname -m) url=""
-    if [[ "$arch" == "x86_64" ]]; then url="https://dnstt.network/dnstt-server-linux-amd64"
-    elif [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then url="https://dnstt.network/dnstt-server-linux-arm64"
-    else echo -e "${C_RED}❌ Unsupported: $arch${C_RESET}"; return 1; fi
-    curl -sL "$url" -o "$DNSTT_BINARY"; chmod +x "$DNSTT_BINARY"
-    if [[ "$arch" == "x86_64" ]]; then curl -sL "https://dnstt.network/dnstt-client-linux-amd64" -o "$DNSTT_CLIENT"
-    else curl -sL "https://dnstt.network/dnstt-client-linux-arm64" -o "$DNSTT_CLIENT"; fi
-    chmod +x "$DNSTT_CLIENT"
-    echo -e "${C_GREEN}✅ Binaries downloaded${C_RESET}"
+    local arch=$(uname -m)
+    if [[ "$arch" == "x86_64" ]]; then
+        curl -sL "https://dnstt.network/dnstt-server-linux-amd64" -o "$DNSTT_BINARY"
+        curl -sL "https://dnstt.network/dnstt-client-linux-amd64" -o "$DNSTT_CLIENT"
+    elif [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then
+        curl -sL "https://dnstt.network/dnstt-server-linux-arm64" -o "$DNSTT_BINARY"
+        curl -sL "https://dnstt.network/dnstt-client-linux-arm64" -o "$DNSTT_CLIENT"
+    else echo "❌ Unsupported: $arch"; return 1; fi
+    chmod +x "$DNSTT_BINARY" "$DNSTT_CLIENT"
+    echo -e "${C_GREEN}✅ Binaries${C_RESET}"
 }
 
 mtu_selection_during_install() {
-    echo -e "\n${C_BOLD}${C_PURPLE}═══ 📡 MTU CONFIGURATION ═══${C_RESET}\n"
-    echo -e "${C_CYAN}Chagua MTU value (inategemea na ISP yako):${C_RESET}\n"
-    echo -e "  ${C_GREEN}1)${C_RESET} 512   ${C_DIM}(default, inafanya kazi kwa wote)${C_RESET}"
-    echo -e "  ${C_GREEN}2)${C_RESET} 900   ${C_DIM}(stable, kasi ndogo)${C_RESET}"
+    echo -e "\n${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_PURPLE}                 📡 MTU CONFIGURATION${C_RESET}"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+    echo -e "  ${C_GREEN}1)${C_RESET} 512   ${C_DIM}(default, works everywhere)${C_RESET}"
+    echo -e "  ${C_GREEN}2)${C_RESET} 900   ${C_DIM}(stable)${C_RESET}"
     echo -e "  ${C_GREEN}3)${C_RESET} 1200  ${C_DIM}(balanced)${C_RESET}"
     echo -e "  ${C_GREEN}4)${C_RESET} 1400  ${C_DIM}(fast)${C_RESET}"
-    echo -e "  ${C_GREEN}5)${C_RESET} 1500  ${C_DIM}(max, inaweza kushindwa)${C_RESET}"
+    echo -e "  ${C_GREEN}5)${C_RESET} 1500  ${C_DIM}(max)${C_RESET}"
     echo -e "  ${C_GREEN}6)${C_RESET} Custom ${C_DIM}(512-1500)${C_RESET}"
     echo ""
-    read -p "👉 Choice [1]: " mtu_choice
-    mtu_choice=${mtu_choice:-1}
+    read -p "👉 Choice [1]: " mtu_choice; mtu_choice=${mtu_choice:-1}
     case $mtu_choice in
-        1) MTU=512 ;; 2) MTU=900 ;; 3) MTU=1200 ;; 4) MTU=1400 ;; 5) MTU=1500 ;;
-        6) read -p "👉 MTU (512-1500): " cm; if [[ "$cm" =~ ^[0-9]+$ ]] && [ "$cm" -ge 512 ] && [ "$cm" -le 1500 ]; then MTU=$cm; else MTU=512; fi ;;
+        1) MTU=512 ;;
+        2) MTU=900 ;;
+        3) MTU=1200 ;;
+        4) MTU=1400 ;;
+        5) MTU=1500 ;;
+        6) read -p "👉 MTU: " cm; if [[ "$cm" =~ ^[0-9]+$ ]] && [ "$cm" -ge 512 ] && [ "$cm" -le 1500 ]; then MTU=$cm; else MTU=512; fi ;;
         *) MTU=512 ;;
     esac
-    mkdir -p "$CONFIG_DIR"
-    echo "$MTU" > "$MTU_CONFIG"
+    mkdir -p "$CONFIG_DIR"; echo "$MTU" > "$MTU_CONFIG"
     echo -e "\n${C_GREEN}✅ MTU set to: $MTU${C_RESET}"
 }
 
 generate_keys() {
     mkdir -p "$DNSTT_KEYS_DIR"; cd "$DNSTT_KEYS_DIR"; rm -f server.key server.pub
-    if ! "$DNSTT_BINARY" -gen-key -privkey-file server.key -pubkey-file server.pub 2>/dev/null; then
+    "$DNSTT_BINARY" -gen-key -privkey-file server.key -pubkey-file server.pub 2>/dev/null || {
         openssl rand -hex 32 > server.key
         cat server.key | sha256sum | awk '{print $1}' > server.pub
-    fi
+    }
     chmod 600 server.key; chmod 644 server.pub
     PUBLIC_KEY=$(cat server.pub)
 }
 
 setup_domain() {
-    echo -e "\n${C_BLUE}🌐 Domain config...${C_RESET}\n"
+    echo -e "\n${C_BLUE}🌐 Domain config${C_RESET}\n"
     echo -e "  ${C_GREEN}1)${C_RESET} Custom domain"
-    echo -e "  ${C_GREEN}2)${C_RESET} Auto deSEC"
-    read -p "👉 Choice [2]: " opt; opt=${opt:-2}
+    echo -e "  ${C_GREEN}2)${C_RESET} Auto-generate with deSEC"
+    read -p "👉 [2]: " opt; opt=${opt:-2}
     if [[ "$opt" == "2" ]]; then
         local rand=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 3)
         local ns="ns-$rand"; local tun="tun-$rand"
         local ip=$(curl -s -4 icanhazip.com)
-        local d1="[{\"subname\":\"$ns\",\"type\":\"A\",\"ttl\":3600,\"records\":[\"$ip\"]}]"
-        curl -s -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$d1" >/dev/null 2>&1
-        local d2="[{\"subname\":\"$tun\",\"type\":\"NS\",\"ttl\":3600,\"records\":[\"$ns.$DESEC_DOMAIN.\"]}]"
-        local r=$(curl -s -w "%{http_code}" -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$d2")
+        curl -s -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "[{\"subname\":\"$ns\",\"type\":\"A\",\"ttl\":3600,\"records\":[\"$ip\"]}]" >/dev/null 2>&1
+        local r=$(curl -s -w "%{http_code}" -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "[{\"subname\":\"$tun\",\"type\":\"NS\",\"ttl\":3600,\"records\":[\"$ns.$DESEC_DOMAIN.\"]}]")
         [[ "${r: -3}" -eq 201 ]] && { DOMAIN="$tun.$DESEC_DOMAIN"; echo -e "${C_GREEN}✅ $DOMAIN${C_RESET}"; } || read -p "Domain: " DOMAIN
     else read -p "Domain: " DOMAIN; fi
     echo "$DOMAIN" > "$DB_DIR/domain.txt"
@@ -913,7 +795,7 @@ setup_domain() {
 
 create_dnstt_service() {
     local domain=$1 mtu=$2 sp=$3
-    mkdir -p "$LOGS_DIR"; touch "$LOGS_DIR/dnstt-server.log"
+    mkdir -p "$LOGS_DIR"
     cat > "$DNSTT_SERVICE_FILE" <<EOF
 [Unit]
 Description=DNSTT Server
@@ -935,49 +817,64 @@ EOF
 }
 
 save_dnstt_info() {
-    cat > "$DNSTT_CONFIG_FILE" <<EOF
-TUNNEL_DOMAIN="$1"
-PUBLIC_KEY="$2"
-MTU_VALUE="$3"
-SSH_PORT="$4"
-EOF
+    printf 'TUNNEL_DOMAIN="%s"\nPUBLIC_KEY="%s"\nMTU_VALUE="%s"\nSSH_PORT="%s"\n' "$1" "$2" "$3" "$4" > "$DNSTT_CONFIG_FILE"
 }
 
 show_client_commands() {
-    local domain=$1 mtu=$2 sp=$3
     local pk=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null)
-    echo -e "\n${C_GREEN}═══ 📱 CLIENT CONNECTION ═══${C_RESET}\n"
-    echo -e "  Domain: ${C_YELLOW}$domain${C_RESET}"
-    echo -e "  Key:    ${C_YELLOW}$pk${C_RESET}"
-    echo -e "  Port:   ${C_YELLOW}$sp${C_RESET}"
-    echo -e "  MTU:    ${C_YELLOW}$mtu${C_RESET}"
+    echo -e "\n${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_PURPLE}                 📱 CLIENT CONNECTION${C_RESET}"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+    echo -e "  ${C_CYAN}Tunnel Domain${C_RESET} : ${C_YELLOW}$1${C_RESET}"
+    echo -e "  ${C_CYAN}Public Key${C_RESET}    : ${C_YELLOW}$pk${C_RESET}"
+    echo -e "  ${C_CYAN}SSH Port${C_RESET}      : ${C_YELLOW}$3${C_RESET}"
+    echo -e "  ${C_CYAN}MTU${C_RESET}           : ${C_YELLOW}$2${C_RESET}"
 }
 
 install_dnstt() {
     clear; show_banner
     [ -f "$DNSTT_SERVICE_FILE" ] && { read -p "Reinstall? (y/n): " r; [[ "$r" != "y" ]] && return; systemctl stop dnstt.service 2>/dev/null; }
+    echo -e "\n${C_BLUE}[1/7] Dependencies...${C_RESET}"
     ff_apt_install wget curl openssl bc dnsutils
+    echo -e "${C_BLUE}[2/7] Downloading binary...${C_RESET}"
     download_dnstt_binary
+    echo -e "${C_BLUE}[3/7] MTU selection...${C_RESET}"
     mtu_selection_during_install
+    echo -e "${C_BLUE}[4/7] Domain setup...${C_RESET}"
     setup_domain
+    echo -e "${C_BLUE}[5/7] Generating keys...${C_RESET}"
     generate_keys
-    echo -e "\n${C_BLUE}Speed Booster selection:${C_RESET}"
-    echo "  1) Standard (1000x)   2) Medium (2000x)   3) High (3000x)"
-    echo "  4) Ultra (5000x)      5) Extreme (10000x) 6) Ultra Plus"
-    echo "  7) Extreme Plus       8) Skip"
-    read -p "👉 [3]: " b; b=${b:-3}
+    echo -e "${C_BLUE}[6/7] Speed Booster...${C_RESET}"
+    echo -e "\n${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_PURPLE}                 ⚡ SPEED BOOSTERS${C_RESET}"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+    echo -e "  ${C_GREEN}[1]${C_RESET} Standard   (1000x)   ${C_DIM}buffer 512${C_RESET}"
+    echo -e "  ${C_GREEN}[2]${C_RESET} Medium     (2000x)   ${C_DIM}buffer 5120${C_RESET}"
+    echo -e "  ${C_GREEN}[3]${C_RESET} High       (3000x)   ${C_DIM}buffer 51200${C_RESET}"
+    echo -e "  ${C_GREEN}[4]${C_RESET} Ultra      (5000x)   ${C_DIM}buffer 512000${C_RESET}"
+    echo -e "  ${C_GREEN}[5]${C_RESET} Extreme    (10000x)  ${C_DIM}buffer 5120000${C_RESET}"
+    echo -e "  ${C_GREEN}[6]${C_RESET} Ultra Plus (768MB)   ${C_DIM}buffer 6291456${C_RESET}"
+    echo -e "  ${C_GREEN}[7]${C_RESET} Extreme+   (1GB)     ${C_DIM}buffer 12582912${C_RESET}"
+    echo -e "  ${C_GREEN}[8]${C_RESET} Skip"
+    echo ""
+    read -p "👉 Choice [3]: " b; b=${b:-3}
     case $b in
-        1) apply_booster_standard_ultimate ;; 2) apply_booster_medium_ultimate ;;
-        3) apply_booster_high_ultimate ;; 4) apply_booster_ultra_ultimate ;;
-        5) apply_booster_extreme_ultimate ;; 6) apply_booster_ultra_plus ;;
-        7) apply_booster_extreme_plus ;; 8) echo "Skipped" ;;
+        1) apply_booster_standard_ultimate ;;
+        2) apply_booster_medium_ultimate ;;
+        3) apply_booster_high_ultimate ;;
+        4) apply_booster_ultra_ultimate ;;
+        5) apply_booster_extreme_ultimate ;;
+        6) apply_booster_ultra_plus ;;
+        7) apply_booster_extreme_plus ;;
+        8) echo "Skipped" ;;
     esac
+    echo -e "\n${C_BLUE}[7/7] Creating service...${C_RESET}"
     SSH_PORT=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1); SSH_PORT=${SSH_PORT:-22}
     create_dnstt_service "$DOMAIN" "$MTU" "$SSH_PORT"
     save_dnstt_info "$DOMAIN" "$PUBLIC_KEY" "$MTU" "$SSH_PORT"
     configure_dnstt_firewall
     systemctl start dnstt.service; sleep 2
-    systemctl is-active --quiet dnstt.service && echo -e "\n${C_GREEN}✅ Running${C_RESET}" || journalctl -u dnstt.service -n 20 --no-pager
+    systemctl is-active --quiet dnstt.service && echo -e "\n${C_GREEN}✅ Service running${C_RESET}" || journalctl -u dnstt.service -n 20 --no-pager
     show_client_commands "$DOMAIN" "$MTU" "$SSH_PORT"
     press_enter
 }
@@ -986,7 +883,7 @@ uninstall_dnstt() {
     systemctl stop dnstt.service 2>/dev/null; systemctl disable dnstt.service 2>/dev/null
     rm -f "$DNSTT_SERVICE_FILE" "$DNSTT_BINARY" "$DNSTT_CLIENT" "$DNSTT_KEYS_DIR/server.key" "$DNSTT_KEYS_DIR/server.pub" "$DB_DIR/domain.txt" "$DNSTT_CONFIG_FILE" "$MTU_CONFIG"
     systemctl daemon-reload
-    echo -e "${C_GREEN}✅ Uninstalled${C_RESET}"; press_enter
+    echo -e "${C_GREEN}✅ Removed${C_RESET}"; press_enter
 }
 
 dnstt_main_menu() {
@@ -994,30 +891,30 @@ dnstt_main_menu() {
         clear; show_banner
         [ ! -f "$DNSTT_SERVICE_FILE" ] && { echo -e "\n${C_RED}❌ Not installed!${C_RESET}"; press_enter; return; }
         local st=""; systemctl is-active --quiet dnstt 2>/dev/null && st="${C_GREEN}● RUNNING${C_RESET}" || st="${C_RED}● STOPPED${C_RESET}"
-        local cd=$(cat "$DB_DIR/domain.txt" 2>/dev/null || echo "Not set")
-        local cm=$(get_current_mtu)
-        local cp=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null || echo "Not set")
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}                    📡 DNSTT MANAGEMENT${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}\n"
-        echo -e "  ${C_CYAN}Status:${C_RESET}     $st"
-        echo -e "  ${C_CYAN}Domain:${C_RESET}     ${C_YELLOW}$cd${C_RESET}"
-        echo -e "  ${C_CYAN}MTU:${C_RESET}        ${C_YELLOW}$cm${C_RESET}"
-        echo -e "  ${C_CYAN}Public Key:${C_RESET} ${C_GREEN}${cp:0:35}...${C_RESET}\n"
-        echo -e "${C_PURPLE}───────────────────────────────────────────────────────────────${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}                    📡 DNSTT MANAGEMENT${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+        echo -e "  ${C_CYAN}Status${C_RESET}     : $st"
+        echo -e "  ${C_CYAN}Domain${C_RESET}     : ${C_YELLOW}$(cat "$DB_DIR/domain.txt" 2>/dev/null || echo 'Not set')${C_RESET}"
+        echo -e "  ${C_CYAN}MTU${C_RESET}        : ${C_YELLOW}$(get_current_mtu)${C_RESET}"
+        echo -e "  ${C_CYAN}Public Key${C_RESET} : ${C_GREEN}$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null | cut -c1-35)...${C_RESET}\n"
         echo -e "  ${C_GREEN} 1)${C_RESET} 🌐 Domain Management"
         echo -e "  ${C_GREEN} 2)${C_RESET} 🔑 Public Key Management"
         echo -e "  ${C_GREEN} 3)${C_RESET} 📡 MTU Settings"
         echo -e "  ${C_GREEN} 4)${C_RESET} ⚡ Speed Boosters"
-        echo -e "  ${C_GREEN} 5)${C_RESET} 📊 View Full Details"
+        echo -e "  ${C_GREEN} 5)${C_RESET} 📊 Full Details"
         echo ""
         echo -e "  ${C_RED} 0)${C_RESET} Return"
         echo ""
         read -p "👉 Choice: " c
         case $c in
-            1) dnstt_domain_menu ;; 2) dnstt_key_menu ;; 3) dnstt_mtu_menu ;;
-            4) dnstt_speed_menu ;; 5) show_dnstt_full_details ;;
-            0) return ;; *) sleep 2 ;;
+            1) dnstt_domain_menu ;;
+            2) dnstt_key_menu ;;
+            3) dnstt_mtu_menu ;;
+            4) dnstt_speed_menu ;;
+            5) show_dnstt_full_details ;;
+            0) return ;;
+            *) sleep 2 ;;
         esac
     done
 }
@@ -1025,12 +922,15 @@ dnstt_main_menu() {
 dnstt_domain_menu() {
     while true; do
         clear; show_banner
-        echo -e "${C_BOLD}${C_PURPLE}═══ 🌐 DOMAIN MANAGEMENT ═══${C_RESET}\n"
-        echo -e "  Current: ${C_YELLOW}$(cat "$DB_DIR/domain.txt" 2>/dev/null || echo 'Not set')${C_RESET}\n"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}                    🌐 DOMAIN MANAGEMENT${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+        echo -e "  ${C_CYAN}Current${C_RESET}: ${C_YELLOW}$(cat "$DB_DIR/domain.txt" 2>/dev/null || echo 'Not set')${C_RESET}\n"
         echo -e "  ${C_GREEN}1)${C_RESET} Set Custom Domain"
         echo -e "  ${C_GREEN}2)${C_RESET} Auto-Generate Domain"
-        echo -e "\n  ${C_RED}0)${C_RESET} Return"
-        read -p "👉 " c
+        echo ""
+        echo -e "  ${C_RED}0)${C_RESET} Return"
+        read -p "👉 Choice: " c
         case $c in 1) set_custom_dnstt_domain ;; 2) change_dnstt_domain ;; 0) return ;; esac
     done
 }
@@ -1038,12 +938,15 @@ dnstt_domain_menu() {
 dnstt_key_menu() {
     while true; do
         clear; show_banner
-        echo -e "${C_BOLD}${C_PURPLE}═══ 🔑 PUBLIC KEY MANAGEMENT ═══${C_RESET}\n"
-        echo -e "  Current: ${C_GREEN}$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null || echo 'Not set')${C_RESET}\n"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}                    🔑 PUBLIC KEY MANAGEMENT${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+        echo -e "  ${C_CYAN}Current${C_RESET}: ${C_GREEN}$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null || echo 'Not set')${C_RESET}\n"
         echo -e "  ${C_GREEN}1)${C_RESET} Set Custom Public Key"
         echo -e "  ${C_GREEN}2)${C_RESET} Regenerate Keys"
-        echo -e "\n  ${C_RED}0)${C_RESET} Return"
-        read -p "👉 " c
+        echo ""
+        echo -e "  ${C_RED}0)${C_RESET} Return"
+        read -p "👉 Choice: " c
         case $c in 1) set_custom_dnstt_public_key ;; 2) regenerate_dnstt_keys ;; 0) return ;; esac
     done
 }
@@ -1051,13 +954,16 @@ dnstt_key_menu() {
 dnstt_mtu_menu() {
     while true; do
         clear; show_banner
-        echo -e "${C_BOLD}${C_PURPLE}═══ 📡 MTU CONFIG ═══${C_RESET}\n"
-        echo -e "  Current: ${C_YELLOW}$(get_current_mtu)${C_RESET}\n"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}                    📡 MTU SETTINGS${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+        echo -e "  ${C_CYAN}Current${C_RESET}: ${C_YELLOW}$(get_current_mtu)${C_RESET}\n"
         echo -e "  ${C_GREEN}1)${C_RESET} 512   ${C_GREEN}4)${C_RESET} 1400"
         echo -e "  ${C_GREEN}2)${C_RESET} 900   ${C_GREEN}5)${C_RESET} 1500"
         echo -e "  ${C_GREEN}3)${C_RESET} 1200  ${C_GREEN}6)${C_RESET} Custom"
-        echo -e "\n  ${C_RED}0)${C_RESET} Return"
-        read -p "👉 " c
+        echo ""
+        echo -e "  ${C_RED}0)${C_RESET} Return"
+        read -p "👉 Choice: " c
         case $c in
             1) set_dnstt_mtu "512"; press_enter ;;
             2) set_dnstt_mtu "900"; press_enter ;;
@@ -1080,23 +986,21 @@ set_dnstt_mtu() {
 dnstt_speed_menu() {
     while true; do
         clear; show_banner
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}                 ⚡ DNSTT SPEED BOOSTERS${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo ""
-        echo -e "  ${C_GREEN}[1]${C_RESET} Standard   (1000x)   → 10-15 Mbps   ${C_DIM}(buffer 512)${C_RESET}"
-        echo -e "  ${C_GREEN}[2]${C_RESET} Medium     (2000x)   → 15-20 Mbps   ${C_DIM}(buffer 5120)${C_RESET}"
-        echo -e "  ${C_GREEN}[3]${C_RESET} High       (3000x)   → 20-25 Mbps   ${C_DIM}(buffer 51200)${C_RESET}"
-        echo -e "  ${C_GREEN}[4]${C_RESET} Ultra      (5000x)   → 25-35 Mbps   ${C_DIM}(buffer 512000)${C_RESET}"
-        echo -e "  ${C_GREEN}[5]${C_RESET} Extreme    (10000x)  → 35-50 Mbps   ${C_DIM}(buffer 5120000)${C_RESET}"
-        echo -e "  ${C_GREEN}[6]${C_RESET} Ultra Plus (768MB)   → 40-60 Mbps   ${C_DIM}(buffer 6291456)${C_RESET}"
-        echo -e "  ${C_GREEN}[7]${C_RESET} Extreme Plus (1GB)   → 60-100 Mbps  ${C_DIM}(buffer 12582912)${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}                 ⚡ DNSTT SPEED BOOSTERS${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+        echo -e "  ${C_GREEN}[1]${C_RESET} Standard   (1000x)   → 10-15 Mbps   ${C_DIM}buffer 512${C_RESET}"
+        echo -e "  ${C_GREEN}[2]${C_RESET} Medium     (2000x)   → 15-20 Mbps   ${C_DIM}buffer 5120${C_RESET}"
+        echo -e "  ${C_GREEN}[3]${C_RESET} High       (3000x)   → 20-25 Mbps   ${C_DIM}buffer 51200${C_RESET}"
+        echo -e "  ${C_GREEN}[4]${C_RESET} Ultra      (5000x)   → 25-35 Mbps   ${C_DIM}buffer 512000${C_RESET}"
+        echo -e "  ${C_GREEN}[5]${C_RESET} Extreme    (10000x)  → 35-50 Mbps   ${C_DIM}buffer 5120000${C_RESET}"
+        echo -e "  ${C_GREEN}[6]${C_RESET} Ultra Plus (768MB)   → 40-60 Mbps   ${C_DIM}buffer 6291456${C_RESET}"
+        echo -e "  ${C_GREEN}[7]${C_RESET} Extreme+   (1GB)     → 60-100 Mbps  ${C_DIM}buffer 12582912${C_RESET}"
         echo ""
         echo -e "  ${C_YELLOW}[8]${C_RESET} View Current Settings"
         echo -e "  ${C_RED}[9]${C_RESET} Reset to Default"
         echo ""
         echo -e "  ${C_RED}[0]${C_RESET} Return"
-        echo ""
         read -p "👉 Choice: " c
         case $c in
             1) apply_booster_standard_ultimate; press_enter ;;
@@ -1106,25 +1010,8 @@ dnstt_speed_menu() {
             5) apply_booster_extreme_ultimate; press_enter ;;
             6) apply_booster_ultra_plus; press_enter ;;
             7) apply_booster_extreme_plus; press_enter ;;
-            8)
-                echo -e "\n${C_CYAN}Current Settings:${C_RESET}"
-                echo -e "  TCP Congestion: $(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null)"
-                echo -e "  UDP rmem_min:   $(sysctl -n net.ipv4.udp_rmem_min 2>/dev/null)"
-                echo -e "  UDP wmem_min:   $(sysctl -n net.ipv4.udp_wmem_min 2>/dev/null)"
-                echo -e "  rmem_max:       $(sysctl -n net.core.rmem_max 2>/dev/null)"
-                echo -e "  wmem_max:       $(sysctl -n net.core.wmem_max 2>/dev/null)"
-                echo -e "  Backlog:        $(sysctl -n net.core.netdev_max_backlog 2>/dev/null)"
-                press_enter ;;
-            9)
-                read -p "Reset? (y/n): " confirm
-                if [[ "$confirm" == "y" ]]; then
-                    sysctl -w net.core.rmem_max=212992 >/dev/null 2>&1
-                    sysctl -w net.core.wmem_max=212992 >/dev/null 2>&1
-                    sysctl -w net.ipv4.tcp_congestion_control=cubic >/dev/null 2>&1
-                    sysctl -w net.core.default_qdisc=pfifo_fast >/dev/null 2>&1
-                    echo -e "${C_GREEN}✅ Reset${C_RESET}"
-                fi
-                press_enter ;;
+            8) echo -e "\n  TCP: $(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null)"; echo -e "  UDP rmem: $(sysctl -n net.ipv4.udp_rmem_min 2>/dev/null)"; echo -e "  rmem_max: $(sysctl -n net.core.rmem_max 2>/dev/null)"; press_enter ;;
+            9) sysctl -w net.core.rmem_max=212992 >/dev/null 2>&1; sysctl -w net.ipv4.tcp_congestion_control=cubic >/dev/null 2>&1; echo "✅"; press_enter ;;
             0) return ;;
         esac
     done
@@ -1132,11 +1019,9 @@ dnstt_speed_menu() {
 
 set_custom_dnstt_domain() {
     clear; show_banner
-    read -p "New domain: " nd
-    [[ -z "$nd" ]] && return
+    read -p "New domain: " nd; [[ -z "$nd" ]] && return
     echo "$nd" > "$DB_DIR/domain.txt"
-    local m=$(get_current_mtu)
-    local sp=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1); sp=${sp:-22}
+    local m=$(get_current_mtu); local sp=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1); sp=${sp:-22}
     systemctl stop dnstt.service 2>/dev/null
     sed -i "s|ExecStart=.*|ExecStart=$DNSTT_BINARY -udp :5300 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $m $nd 127.0.0.1:$sp|" "$DNSTT_SERVICE_FILE"
     [ -f "$DNSTT_CONFIG_FILE" ] && sed -i "s|TUNNEL_DOMAIN=.*|TUNNEL_DOMAIN=\"$nd\"|" "$DNSTT_CONFIG_FILE"
@@ -1149,60 +1034,65 @@ change_dnstt_domain() {
     [ -f "$DB_DIR/domain.txt" ] && { local o=$(cat "$DB_DIR/domain.txt"); curl -s -X DELETE "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/$(echo $o|cut -d. -f1)/NS/" -H "Authorization: Token $DESEC_TOKEN" >/dev/null 2>&1; }
     local rand=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 3)
     local ns="ns-$rand"; local tun="tun-$rand"; local ip=$(curl -s -4 icanhazip.com)
-    local d1="[{\"subname\":\"$ns\",\"type\":\"A\",\"ttl\":3600,\"records\":[\"$ip\"]}]"
-    curl -s -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$d1" >/dev/null 2>&1
-    local d2="[{\"subname\":\"$tun\",\"type\":\"NS\",\"ttl\":3600,\"records\":[\"$ns.$DESEC_DOMAIN.\"]}]"
-    local r=$(curl -s -w "%{http_code}" -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$d2")
+    curl -s -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "[{\"subname\":\"$ns\",\"type\":\"A\",\"ttl\":3600,\"records\":[\"$ip\"]}]" >/dev/null 2>&1
+    local r=$(curl -s -w "%{http_code}" -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "[{\"subname\":\"$tun\",\"type\":\"NS\",\"ttl\":3600,\"records\":[\"$ns.$DESEC_DOMAIN.\"]}]")
     if [[ "${r: -3}" -eq 201 ]]; then
         local nd="$tun.$DESEC_DOMAIN"
         echo "$nd" > "$DB_DIR/domain.txt"
-        local m=$(get_current_mtu)
-        local sp=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1); sp=${sp:-22}
+        local m=$(get_current_mtu); local sp=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1); sp=${sp:-22}
         systemctl stop dnstt.service 2>/dev/null
         sed -i "s|ExecStart=.*|ExecStart=$DNSTT_BINARY -udp :5300 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $m $nd 127.0.0.1:$sp|" "$DNSTT_SERVICE_FILE"
         [ -f "$DNSTT_CONFIG_FILE" ] && sed -i "s|TUNNEL_DOMAIN=.*|TUNNEL_DOMAIN=\"$nd\"|" "$DNSTT_CONFIG_FILE"
         systemctl daemon-reload; systemctl restart dnstt.service
         echo -e "${C_GREEN}✅ $nd${C_RESET}"
-    else echo -e "${C_RED}❌ HTTP: ${r: -3}${C_RESET}"; fi
+    else echo -e "${C_RED}❌ HTTP ${r: -3}${C_RESET}"; fi
     press_enter
 }
 
 set_custom_dnstt_public_key() {
     clear; show_banner
-    read -p "New public key: " cp
-    [[ -z "$cp" || ${#cp} -lt 30 ]] && { echo -e "${C_RED}❌ Invalid${C_RESET}"; press_enter; return; }
-    echo "$cp" > "$DNSTT_KEYS_DIR/server.pub"
-    chmod 644 "$DNSTT_KEYS_DIR/server.pub"
+    read -p "New public key: " cp; [[ ${#cp} -lt 30 ]] && { echo "❌"; press_enter; return; }
+    echo "$cp" > "$DNSTT_KEYS_DIR/server.pub"; chmod 644 "$DNSTT_KEYS_DIR/server.pub"
     [ -f "$DNSTT_CONFIG_FILE" ] && sed -i "s|PUBLIC_KEY=.*|PUBLIC_KEY=\"$cp\"|" "$DNSTT_CONFIG_FILE"
     systemctl restart dnstt.service 2>/dev/null
-    echo -e "${C_GREEN}✅ Updated${C_RESET}"; press_enter
+    echo -e "${C_GREEN}✅${C_RESET}"; press_enter
 }
 
 regenerate_dnstt_keys() {
     clear; show_banner
-    read -p "Regenerate? (y/n): " c
-    [[ "$c" != "y" ]] && return
+    read -p "Regenerate? (y/n): " c; [[ "$c" != "y" ]] && return
     systemctl stop dnstt.service 2>/dev/null
     cd "$DNSTT_KEYS_DIR"; rm -f server.key server.pub
-    "$DNSTT_BINARY" -gen-key -privkey-file server.key -pubkey-file server.pub 2>/dev/null || { openssl rand -hex 32 > server.key; cat server.key | sha256sum | awk '{print $1}' > server.pub; }
+    "$DNSTT_BINARY" -gen-key -privkey-file server.key -pubkey-file server.pub 2>/dev/null || {
+        openssl rand -hex 32 > server.key
+        cat server.key | sha256sum | awk '{print $1}' > server.pub
+    }
     chmod 600 server.key; chmod 644 server.pub
     local np=$(cat server.pub)
     [ -f "$DNSTT_CONFIG_FILE" ] && sed -i "s|PUBLIC_KEY=.*|PUBLIC_KEY=\"$np\"|" "$DNSTT_CONFIG_FILE"
     systemctl restart dnstt.service; sleep 2
-    echo -e "${C_GREEN}✅ New Key: $np${C_RESET}"; press_enter
+    echo -e "${C_GREEN}✅ $np${C_RESET}"; press_enter
 }
 
 show_dnstt_full_details() {
     clear; show_banner
-    [ ! -f "$DB_DIR/domain.txt" ] && { echo -e "${C_YELLOW}Not installed${C_RESET}"; press_enter; return; }
+    [ ! -f "$DB_DIR/domain.txt" ] && { echo "Not installed"; press_enter; return; }
     local d=$(cat "$DB_DIR/domain.txt") m=$(get_current_mtu) pk=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null)
     local sp=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1); sp=${sp:-22}
     local st=""; systemctl is-active --quiet dnstt.service 2>/dev/null && st="${C_GREEN}● RUNNING${C_RESET}" || st="${C_RED}● STOPPED${C_RESET}"
-    echo -e "\n  Status: $st\n  Domain: ${C_WHITE}$d${C_RESET}\n  MTU: ${C_WHITE}$m${C_RESET}\n  SSH Port: ${C_WHITE}$sp${C_RESET}\n  Public Key: ${C_GREEN}$pk${C_RESET}"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_PURPLE}                 📊 DNSTT DETAILS${C_RESET}"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+    echo -e "  ${C_CYAN}Status${C_RESET}     : $st"
+    echo -e "  ${C_CYAN}Domain${C_RESET}     : ${C_YELLOW}$d${C_RESET}"
+    echo -e "  ${C_CYAN}MTU${C_RESET}        : ${C_YELLOW}$m${C_RESET}"
+    echo -e "  ${C_CYAN}SSH Port${C_RESET}   : ${C_YELLOW}$sp${C_RESET}"
+    echo -e "  ${C_CYAN}Public Key${C_RESET} : ${C_GREEN}$pk${C_RESET}"
     press_enter
 }
 
 configure_dnstt_firewall() {
+    echo -e "\n${C_BLUE}🔥 Configuring firewall...${C_RESET}"
     ! command -v iptables &>/dev/null && ff_apt_install iptables iptables-persistent
     iptables -t nat -F 2>/dev/null; iptables -F 2>/dev/null
     iptables -A INPUT -p udp --dport 53 -j ACCEPT
@@ -1210,11 +1100,364 @@ configure_dnstt_firewall() {
     iptables -A INPUT -p udp --dport 5300 -j ACCEPT
     iptables -A OUTPUT -p udp --sport 5300 -j ACCEPT
     iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
-    mkdir -p /etc/iptables; iptables-save > /etc/iptables/rules.v4 2>/dev/null
-    echo -e "${C_GREEN}✅ Firewall${C_RESET}"
+    mkdir -p /etc/iptables
+    iptables-save > /etc/iptables/rules.v4 2>/dev/null
+    echo -e "${C_GREEN}✅ Firewall configured${C_RESET}"
 }
 
-# ========== PROTOCOL MENU (FIXED) ==========
+# ========== LIMITER SERVICE (BANNER SAWA KABISA) ==========
+create_limiter_service() {
+    cat > "$LIMITER_SCRIPT" << 'LIMEOF'
+#!/bin/bash
+DB_FILE="/etc/voltrontech/users.db"
+BW_DIR="/etc/voltrontech/bandwidth"
+PID_DIR="$BW_DIR/pidtrack"
+BANNER_DIR="/etc/voltrontech/banners"
+BANNER_ENABLED_FILE="/etc/voltrontech/banners_enabled"
+SCAN=15
+mkdir -p "$BW_DIR" "$PID_DIR" "$BANNER_DIR"
+shopt -s nullglob
+
+while true; do
+    [[ ! -s "$DB_FILE" ]] && { sleep $SCAN; continue; }
+    ts=$(date +%s)
+    dyn=false
+    [[ -f "$BANNER_ENABLED_FILE" ]] && dyn=true
+
+    declare -A lk=()
+    while read -r u _ s _; do [[ "$s" == "L" ]] && lk["$u"]=1; done < <(passwd -Sa 2>/dev/null)
+
+    while IFS=: read -r user pass expiry limit bw traffic status; do
+        [[ -z "$user" || "$user" == \#* ]] && continue
+        [[ -z "$status" ]] && status="ACTIVE"
+        [[ "$limit" =~ ^[0-9]+$ ]] || limit=999
+        [[ "$bw" =~ ^[0-9]+\.?[0-9]*$ ]] || bw=0
+
+        oc=$(pgrep -c -u "$user" sshd 2>/dev/null || echo 0)
+        [[ "$oc" =~ ^[0-9]+$ ]] || oc=0
+
+        locked=false; expired=false; ex=false
+        [[ -n "${lk[$user]+x}" ]] && locked=true
+
+        et=0; dl="N/A"
+        if [[ "$expiry" != "Never" && -n "$expiry" ]]; then
+            et=$(date -d "$expiry" +%s 2>/dev/null || echo 0)
+            if [[ "$et" =~ ^[0-9]+$ ]] && (( et > 0 )); then
+                df=$((et - ts))
+                if (( df <= 0 )); then
+                    expired=true; dl="EXPIRED"
+                    ! $locked && { usermod -L "$user" &>/dev/null; locked=true; }
+                else
+                    d=$((df/86400)); h=$(((df%86400)/3600))
+                    [[ $d -eq 0 ]] && dl="${h}h left" || dl="${d}d ${h}h"
+                fi
+            fi
+        fi
+
+        (( limit > 0 && oc > limit )) && ! $locked && { usermod -L "$user" &>/dev/null; killall -u "$user" -9 &>/dev/null; locked=true; }
+
+        uf="$BW_DIR/${user}.usage"; ad=0
+        [[ -f "$uf" ]] && { read -r ad < "$uf"; [[ "$ad" =~ ^[0-9]+$ ]] || ad=0; }
+
+        if [[ "$bw" != "0" && -n "$bw" ]]; then
+            qb=$(awk "BEGIN{printf \"%.0f\", $bw*1073741824}")
+            (( qb > 0 && ad >= qb )) && { ex=true; ! $locked && { usermod -L "$user" &>/dev/null; locked=true; }; }
+        fi
+
+        # ============ DYNAMIC BANNER (sawa kabisa na generate_user_banner) ============
+        if $dyn; then
+            if $locked; then acct_status="🔒 LOCKED"; status_color="#FF6B6B"
+            elif $expired; then acct_status="🗓️ EXPIRED"; status_color="#FF9F43"
+            elif $ex; then acct_status="⚠️ DATA EXHAUSTED"; status_color="#FF6B6B"
+            else acct_status="✅ ACTIVE"; status_color="#6BCB77"; fi
+
+            if [[ "$bw" != "0" && -n "$bw" ]]; then
+                ug=$(awk "BEGIN{printf \"%.2f\", $ad/1073741824}")
+                rg=$(awk "BEGIN{r=$bw-$ug; if(r<0) r=0; printf \"%.2f\", r}")
+                bw_info="${ug}/${bw} GB | ${rg} GB left"
+            else
+                bw_info="Unlimited"
+            fi
+
+            UPTIME=$(uptime -p | sed 's/up //')
+            LOAD=$(awk '{print $1}' /proc/loadavg)
+
+            bc=""
+            bc+="<br><br>"
+            bc+="<center><font color=\"#9B59B6\">‎▬▬▬▬▬ஜ۩</font><font color=\"#FF6B6B\" size=\"8\"><b> 🌍VOLTRON VPN🌍</b></font><font color=\"#9B59B6\">‎۩ஜ▬▬▬▬▬</font></center><br>"
+            bc+="<br>"
+            bc+="<center><font color=\"#4D96FF\" size=\"5\"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>"
+            bc+="<br>"
+            bc+="<center><font color=\"#000000\">👤 <b>Username      :</b> $user</font></center><br>"
+            bc+="<center><font color=\"#000000\">📅 <b>Expiration    :</b> $expiry ($dl)</font></center><br>"
+            bc+="<center><font color=\"#4D96FF\">📊 <b>Bandwidth     :</b> $bw_info</font></center><br>"
+            bc+="<center><font color=\"#000000\">🔌 <b>Sessions      :</b> $oc/$limit</font></center><br>"
+            bc+="<center><font color=\"$status_color\" size=\"4\"><b>📌 Account Status : $acct_status</b></font></center><br>"
+            bc+="<br>"
+            bc+="<center><font color=\"#000000\">⏱️ <b>Server Uptime :</b> $UPTIME</font></center><br>"
+            bc+="<center><font color=\"#000000\">📈 <b>Server Load   :</b> $LOAD</font></center><br>"
+            bc+="<br>"
+            bc+="<center><font color=\"#6BCB77\" size=\"4\"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>"
+            bc+="<center><font color=\"#000000\">📱 Telegram  : https://t.me/voltrontech</font></center><br>"
+            bc+="<center><font color=\"#000000\">💬 WhatsApp  : https://chat.whatsapp.com/EZtAFt9dmS5DVKbNN5iSPz</font></center><br>"
+            bc+="<br>"
+            bc+="<center><font color=\"#FF6B6B\" size=\"4\"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>"
+            bc+="<center><font color=\"#000000\">• Account expires on: $expiry</font></center><br>"
+            bc+="<center><font color=\"#000000\">• No torrent or illegal activity</font></center><br>"
+            bc+="<center><font color=\"#000000\">• Account sharing is prohibited</font></center><br>"
+            bc+="<br>"
+            bc+="<center><font color=\"#9B59B6\">‎▬▬▬▬▬ஜ۩</font><font color=\"#FF6B6B\" size=\"8\"><b>  🌍VOLTRON VPN🌍 </b></font><font color=\"#9B59B6\">‎۩ஜ▬▬▬▬▬</font></center><br>"
+
+            bf="$BANNER_DIR/${user}.txt"; tf="${bf}.tmp"
+            printf "%s" "$bc" > "$tf"
+            if ! cmp -s "$tf" "$bf" 2>/dev/null; then mv "$tf" "$bf"; else rm -f "$tf"; fi
+            chmod 644 "$bf" 2>/dev/null
+        fi
+
+        [[ -z "$bw" || "$bw" == "0" ]] && continue
+        acc=$ad
+        (( oc == 0 )) && { rm -f "$PID_DIR/${user}__"*.last 2>/dev/null; continue; }
+
+        declare -A upids=()
+        while read -r sp; do [[ "$sp" =~ ^[0-9]+$ ]] && upids["$sp"]=1; done < <(pgrep -u "$user" sshd 2>/dev/null)
+
+        dt=0
+        for pid in "${!upids[@]}"; do
+            io="/proc/$pid/io"; cur=0
+            [[ -r "$io" ]] && {
+                rc=0; wc=0
+                while read -r k v; do
+                    case "$k" in rchar:) rc=${v:-0};; wchar:) wc=${v:-0};; esac
+                done < "$io"
+                cur=$((rc+wc))
+            }
+            pf="$PID_DIR/${user}__${pid}.last"
+            [[ -f "$pf" ]] && {
+                read -r pv < "$pf"
+                [[ "$pv" =~ ^[0-9]+$ ]] || pv=0
+                (( cur >= pv )) && d=$((cur-pv)) || d=$cur
+                dt=$((dt+d))
+            }
+            printf "%s\n" "$cur" > "$pf"
+        done
+
+        nt=$((acc+dt))
+        printf "%s\n" "$nt" > "$uf"
+        tg=$(awk "BEGIN{printf \"%.2f\", $nt/1073741824}" 2>/dev/null)
+        [[ -n "$tg" ]] && sed -i "s/^$user:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*/$user:$pass:$expiry:$limit:$bw:$tg:$status/" "$DB_FILE" 2>/dev/null
+    done < "$DB_FILE"
+    sleep $SCAN
+done
+LIMEOF
+    chmod +x "$LIMITER_SCRIPT"
+    cat > "$LIMITER_SERVICE" <<EOF
+[Unit]
+Description=Voltron Limiter
+After=network.target
+[Service]
+Type=simple
+ExecStart=$LIMITER_SCRIPT
+Restart=always
+RestartSec=10
+[Install]
+WantedBy=multi-user.target
+EOF
+    pkill -f voltrontech-limiter 2>/dev/null
+    systemctl daemon-reload
+    systemctl enable voltrontech-limiter &>/dev/null
+    systemctl restart voltrontech-limiter --no-block &>/dev/null
+}
+
+create_traffic_monitor() {
+    cat > "$TRAFFIC_SCRIPT" <<'EOF'
+#!/bin/bash
+DB_FILE="/etc/voltrontech/users.db"
+TRAFFIC_DIR="/etc/voltrontech/traffic"
+mkdir -p "$TRAFFIC_DIR"
+while true; do
+    [[ -f "$DB_FILE" ]] && while IFS=: read -r u p e l tl tu s; do
+        [[ -z "$u" ]] && continue
+        id "$u" &>/dev/null || continue
+        tf="$TRAFFIC_DIR/$u"
+        [[ -f "$tf" ]] && cb=$(cat "$tf" 2>/dev/null || echo 0) && cg=$(echo "scale=3; $cb/1073741824" | bc 2>/dev/null || echo 0) && sed -i "s/^$u:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*/$u:$p:$e:$l:$tl:$cg:$s/" "$DB_FILE" 2>/dev/null
+    done < "$DB_FILE"
+    sleep 60
+done
+EOF
+    chmod +x "$TRAFFIC_SCRIPT"
+    cat > "$TRAFFIC_SERVICE" <<EOF
+[Unit]
+Description=Voltron Traffic
+After=network.target
+[Service]
+Type=simple
+ExecStart=$TRAFFIC_SCRIPT
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable voltron-traffic.service 2>/dev/null
+    systemctl restart voltron-traffic.service 2>/dev/null
+}
+
+# ========== BACKUP / RESTORE ==========
+backup_user_data() { clear; show_banner; read -p "Path [/root/vt.tar.gz]: " p; p=${p:-/root/vt.tar.gz}; tar -czf "$p" -C "$(dirname "$DB_DIR")" "$(basename "$DB_DIR")" 2>/dev/null && echo "✅ $p" || echo "❌"; press_enter; }
+restore_user_data() { clear; show_banner; read -p "Path: " p; [ ! -f "$p" ] && { echo "❌"; press_enter; return; }; read -p "Confirm? (y/n): " c; [[ "$c" == "y" ]] && { local td=$(mktemp -d); tar -xzf "$p" -C "$td" 2>/dev/null; [ -f "$td/voltrontech/users.db" ] && cp "$td/voltrontech/users.db" "$DB_FILE"; rm -rf "$td"; echo "✅"; }; press_enter; }
+
+# ========== DNS ==========
+dns_menu() { clear; show_banner; [ -f "$DNS_INFO_FILE" ] && { source "$DNS_INFO_FILE"; echo "Existing: $FULL_DOMAIN"; read -p "Delete? (y/n): " c; [[ "$c" == "y" ]] && { curl -s -X DELETE "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/$SUBDOMAIN/A/" -H "Authorization: Token $DESEC_TOKEN" >/dev/null; rm -f "$DNS_INFO_FILE"; }; } || { read -p "Generate? (y/n): " c; [[ "$c" == "y" ]] && generate_dns_record; }; press_enter; }
+
+generate_dns_record() {
+    local ip=$(curl -s -4 icanhazip.com)
+    [[ ! "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] && return 1
+    local sub="vps-$(head /dev/urandom | tr -dc a-z0-9 | head -c 8)"
+    local full="$sub.$DESEC_DOMAIN"
+    local data=$(printf '[{"subname":"%s","type":"A","ttl":3600,"records":["%s"]}]' "$sub" "$ip")
+    local r=$(curl -s -w "%{http_code}" -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$data")
+    [[ "${r: -3}" -ne 201 ]] && return 1
+    printf 'SUBDOMAIN="%s"\nFULL_DOMAIN="%s"\n' "$sub" "$full" > "$DNS_INFO_FILE"
+    echo "✅ $full"
+}
+
+# ========== VPS DASHBOARD ==========
+show_vps_dashboard() {
+    clear
+    local ip=$(curl -s -4 icanhazip.com); local up=$(uptime -p | sed 's/up //')
+    local ram=$(free -h | awk '/^Mem:/ {print $3"/"$2}')
+    local disk=$(df -h / | awk 'NR==2 {print $3"/"$2" ("$5")"}')
+    local load=$(awk '{print $1}' /proc/loadavg)
+    local users=$(grep -c . "$DB_FILE" 2>/dev/null || echo 0)
+    echo -e "\n${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_PURPLE}                 🖥️  VPS DASHBOARD${C_RESET}"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+    echo -e "  ${C_CYAN}IP${C_RESET}     : $ip"
+    echo -e "  ${C_CYAN}Uptime${C_RESET} : $up"
+    echo -e "  ${C_CYAN}RAM${C_RESET}    : $ram"
+    echo -e "  ${C_CYAN}Disk${C_RESET}   : $disk"
+    echo -e "  ${C_CYAN}Load${C_RESET}   : $load"
+    echo -e "  ${C_CYAN}Users${C_RESET}  : $users\n"
+    echo -e "  ${C_PURPLE}Services:${C_RESET}"
+    for s in sshd dnstt haproxy badvpn udp-custom zivpn falconproxy voltrontech-api voltrontech-limiter voltron-traffic nginx; do
+        st=$(systemctl is-active "$s" 2>/dev/null)
+        [[ "$st" == "active" ]] && echo -e "    ${C_GREEN}● $s${C_RESET}" || echo -e "    ${C_DIM}○ $s${C_RESET}"
+    done
+    echo -e "\n  ${C_DIM}[Enter] refresh | [0] exit${C_RESET}"
+    read -p "👉 " rc
+    [[ "$rc" != "0" ]] && show_vps_dashboard
+}
+
+show_vpn_data_usage() {
+    clear; show_banner
+    [[ ! -s "$DB_FILE" ]] && { echo "No users"; press_enter; return; }
+    while IFS=: read -r u p e l b _x; do
+        [[ -z "$u" ]] && continue
+        ub=0; [[ -f "$BANDWIDTH_DIR/${u}.usage" ]] && ub=$(cat "$BANDWIDTH_DIR/${u}.usage")
+        [[ -z "$ub" ]] && ub=0
+        ug=$(awk "BEGIN{printf \"%.2f\", $ub/1073741824}")
+        st=$(get_user_status "$u" | sed 's/\x1b\[[0-9;]*m//g')
+        printf "${C_GREEN}%-15s${C_RESET} | ${C_YELLOW}%-10s GB${C_RESET} | %s\n" "$u" "$ug" "$st"
+    done < "$DB_FILE"
+    press_enter
+}
+
+# ========== AUTO REBOOT ==========
+auto_reboot_menu() {
+    clear; show_banner
+    cc=$(crontab -l 2>/dev/null | grep "systemctl reboot")
+    st="Disabled"; [[ -n "$cc" ]] && st="Active"
+    echo -e "Status: $st\n1) Enable  2) Disable  0) Return"
+    read -p "👉 " c
+    case $c in
+        1) (crontab -l 2>/dev/null | grep -v "systemctl reboot"; echo "0 0 * * * systemctl reboot") | crontab -; echo "✅"; press_enter ;;
+        2) (crontab -l 2>/dev/null | grep -v "systemctl reboot") | crontab -; echo "✅"; press_enter ;;
+        0) return ;;
+    esac
+}
+
+# ========== CACHE CLEANER ==========
+enable_cache_cleaner() {
+    touch /var/log/voltron-cache.log
+    cat > "$CACHE_SCRIPT" << 'EOF'
+#!/bin/bash
+LOG="/var/log/voltron-cache.log"
+echo "$(date): Clean" >> "$LOG"
+apt clean >> "$LOG" 2>&1
+apt autoclean >> "$LOG" 2>&1
+apt autoremove -y >> "$LOG" 2>&1
+journalctl --vacuum-time=3d >> "$LOG" 2>&1
+rm -rf /tmp/* /var/tmp/* 2>/dev/null
+echo "$(date): Done" >> "$LOG"
+EOF
+    chmod +x "$CACHE_SCRIPT"
+    echo "0 0 * * * root $CACHE_SCRIPT" > "$CACHE_CRON_FILE"
+    (crontab -l 2>/dev/null | grep -v "voltron-cache"; echo "0 0 * * * $CACHE_SCRIPT") | crontab -
+    echo "✅"; press_enter
+}
+disable_cache_cleaner() { rm -f "$CACHE_CRON_FILE"; crontab -l 2>/dev/null | grep -v "voltron-cache" | crontab -; echo "✅"; press_enter; }
+cache_cleaner_menu() {
+    while true; do
+        clear; show_banner
+        st="DISABLED"; [ -f "$CACHE_CRON_FILE" ] && st="ENABLED"
+        echo -e "Cache cleaner: $st\n1) Enable  2) Disable  0) Return"
+        read -p "👉 " c
+        case $c in 1) enable_cache_cleaner ;; 2) disable_cache_cleaner ;; 0) return ;; esac
+    done
+}
+
+# ========== ORPHAN ==========
+find_orphan_users() {
+    local -a o=()
+    while IFS=: read -r u _ uid _ _ h sh; do
+        [[ "$uid" =~ ^[0-9]+$ ]] || continue
+        (( uid >= 1000 )) || continue
+        [[ "$h" == "/home/$u" ]] || continue
+        case "$sh" in /usr/sbin/nologin|/usr/bin/false|/bin/false) ;; *) continue ;; esac
+        grep -q "^$u:" "$DB_FILE" && continue
+        o+=("$u")
+    done < /etc/passwd
+    printf '%s\n' "${o[@]}"
+}
+orphan_cleanup_menu() {
+    clear; show_banner
+    mapfile -t ol < <(find_orphan_users)
+    [ ${#ol[@]} -eq 0 ] && { echo "No orphans"; press_enter; return; }
+    echo "Found ${#ol[@]} orphans:"
+    for i in "${!ol[@]}"; do printf "  [%d] %s\n" "$((i+1))" "${ol[$i]}"; done
+    read -p "Delete ALL? (y/n): " c
+    [[ "$c" == "y" ]] && delete_voltrontech_user_accounts "${ol[@]}"
+    press_enter
+}
+
+# ========== SYSTEM UTILITIES ==========
+system_utilities_menu() {
+    while true; do
+        clear; show_banner
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}                 ⚙️  SYSTEM UTILITIES${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+        echo -e "  ${C_GREEN}1)${C_RESET} 💾 Backup"
+        echo -e "  ${C_GREEN}2)${C_RESET} 📥 Restore"
+        echo -e "  ${C_GREEN}3)${C_RESET} 🌐 DNS Manager"
+        echo -e "  ${C_GREEN}4)${C_RESET} 🖥️  VPS Dashboard"
+        echo -e "  ${C_GREEN}5)${C_RESET} 📊 Data Usage"
+        echo -e "  ${C_GREEN}6)${C_RESET} 🔄 Auto Reboot"
+        echo -e "  ${C_GREEN}7)${C_RESET} 🧹 Cache Cleaner"
+        echo -e "  ${C_GREEN}8)${C_RESET} 🔍 Orphan Cleanup"
+        echo -e "  ${C_GREEN}9)${C_RESET} ⚡ Speed Boosters"
+        echo ""
+        echo -e "  ${C_RED}0)${C_RESET} Return"
+        read -p "👉 Choice: " c
+        case $c in
+            1) backup_user_data ;; 2) restore_user_data ;; 3) dns_menu ;;
+            4) show_vps_dashboard ;; 5) show_vpn_data_usage ;; 6) auto_reboot_menu ;;
+            7) cache_cleaner_menu ;; 8) orphan_cleanup_menu ;; 9) dnstt_speed_menu ;;
+            0) return ;;
+        esac
+    done
+}
+
+# ========== PROTOCOL MENU ==========
 protocol_menu() {
     while true; do
         clear; show_banner
@@ -1231,10 +1474,9 @@ protocol_menu() {
         local fs_col="$C_DIM"; [[ "$fs" == "active" ]] && fs_col="$C_GREEN"
         local zs_col="$C_DIM"; [[ "$zs" == "active" ]] && zs_col="$C_GREEN"
         local xs=""; command -v x-ui &>/dev/null && xs="${C_GREEN}● INSTALLED${C_RESET}" || xs="${C_DIM}● NOT INSTALLED${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}              🔌 PROTOCOL MANAGEMENT${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo ""
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}              🔌 PROTOCOL MANAGEMENT${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
         printf "  ${C_GREEN}%2s${C_RESET}) %-22s [${bs_col}%s${C_RESET}]\n" "1" "badvpn (UDP 7300)" "$bs"
         printf "  ${C_GREEN}%2s${C_RESET}) %-22s [${us_col}%s${C_RESET}]\n" "2" "udp-custom" "$us"
         printf "  ${C_GREEN}%2s${C_RESET}) %-22s [${hs_col}%s${C_RESET}]\n" "3" "SSL Tunnel (HAProxy)" "$hs"
@@ -1250,7 +1492,7 @@ protocol_menu() {
             1) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_badvpn || uninstall_badvpn ;;
             2) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_udp_custom || uninstall_udp_custom ;;
             3) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_ssl_tunnel || uninstall_ssl_tunnel ;;
-            4) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_GREEN}2)${C_RESET} Manage (Domain/Keys/MTU/Boosters)\n  ${C_RED}3)${C_RESET} Uninstall"; read -p "👉 " sub
+            4) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_GREEN}2)${C_RESET} Manage\n  ${C_RED}3)${C_RESET} Uninstall"; read -p "👉 " sub
                case $sub in 1) install_dnstt ;; 2) dnstt_main_menu ;; 3) uninstall_dnstt ;; esac ;;
             5) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_falcon_proxy || uninstall_falcon_proxy ;;
             6) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_zivpn || uninstall_zivpn ;;
@@ -1281,7 +1523,7 @@ Restart=always
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload; systemctl enable badvpn.service 2>/dev/null; systemctl start badvpn.service
-    echo "✅ badvpn"; press_enter
+    echo "✅"; press_enter
 }
 uninstall_badvpn() { systemctl stop badvpn.service 2>/dev/null; systemctl disable badvpn.service 2>/dev/null; rm -f "$BADVPN_SERVICE_FILE" "$BADVPN_BIN"; systemctl daemon-reload; echo "✅"; press_enter; }
 
@@ -1302,7 +1544,7 @@ Restart=always
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload; systemctl enable udp-custom.service 2>/dev/null; systemctl start udp-custom.service
-    echo "✅ udp-custom"; press_enter
+    echo "✅"; press_enter
 }
 uninstall_udp_custom() { systemctl stop udp-custom.service 2>/dev/null; systemctl disable udp-custom.service 2>/dev/null; rm -f "$UDP_CUSTOM_SERVICE_FILE" "$UDP_CUSTOM_BIN"; systemctl daemon-reload; echo "✅"; press_enter; }
 
@@ -1327,7 +1569,7 @@ backend ssh_backend
     server ssh_server 127.0.0.1:22
 EOF
     systemctl restart haproxy
-    echo "✅ SSL 444"; press_enter
+    echo "✅"; press_enter
 }
 uninstall_ssl_tunnel() { systemctl stop haproxy 2>/dev/null; ff_apt_purge haproxy; rm -f "$HAPROXY_CONFIG" "$SSL_CERT_FILE"; echo "✅"; press_enter; }
 
@@ -1349,7 +1591,7 @@ Restart=always
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload; systemctl enable falconproxy.service 2>/dev/null; systemctl start falconproxy.service
-    echo "✅ Falcon"; press_enter
+    echo "✅"; press_enter
 }
 uninstall_falcon_proxy() { systemctl stop falconproxy.service 2>/dev/null; systemctl disable falconproxy.service 2>/dev/null; rm -f "$FALCONPROXY_SERVICE_FILE" "$FALCONPROXY_BINARY"; systemctl daemon-reload; echo "✅"; press_enter; }
 
@@ -1377,7 +1619,7 @@ Restart=always
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload; systemctl enable zivpn.service 2>/dev/null; systemctl start zivpn.service
-    echo "✅ ZiVPN"; press_enter
+    echo "✅"; press_enter
 }
 uninstall_zivpn() { systemctl stop zivpn.service 2>/dev/null; systemctl disable zivpn.service 2>/dev/null; rm -f "$ZIVPN_SERVICE_FILE" "$ZIVPN_BIN"; rm -rf "$ZIVPN_DIR"; systemctl daemon-reload; echo "✅"; press_enter; }
 
@@ -1386,21 +1628,16 @@ uninstall_xui_panel() { command -v x-ui &>/dev/null && x-ui uninstall; rm -f /us
 
 # ========== DYNAMIC BANNER ==========
 update_ssh_banners_config() {
-    grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null || \
-        echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
+    grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null || echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
     mkdir -p "$BANNER_DIR" /etc/ssh/sshd_config.d
     if [[ ! -f "$BANNER_ENABLED_FILE" ]]; then
         rm -f "$SSHD_FF_CONFIG" 2>/dev/null
-        if sshd -t 2>/dev/null; then
-            systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-        fi
+        sshd -t 2>/dev/null && systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
         return
     fi
     local tmp="/tmp/voltron-banners.conf"
     {
         echo "# Voltron Tech - Dynamic Banners"
-        echo "# Generated: $(date)"
-        echo ""
         if [[ -f "$DB_FILE" ]]; then
             while IFS=: read -r user pass expiry limit bandwidth_gb _rest; do
                 [[ -z "$user" || "$user" == \#* ]] && continue
@@ -1409,19 +1646,16 @@ update_ssh_banners_config() {
                 [[ ! -f "$BANNER_DIR/${user}.txt" ]] && continue
                 echo "Match User $user"
                 echo "    Banner /etc/voltrontech/banners/${user}.txt"
-                echo ""
             done < "$DB_FILE"
         fi
     } > "$tmp"
     chmod 644 "$tmp"
     if ! cmp -s "$tmp" "$SSHD_FF_CONFIG" 2>/dev/null; then
-        mv "$tmp" "$SSHD_FF_CONFIG"
-        chmod 644 "$SSHD_FF_CONFIG"
+        mv "$tmp" "$SSHD_FF_CONFIG"; chmod 644 "$SSHD_FF_CONFIG"
         if sshd -t 2>/dev/null; then
             systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
         else
-            rm -f "$SSHD_FF_CONFIG"
-            systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+            rm -f "$SSHD_FF_CONFIG"; systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
         fi
     else rm -f "$tmp"; fi
 }
@@ -1429,22 +1663,12 @@ update_ssh_banners_config() {
 enable_dynamic_banner() {
     mkdir -p "$BANNER_DIR"; touch "$BANNER_ENABLED_FILE"
     local count=0
-    if [[ -f "$DB_FILE" ]]; then
-        while IFS=: read -r user pass expiry limit bandwidth_gb _rest; do
-            [[ -z "$user" || "$user" == \#* ]] && continue
-            generate_user_banner "$user" "$expiry" "$limit" "$bandwidth_gb"
-            ((count++))
-        done < "$DB_FILE"
-    fi
+    [[ -f "$DB_FILE" ]] && while IFS=: read -r user pass expiry limit bandwidth_gb _rest; do
+        [[ -z "$user" || "$user" == \#* ]] && continue
+        generate_user_banner "$user" "$expiry" "$limit" "$bandwidth_gb"; ((count++))
+    done < "$DB_FILE"
     update_ssh_banners_config
-    if sshd -t 2>/dev/null; then
-        systemctl restart voltrontech-limiter 2>/dev/null
-        echo -e "\n${C_GREEN}✅ Enabled ($count users)${C_RESET}"
-    else
-        rm -f "$SSHD_FF_CONFIG"
-        systemctl restart sshd 2>/dev/null
-        echo -e "\n${C_RED}❌ Error${C_RESET}"
-    fi
+    sshd -t 2>/dev/null && { systemctl restart voltrontech-limiter 2>/dev/null; echo -e "\n${C_GREEN}✅ Enabled ($count)${C_RESET}"; } || { rm -f "$SSHD_FF_CONFIG"; systemctl restart sshd 2>/dev/null; echo -e "\n${C_RED}❌ Error${C_RESET}"; }
     press_enter
 }
 
@@ -1457,8 +1681,7 @@ disable_dynamic_banner() {
 preview_dynamic_ssh_banner() {
     [[ ! -f "$BANNER_ENABLED_FILE" ]] && { echo -e "\n${C_RED}❌ Not enabled${C_RESET}"; press_enter; return; }
     _select_user_interface "--- Preview ---"
-    local u=$SELECTED_USER
-    [[ -z "$u" || "$u" == "NO_USERS" ]] && return
+    local u=$SELECTED_USER; [[ -z "$u" || "$u" == "NO_USERS" ]] && return
     [[ -f "$BANNER_DIR/${u}.txt" ]] && cat "$BANNER_DIR/${u}.txt" || echo "Not found"
     press_enter
 }
@@ -1467,18 +1690,21 @@ ssh_banner_menu() {
     while true; do
         clear; show_banner
         local st=""; [[ -f "$BANNER_ENABLED_FILE" ]] && st="${C_GREEN}● ENABLED${C_RESET}" || st="${C_RED}● DISABLED${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══ 🎨 DYNAMIC BANNER ═══${C_RESET}\n"
-        echo -e "  Status: $st\n"
-        echo "  1) Enable"
-        echo "  2) Disable"
-        echo "  3) Preview"
-        echo "  0) Return"
-        read -p "👉 " c
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}                 🎨 DYNAMIC BANNER${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+        echo -e "  ${C_CYAN}Status${C_RESET} : $st\n"
+        echo -e "  ${C_GREEN}1)${C_RESET} Enable"
+        echo -e "  ${C_RED}2)${C_RESET} Disable"
+        echo -e "  ${C_GREEN}3)${C_RESET} Preview"
+        echo ""
+        echo -e "  ${C_RED}0)${C_RESET} Return"
+        read -p "👉 Choice: " c
         case $c in 1) enable_dynamic_banner ;; 2) disable_dynamic_banner ;; 3) preview_dynamic_ssh_banner ;; 0) return ;; esac
     done
 }
 
-# ========== LIMITER (SAME BANNER) ==========
+# ========== LIMITER ==========
 create_limiter_service() {
     cat > "$LIMITER_SCRIPT" << 'LIMEOF'
 #!/bin/bash
@@ -1628,10 +1854,11 @@ EOF
     systemctl restart voltron-traffic.service 2>/dev/null
 }
 
-# ========== SYSTEM UTILITIES ==========
+# ========== BACKUP / RESTORE ==========
 backup_user_data() { clear; show_banner; read -p "Path [/root/vt.tar.gz]: " p; p=${p:-/root/vt.tar.gz}; tar -czf "$p" -C "$(dirname "$DB_DIR")" "$(basename "$DB_DIR")" 2>/dev/null && echo "✅ $p" || echo "❌"; press_enter; }
 restore_user_data() { clear; show_banner; read -p "Path: " p; [ ! -f "$p" ] && { echo "❌"; press_enter; return; }; read -p "Confirm? (y/n): " c; [[ "$c" == "y" ]] && { local td=$(mktemp -d); tar -xzf "$p" -C "$td" 2>/dev/null; [ -f "$td/voltrontech/users.db" ] && cp "$td/voltrontech/users.db" "$DB_FILE"; rm -rf "$td"; echo "✅"; }; press_enter; }
 
+# ========== DNS ==========
 dns_menu() { clear; show_banner; [ -f "$DNS_INFO_FILE" ] && { source "$DNS_INFO_FILE"; echo "Existing: $FULL_DOMAIN"; read -p "Delete? (y/n): " c; [[ "$c" == "y" ]] && { curl -s -X DELETE "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/$SUBDOMAIN/A/" -H "Authorization: Token $DESEC_TOKEN" >/dev/null; rm -f "$DNS_INFO_FILE"; }; } || { read -p "Generate? (y/n): " c; [[ "$c" == "y" ]] && generate_dns_record; }; press_enter; }
 
 generate_dns_record() {
@@ -1646,6 +1873,7 @@ generate_dns_record() {
     echo "✅ $full"
 }
 
+# ========== VPS DASHBOARD ==========
 show_vps_dashboard() {
     clear
     local ip=$(curl -s -4 icanhazip.com); local up=$(uptime -p | sed 's/up //')
@@ -1653,18 +1881,21 @@ show_vps_dashboard() {
     local disk=$(df -h / | awk 'NR==2 {print $3"/"$2" ("$5")"}')
     local load=$(awk '{print $1}' /proc/loadavg)
     local users=$(grep -c . "$DB_FILE" 2>/dev/null || echo 0)
-    echo -e "\n${C_PURPLE}═══ 🖥️  VPS DASHBOARD ═══${C_RESET}\n"
-    echo -e "  IP:     $ip"
-    echo -e "  Uptime: $up"
-    echo -e "  RAM:    $ram"
-    echo -e "  Disk:   $disk"
-    echo -e "  Load:   $load"
-    echo -e "  Users:  $users\n"
+    echo -e "\n${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_PURPLE}                 🖥️  VPS DASHBOARD${C_RESET}"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+    echo -e "  ${C_CYAN}IP${C_RESET}     : $ip"
+    echo -e "  ${C_CYAN}Uptime${C_RESET} : $up"
+    echo -e "  ${C_CYAN}RAM${C_RESET}    : $ram"
+    echo -e "  ${C_CYAN}Disk${C_RESET}   : $disk"
+    echo -e "  ${C_CYAN}Load${C_RESET}   : $load"
+    echo -e "  ${C_CYAN}Users${C_RESET}  : $users\n"
+    echo -e "  ${C_PURPLE}Services:${C_RESET}"
     for s in sshd dnstt haproxy badvpn udp-custom zivpn falconproxy voltrontech-api voltrontech-limiter voltron-traffic nginx; do
         st=$(systemctl is-active "$s" 2>/dev/null)
         [[ "$st" == "active" ]] && echo -e "    ${C_GREEN}● $s${C_RESET}" || echo -e "    ${C_DIM}○ $s${C_RESET}"
     done
-    echo -e "\n  [Enter] refresh | [0] exit"
+    echo -e "\n  ${C_DIM}[Enter] refresh | [0] exit${C_RESET}"
     read -p "👉 " rc
     [[ "$rc" != "0" ]] && show_vps_dashboard
 }
@@ -1683,6 +1914,7 @@ show_vpn_data_usage() {
     press_enter
 }
 
+# ========== AUTO REBOOT ==========
 auto_reboot_menu() {
     clear; show_banner
     cc=$(crontab -l 2>/dev/null | grep "systemctl reboot")
@@ -1696,6 +1928,7 @@ auto_reboot_menu() {
     esac
 }
 
+# ========== CACHE CLEANER ==========
 enable_cache_cleaner() {
     touch /var/log/voltron-cache.log
     cat > "$CACHE_SCRIPT" << 'EOF'
@@ -1725,6 +1958,7 @@ cache_cleaner_menu() {
     done
 }
 
+# ========== ORPHAN ==========
 find_orphan_users() {
     local -a o=()
     while IFS=: read -r u _ uid _ _ h sh; do
@@ -1737,7 +1971,6 @@ find_orphan_users() {
     done < /etc/passwd
     printf '%s\n' "${o[@]}"
 }
-
 orphan_cleanup_menu() {
     clear; show_banner
     mapfile -t ol < <(find_orphan_users)
@@ -1749,21 +1982,25 @@ orphan_cleanup_menu() {
     press_enter
 }
 
+# ========== SYSTEM UTILITIES ==========
 system_utilities_menu() {
     while true; do
         clear; show_banner
-        echo -e "${C_PURPLE}═══ ⚙️  SYSTEM UTILITIES ═══${C_RESET}\n"
-        echo "  1) 💾 Backup"
-        echo "  2) 📥 Restore"
-        echo "  3) 🌐 DNS Manager"
-        echo "  4) 🖥️  VPS Dashboard"
-        echo "  5) 📊 Data Usage"
-        echo "  6) 🔄 Auto Reboot"
-        echo "  7) 🧹 Cache Cleaner"
-        echo "  8) 🔍 Orphan Cleanup"
-        echo "  9) ⚡ Speed Boosters"
-        echo "  0) Return"
-        read -p "👉 " c
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}                 ⚙️  SYSTEM UTILITIES${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+        echo -e "  ${C_GREEN}1)${C_RESET} 💾 Backup"
+        echo -e "  ${C_GREEN}2)${C_RESET} 📥 Restore"
+        echo -e "  ${C_GREEN}3)${C_RESET} 🌐 DNS Manager"
+        echo -e "  ${C_GREEN}4)${C_RESET} 🖥️  VPS Dashboard"
+        echo -e "  ${C_GREEN}5)${C_RESET} 📊 Data Usage"
+        echo -e "  ${C_GREEN}6)${C_RESET} 🔄 Auto Reboot"
+        echo -e "  ${C_GREEN}7)${C_RESET} 🧹 Cache Cleaner"
+        echo -e "  ${C_GREEN}8)${C_RESET} 🔍 Orphan Cleanup"
+        echo -e "  ${C_GREEN}9)${C_RESET} ⚡ Speed Boosters"
+        echo ""
+        echo -e "  ${C_RED}0)${C_RESET} Return"
+        read -p "👉 Choice: " c
         case $c in
             1) backup_user_data ;; 2) restore_user_data ;; 3) dns_menu ;;
             4) show_vps_dashboard ;; 5) show_vpn_data_usage ;; 6) auto_reboot_menu ;;
@@ -1785,21 +2022,27 @@ web_panel_menu() {
         local ip=$(curl -s -4 icanhazip.com 2>/dev/null)
         local dip=$(dig +short "$WEB_PANEL_API_DOMAIN" 2>/dev/null | tail -1)
         local dns_st=""; [[ "$dip" == "$ip" ]] && dns_st="${C_GREEN}● OK${C_RESET}" || dns_st="${C_YELLOW}● NOT SET${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══ 🌐 WEB PANEL ═══${C_RESET}\n"
-        echo -e "  Domain: $WEB_PANEL_API_DOMAIN\n  VPS IP: $ip\n"
-        echo -e "  API:   $api_st\n  Nginx: $ng_st\n  SSL:   $ssl_st\n  DNS:   $dns_st\n"
-        echo "  [ 1] 🚀 Full Setup"
-        echo "  [ 2] 📥 API Only"
-        echo "  [ 3] 🌐 DNS Only"
-        echo "  [ 4] ⚙️  Nginx Only"
-        echo "  [ 5] 🔒 SSL Only"
-        echo "  [ 6] 🧪 Test"
-        echo "  [ 7] 📋 Logs"
-        echo "  [ 8] 🔑 API Info"
-        echo "  [ 9] 🔄 Restart API"
-        echo "  [10] 📝 Copy for Lovable"
-        echo "  [11] 🗑️  Remove"
-        echo "  [ 0] Return"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}                 🌐 WEB PANEL${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+        echo -e "  ${C_CYAN}Domain${C_RESET} : $WEB_PANEL_API_DOMAIN"
+        echo -e "  ${C_CYAN}VPS IP${C_RESET} : $ip\n"
+        echo -e "  ${C_CYAN}API${C_RESET}    : $api_st"
+        echo -e "  ${C_CYAN}Nginx${C_RESET}  : $ng_st"
+        echo -e "  ${C_CYAN}SSL${C_RESET}    : $ssl_st"
+        echo -e "  ${C_CYAN}DNS${C_RESET}    : $dns_st\n"
+        echo -e "  ${C_GREEN}[ 1]${C_RESET} 🚀 Full Setup"
+        echo -e "  ${C_GREEN}[ 2]${C_RESET} 📥 API Only"
+        echo -e "  ${C_GREEN}[ 3]${C_RESET} 🌐 DNS Only"
+        echo -e "  ${C_GREEN}[ 4]${C_RESET} ⚙️  Nginx Only"
+        echo -e "  ${C_GREEN}[ 5]${C_RESET} 🔒 SSL Only"
+        echo -e "  ${C_GREEN}[ 6]${C_RESET} 🧪 Test"
+        echo -e "  ${C_GREEN}[ 7]${C_RESET} 📋 Logs"
+        echo -e "  ${C_GREEN}[ 8]${C_RESET} 🔑 API Info"
+        echo -e "  ${C_GREEN}[ 9]${C_RESET} 🔄 Restart API"
+        echo -e "  ${C_GREEN}[10]${C_RESET} 📝 Copy for Lovable"
+        echo -e "  ${C_RED}[11]${C_RESET} 🗑️  Remove"
+        echo -e "  ${C_RED}[ 0]${C_RESET} Return"
         read -p "👉 " c
         case $c in
             1) web_panel_full_setup ;; 2) web_panel_install_api ;; 3) web_panel_dns_setup ;;
@@ -2303,6 +2546,7 @@ initial_setup() {
     echo -e "${C_GREEN}✅ Setup complete${C_RESET}"
 }
 
+# ========== UNINSTALL ==========
 uninstall_script() {
     clear; show_banner
     read -p "Type YES to uninstall: " c
@@ -2323,42 +2567,66 @@ uninstall_script() {
     echo "✅ Uninstalled"; sleep 2; rm -f "$0"; exit 0
 }
 
-# ========== MAIN MENU (FIXED ORDER) ==========
+# ========== MAIN MENU ==========
 main_menu() {
     while true; do
         show_banner
-        echo -e "${C_PURPLE}═══ 👤 USER MANAGEMENT ═══${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}                    👤 USER MANAGEMENT${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
         printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "1" "Create User" "7" "List Users"
         printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "2" "Delete User" "8" "Renew User"
         printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "3" "Edit User" "9" "Cleanup Expired"
         printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "4" "Lock User" "10" "Bulk Create"
         printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "5" "Unlock User" "11" "View Bandwidth"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "6" "Trial Account" "12" "Orphan Cleanup"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "6" "Trial Account" "12" "📱 Client Config"
         echo ""
-        echo -e "${C_PURPLE}═══ 🔌 PROTOCOLS & SERVICES ═══${C_RESET}"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "13" "Protocols" "18" "Web Panel"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "14" "DNSTT Manage" "19" "System Utilities"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "15" "Speed Boosters" "20" "Restart Services"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "16" "VPS Dashboard" "21" "📱 Client Config"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s\n" "17" "🎨 Dynamic Banner"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}                    🔌 PROTOCOLS & SERVICES${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "13" "Protocols" "19" "Web Panel"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "14" "DNSTT Manage" "20" "System Utilities"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "15" "Speed Boosters" "21" "Restart Services"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "16" "VPS Dashboard" "22" "Orphan Cleanup"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s\n" "17" "Dynamic Banner"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s\n" "18" "📱 SSH Manager Config"
         echo ""
-        echo -e "${C_PURPLE}═══ 🔥 DANGER ZONE ═══${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}                    🔥 DANGER ZONE${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
         printf "  ${C_RED}%2s${C_RESET}) %-28s  ${C_RED}%2s${C_RESET}) %-25s\n" "99" "Uninstall" "0" "Exit"
         echo ""
         read -p "👉 Select: " choice
         case $choice in
-            1) create_user ;; 2) delete_user ;; 3) edit_user ;; 4) lock_user ;;
-            5) unlock_user ;; 6) create_trial_account ;; 7) list_users ;; 8) renew_user ;;
-            9) cleanup_expired ;; 10) bulk_create_users ;; 11) view_user_bandwidth ;;
-            12) orphan_cleanup_menu ;;
-            13) protocol_menu ;; 14) dnstt_main_menu ;; 15) dnstt_speed_menu ;;
-            16) show_vps_dashboard ;; 17) ssh_banner_menu ;; 18) web_panel_menu ;;
-            19) system_utilities_menu ;;
-            20) echo "Restarting..."; systemctl restart dnstt badvpn udp-custom haproxy zivpn falconproxy voltrontech-limiter voltron-traffic voltrontech-api 2>/dev/null; echo "✅"; press_enter ;;
-            21) client_config_menu ;;
+            1) create_user ;;
+            2) delete_user ;;
+            3) edit_user ;;
+            4) lock_user ;;
+            5) unlock_user ;;
+            6) create_trial_account ;;
+            7) list_users ;;
+            8) renew_user ;;
+            9) cleanup_expired ;;
+            10) bulk_create_users ;;
+            11) view_user_bandwidth ;;
+            12) client_config_menu ;;
+            13) protocol_menu ;;
+            14) dnstt_main_menu ;;
+            15) dnstt_speed_menu ;;
+            16) show_vps_dashboard ;;
+            17) ssh_banner_menu ;;
+            18) client_config_menu ;;
+            19) web_panel_menu ;;
+            20) system_utilities_menu ;;
+            21)
+                echo -e "\n${C_BLUE}🔄 Restarting all services...${C_RESET}"
+                systemctl restart dnstt badvpn udp-custom haproxy zivpn falconproxy voltrontech-limiter voltron-traffic voltrontech-api 2>/dev/null
+                echo -e "${C_GREEN}✅ Done${C_RESET}"
+                press_enter ;;
+            22) orphan_cleanup_menu ;;
             99) uninstall_script ;;
             0) echo -e "\n${C_GREEN}👋 Goodbye!${C_RESET}\n"; exit 0 ;;
-            *) echo "❌ Invalid"; sleep 2 ;;
+            *) echo -e "\n${C_RED}❌ Invalid option${C_RESET}"; sleep 2 ;;
         esac
     done
 }
