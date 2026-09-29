@@ -155,20 +155,6 @@ get_user_status() {
 }
 
 # ========== ORPHAN USER ==========
-is_voltrontech_orphan_user() {
-    local username="$1"
-    local passwd_line system_user _ uid _ home shell
-    passwd_line=$(getent passwd "$username" 2>/dev/null) || return 1
-    IFS=: read -r system_user _ uid _ _ home shell <<< "$passwd_line"
-    [[ "$uid" =~ ^[0-9]+$ ]] || return 1
-    grep -q "^$username:" "$DB_FILE" && return 1
-    if id -nG "$username" 2>/dev/null | tr ' ' '\n' | grep -Fxq "$FF_USERS_GROUP"; then return 0; fi
-    (( uid >= 1000 )) || return 1
-    [[ "$home" == "/home/$username" || "$home" == /home/* ]] || return 1
-    case "$shell" in /usr/sbin/nologin|/usr/bin/false|/bin/false) return 0 ;; esac
-    return 1
-}
-
 delete_voltrontech_user_accounts() {
     local -a users_to_delete=("$@")
     local username
@@ -177,9 +163,9 @@ delete_voltrontech_user_accounts() {
         [[ -n "$username" ]] || continue
         killall -u "$username" -9 &>/dev/null
         if id "$username" &>/dev/null; then
-            if userdel -r "$username" &>/dev/null; then echo -e " ✅ System user '${C_YELLOW}$username${C_RESET}' deleted."
-            else echo -e " ❌ Failed to delete '${C_YELLOW}$username${C_RESET}'."; fi
-        else echo -e " ℹ️ System user '${C_YELLOW}$username${C_RESET}' missing."; fi
+            if userdel -r "$username" &>/dev/null; then echo -e " ✅ '${C_YELLOW}$username${C_RESET}' deleted."
+            else echo -e " ❌ Failed '${C_YELLOW}$username${C_RESET}'."; fi
+        else echo -e " ℹ️ '${C_YELLOW}$username${C_RESET}' missing."; fi
         rm -f "$BANDWIDTH_DIR/${username}.usage"
         rm -rf "$BANDWIDTH_DIR/pidtrack/${username}"
     done
@@ -266,10 +252,8 @@ generate_user_banner() {
     local expiry="$2"
     local limit="$3"
     local bandwidth_gb="$4"
-
     local bw_display="Unlimited"
     if [[ "$bandwidth_gb" != "0" ]]; then bw_display="${bandwidth_gb} GB"; fi
-
     mkdir -p "$BANNER_DIR"
     cat > "$BANNER_DIR/${username}.txt" << EOF
 <br><br>
@@ -299,7 +283,7 @@ generate_user_banner() {
 EOF
 }
 
-# ========== CREATE USER ==========
+# ========== USER MANAGEMENT ==========
 create_user() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- ✨ Create New SSH User ---${C_RESET}"
@@ -341,7 +325,6 @@ create_user() {
     press_enter
 }
 
-# ========== DELETE USER ==========
 delete_user() {
     _select_multi_user_interface "--- 🗑️ Delete Users ---"
     [[ ${#SELECTED_USERS[@]} -eq 0 || "${SELECTED_USERS[0]}" == "NO_USERS" ]] && { press_enter; return; }
@@ -352,7 +335,6 @@ delete_user() {
     press_enter
 }
 
-# ========== EDIT USER ==========
 edit_user() {
     _select_user_interface "--- ✏️ Edit User ---"
     local username=$SELECTED_USER
@@ -387,7 +369,6 @@ edit_user() {
     done
 }
 
-# ========== LOCK USER ==========
 lock_user() {
     _select_multi_user_interface "--- 🔒 Lock Users ---"
     [[ ${#SELECTED_USERS[@]} -eq 0 || "${SELECTED_USERS[0]}" == "NO_USERS" ]] && { press_enter; return; }
@@ -398,7 +379,6 @@ lock_user() {
     press_enter
 }
 
-# ========== UNLOCK USER ==========
 unlock_user() {
     _select_multi_user_interface "--- 🔓 Unlock Users ---"
     [[ ${#SELECTED_USERS[@]} -eq 0 || "${SELECTED_USERS[0]}" == "NO_USERS" ]] && { press_enter; return; }
@@ -409,7 +389,6 @@ unlock_user() {
     press_enter
 }
 
-# ========== LIST USERS ==========
 list_users() {
     clear; show_banner
     [[ ! -s "$DB_FILE" ]] && { echo -e "\n${C_YELLOW}ℹ️ No users.${C_RESET}"; press_enter; return; }
@@ -445,7 +424,6 @@ list_users() {
     press_enter
 }
 
-# ========== RENEW USER ==========
 renew_user() {
     _select_multi_user_interface "--- 🔄 Renew Users ---"
     [[ ${#SELECTED_USERS[@]} -eq 0 || "${SELECTED_USERS[0]}" == "NO_USERS" ]] && { press_enter; return; }
@@ -464,7 +442,6 @@ renew_user() {
     press_enter
 }
 
-# ========== CLEANUP EXPIRED ==========
 cleanup_expired() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 🧹 Cleanup Expired ---${C_RESET}"
@@ -478,20 +455,12 @@ cleanup_expired() {
     echo -e "\nExpired: ${C_RED}${expired_users[*]}${C_RESET}"
     read -p "👉 Delete all? (y/n): " confirm
     if [[ "$confirm" == "y" ]]; then
-        for user in "${expired_users[@]}"; do
-            killall -u "$user" -9 &>/dev/null
-            rm -f "$BANDWIDTH_DIR/${user}.usage"
-            rm -rf "$BANDWIDTH_DIR/pidtrack/${user}"
-            userdel -r "$user" &>/dev/null
-            sed -i "/^$user:/d" "$DB_FILE"
-        done
+        delete_voltrontech_user_accounts "${expired_users[@]}"
         echo -e "\n${C_GREEN}✅ Cleaned.${C_RESET}"
     else echo -e "\n${C_YELLOW}❌ Cancelled.${C_RESET}"; fi
-    invalidate_banner_cache; update_ssh_banners_config
     press_enter
 }
 
-# ========== BULK CREATE ==========
 bulk_create_users() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 👥 Bulk Create Users ---${C_RESET}"
@@ -527,7 +496,6 @@ bulk_create_users() {
     press_enter
 }
 
-# ========== VIEW BANDWIDTH ==========
 view_user_bandwidth() {
     _select_user_interface "--- 📊 View Bandwidth ---"
     local u=$SELECTED_USER
@@ -555,7 +523,7 @@ view_user_bandwidth() {
     press_enter
 }
 
-# ========== TRIAL ACCOUNT ==========
+# ========== TRIAL ==========
 setup_trial_cleanup_script() {
     cat > "$TRIAL_CLEANUP_SCRIPT" << 'TREOF'
 #!/bin/bash
@@ -629,7 +597,7 @@ create_trial_account() {
     press_enter
 }
 
-# ========== DNSTT BINARY ==========
+# ========== DNSTT ==========
 download_dnstt_binary() {
     local arch=$(uname -m)
     local url=""
@@ -643,7 +611,6 @@ download_dnstt_binary() {
     echo -e "${C_GREEN}✅ Binaries downloaded${C_RESET}"
 }
 
-# ========== SPEED BOOSTERS ==========
 apply_booster_standard_ultimate() {
     modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null
     sysctl -w net.ipv4.tcp_congestion_control=bbr >/dev/null 2>&1
@@ -751,7 +718,6 @@ apply_booster_extreme_plus() {
     echo -e "${C_GREEN}✅ Extreme Plus applied${C_RESET}"
 }
 
-# ========== DNSTT KEY GENERATION ==========
 generate_keys() {
     mkdir -p "$DNSTT_KEYS_DIR"; cd "$DNSTT_KEYS_DIR"; rm -f server.key server.pub
     if ! "$DNSTT_BINARY" -gen-key -privkey-file server.key -pubkey-file server.pub 2>/dev/null; then
@@ -762,7 +728,6 @@ generate_keys() {
     PUBLIC_KEY=$(cat server.pub)
 }
 
-# ========== DNSTT DOMAIN SETUP ==========
 setup_domain() {
     echo -e "\n${C_BLUE}🌐 Domain config...${C_RESET}\n"
     echo -e "  ${C_GREEN}1)${C_RESET} Custom domain"
@@ -785,7 +750,6 @@ setup_domain() {
     echo "$DOMAIN" > "$DB_DIR/domain.txt"
 }
 
-# ========== DNSTT SERVICE ==========
 create_dnstt_service() {
     local domain=$1; local mtu=$2; local ssh_port=$3
     [[ -z "$mtu" ]] && mtu=512
@@ -835,162 +799,33 @@ show_client_commands() {
 
 install_dnstt() {
     clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_BOLD}${C_PURPLE}           📡 DNSTT INSTALLATION${C_RESET}"
-    echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
     [ -f "$DNSTT_SERVICE_FILE" ] && { read -p "Reinstall? (y/n): " r; [[ "$r" != "y" ]] && return; systemctl stop dnstt.service 2>/dev/null; }
-    echo -e "\n${C_BLUE}[1/7] Dependencies...${C_RESET}"
     ff_apt_install wget curl openssl bc dnsutils
-    echo -e "\n${C_BLUE}[2/7] Downloading binary...${C_RESET}"
     download_dnstt_binary
-    echo -e "\n${C_BLUE}[3/7] MTU...${C_RESET}"
     read -p "👉 MTU [512]: " MTU; MTU=${MTU:-512}
     echo "$MTU" > "$MTU_CONFIG"
-    echo -e "\n${C_BLUE}[4/7] Domain...${C_RESET}"
     setup_domain
-    echo -e "\n${C_BLUE}[5/7] Generating keys...${C_RESET}"
     generate_keys
-    echo -e "\n${C_BLUE}[6/7] Speed Booster...${C_RESET}"
-    echo -e "  ${C_GREEN}[1]${C_RESET} 1000x  ${C_GREEN}[2]${C_RESET} 2000x  ${C_GREEN}[3]${C_RESET} 3000x  ${C_GREEN}[4]${C_RESET} 5000x  ${C_GREEN}[5]${C_RESET} 10000x  ${C_GREEN}[6]${C_RESET} Skip"
-    read -p "👉 [3]: " b; b=${b:-3}
+    read -p "👉 Speed [1-5, default 3]: " b; b=${b:-3}
     case $b in 1) apply_booster_standard_ultimate ;; 2) apply_booster_medium_ultimate ;; 3) apply_booster_high_ultimate ;; 4) apply_booster_ultra_ultimate ;; 5) apply_booster_extreme_ultimate ;; esac
-    echo -e "\n${C_BLUE}[7/7] Creating service...${C_RESET}"
-    SSH_PORT=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1)
-    SSH_PORT=${SSH_PORT:-22}
+    SSH_PORT=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1); SSH_PORT=${SSH_PORT:-22}
     create_dnstt_service "$DOMAIN" "$MTU" "$SSH_PORT"
     save_dnstt_info "$DOMAIN" "$PUBLIC_KEY" "$MTU" "$SSH_PORT"
     configure_dnstt_firewall
     apply_buffer_optimization; apply_bbr; apply_network_tuning; apply_dns_caching
     systemctl start dnstt.service; sleep 2
-    systemctl is-active --quiet dnstt.service && echo -e "\n${C_GREEN}✅ Service running${C_RESET}" || journalctl -u dnstt.service -n 20 --no-pager
+    systemctl is-active --quiet dnstt.service && echo -e "\n${C_GREEN}✅ Running${C_RESET}" || journalctl -u dnstt.service -n 20 --no-pager
     show_client_commands "$DOMAIN" "$MTU" "$SSH_PORT"
     press_enter
 }
 
 uninstall_dnstt() {
-    echo -e "\n${C_BLUE}🗑️ Uninstalling DNSTT...${C_RESET}"
     systemctl stop dnstt.service 2>/dev/null; systemctl disable dnstt.service 2>/dev/null
     rm -f "$DNSTT_SERVICE_FILE" "$DNSTT_BINARY" "$DNSTT_CLIENT"
     rm -f "$DNSTT_KEYS_DIR/server.key" "$DNSTT_KEYS_DIR/server.pub"
     rm -f "$DB_DIR/domain.txt" "$DNSTT_CONFIG_FILE" "$MTU_CONFIG"
     systemctl daemon-reload
-    echo -e "${C_GREEN}✅ DNSTT uninstalled${C_RESET}"
-    press_enter
-}
-
-set_custom_dnstt_domain() {
-    clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🌐 Set Custom Domain ---${C_RESET}"
-    [ ! -f "$DNSTT_SERVICE_FILE" ] && { echo -e "\n${C_RED}❌ DNSTT not installed.${C_RESET}"; press_enter; return; }
-    local cd=$(cat "$DB_DIR/domain.txt" 2>/dev/null || echo "Not set")
-    echo -e "\n${C_CYAN}Current: ${C_YELLOW}$cd${C_RESET}\n"
-    read -p "👉 New domain: " new_domain
-    [[ -z "$new_domain" ]] && { echo -e "${C_RED}❌ Empty.${C_RESET}"; press_enter; return; }
-    [[ ! "$new_domain" =~ ^[a-zA-Z0-9.-]+$ ]] && { echo -e "${C_RED}❌ Invalid.${C_RESET}"; press_enter; return; }
-    read -p "👉 Confirm? (y/n): " confirm
-    [[ "$confirm" != "y" ]] && return
-    echo "$new_domain" > "$DB_DIR/domain.txt"
-    local mtu=$(get_current_mtu)
-    local ssh_port=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1)
-    ssh_port=${ssh_port:-22}
-    systemctl stop dnstt.service 2>/dev/null
-    sed -i "s|ExecStart=.*|ExecStart=$DNSTT_BINARY -udp :5300 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $mtu $new_domain 127.0.0.1:$ssh_port|" "$DNSTT_SERVICE_FILE"
-    [ -f "$DNSTT_CONFIG_FILE" ] && sed -i "s|TUNNEL_DOMAIN=.*|TUNNEL_DOMAIN=\"$new_domain\"|" "$DNSTT_CONFIG_FILE"
-    systemctl daemon-reload; systemctl restart dnstt.service
-    sleep 2
-    systemctl is-active --quiet dnstt.service && echo -e "\n${C_GREEN}✅ Domain: $new_domain${C_RESET}" || echo -e "\n${C_RED}❌ Failed${C_RESET}"
-    press_enter
-}
-
-change_dnstt_domain() {
-    clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🌐 Auto-Generate Domain ---${C_RESET}"
-    [ ! -f "$DNSTT_SERVICE_FILE" ] && { echo -e "\n${C_RED}❌ DNSTT not installed.${C_RESET}"; press_enter; return; }
-    [ -f "$DB_DIR/domain.txt" ] && { local old=$(cat "$DB_DIR/domain.txt"); local olds=$(echo "$old" | cut -d. -f1); curl -s -X DELETE "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/$olds/NS/" -H "Authorization: Token $DESEC_TOKEN" >/dev/null 2>&1; }
-    local rand=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 3)
-    local ns_sub="ns-$rand"; local tun_sub="tun-$rand"
-    local ip=$(curl -s -4 icanhazip.com)
-    echo -e "\n${C_BLUE}🔄 Generating...${C_RESET}"
-    local ns_data="[{\"subname\":\"$ns_sub\",\"type\":\"A\",\"ttl\":3600,\"records\":[\"$ip\"]}]"
-    curl -s -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$ns_data" >/dev/null 2>&1
-    local ns_rec="[{\"subname\":\"$tun_sub\",\"type\":\"NS\",\"ttl\":3600,\"records\":[\"$ns_sub.$DESEC_DOMAIN.\"]}]"
-    local resp=$(curl -s -w "%{http_code}" -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$ns_rec")
-    local http=${resp: -3}
-    if [[ "$http" -eq 201 ]]; then
-        local new_domain="$tun_sub.$DESEC_DOMAIN"
-        echo "$new_domain" > "$DB_DIR/domain.txt"
-        local mtu=$(get_current_mtu)
-        local ssh_port=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1)
-        ssh_port=${ssh_port:-22}
-        systemctl stop dnstt.service 2>/dev/null
-        sed -i "s|ExecStart=.*|ExecStart=$DNSTT_BINARY -udp :5300 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $mtu $new_domain 127.0.0.1:$ssh_port|" "$DNSTT_SERVICE_FILE"
-        [ -f "$DNSTT_CONFIG_FILE" ] && sed -i "s|TUNNEL_DOMAIN=.*|TUNNEL_DOMAIN=\"$new_domain\"|" "$DNSTT_CONFIG_FILE"
-        systemctl daemon-reload; systemctl restart dnstt.service
-        echo -e "\n${C_GREEN}✅ Domain: $new_domain${C_RESET}"
-    else echo -e "\n${C_RED}❌ HTTP: $http${C_RESET}"; fi
-    press_enter
-}
-
-set_custom_dnstt_public_key() {
-    clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🔑 Set Custom Public Key ---${C_RESET}"
-    [ ! -f "$DNSTT_SERVICE_FILE" ] && { echo -e "\n${C_RED}❌ DNSTT not installed.${C_RESET}"; press_enter; return; }
-    local cp=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null || echo "Not set")
-    echo -e "\n${C_CYAN}Current:${C_RESET}\n${C_YELLOW}$cp${C_RESET}\n"
-    read -p "👉 New public key: " custom_pubkey
-    [[ -z "$custom_pubkey" ]] && { echo -e "${C_RED}❌ Empty.${C_RESET}"; press_enter; return; }
-    [[ ${#custom_pubkey} -lt 30 ]] && { echo -e "${C_RED}❌ Too short.${C_RESET}"; press_enter; return; }
-    read -p "👉 Confirm? (y/n): " confirm
-    [[ "$confirm" != "y" ]] && return
-    [ -f "$DNSTT_KEYS_DIR/server.pub" ] && cp "$DNSTT_KEYS_DIR/server.pub" "$DNSTT_KEYS_DIR/server.pub.bak.$(date +%s)"
-    echo "$custom_pubkey" > "$DNSTT_KEYS_DIR/server.pub"
-    chmod 644 "$DNSTT_KEYS_DIR/server.pub"
-    [ -f "$DNSTT_CONFIG_FILE" ] && sed -i "s|PUBLIC_KEY=.*|PUBLIC_KEY=\"$custom_pubkey\"|" "$DNSTT_CONFIG_FILE"
-    systemctl restart dnstt.service 2>/dev/null
-    sleep 2
-    systemctl is-active --quiet dnstt.service && echo -e "\n${C_GREEN}✅ Key updated!${C_RESET}" || echo -e "\n${C_RED}❌ Failed${C_RESET}"
-    press_enter
-}
-
-regenerate_dnstt_keys() {
-    clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🔑 Regenerate Keys ---${C_RESET}"
-    [ ! -f "$DNSTT_SERVICE_FILE" ] && { echo -e "\n${C_RED}❌ DNSTT not installed.${C_RESET}"; press_enter; return; }
-    read -p "⚠️ Generate NEW keys? (y/n): " confirm
-    [[ "$confirm" != "y" ]] && return
-    systemctl stop dnstt.service 2>/dev/null
-    [ -f "$DNSTT_KEYS_DIR/server.key" ] && { cp "$DNSTT_KEYS_DIR/server.key" "$DNSTT_KEYS_DIR/server.key.bak.$(date +%s)"; cp "$DNSTT_KEYS_DIR/server.pub" "$DNSTT_KEYS_DIR/server.pub.bak.$(date +%s)"; }
-    cd "$DNSTT_KEYS_DIR"; rm -f server.key server.pub
-    if ! "$DNSTT_BINARY" -gen-key -privkey-file server.key -pubkey-file server.pub 2>/dev/null; then
-        openssl rand -hex 32 > server.key
-        cat server.key | sha256sum | awk '{print $1}' > server.pub
-    fi
-    chmod 600 server.key; chmod 644 server.pub
-    local new_pubkey=$(cat server.pub 2>/dev/null)
-    [ -f "$DNSTT_CONFIG_FILE" ] && sed -i "s|PUBLIC_KEY=.*|PUBLIC_KEY=\"$new_pubkey\"|" "$DNSTT_CONFIG_FILE"
-    systemctl restart dnstt.service
-    sleep 2
-    systemctl is-active --quiet dnstt.service && echo -e "\n${C_GREEN}✅ New keys!${C_RESET}\n${C_CYAN}$new_pubkey${C_RESET}" || echo -e "\n${C_RED}❌ Failed${C_RESET}"
-    press_enter
-}
-
-show_dnstt_full_details() {
-    clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 📡 DNSTT Details ---${C_RESET}"
-    [ ! -f "$DB_DIR/domain.txt" ] && { echo -e "\n${C_YELLOW}DNSTT not installed${C_RESET}"; press_enter; return; }
-    local domain=$(cat "$DB_DIR/domain.txt" 2>/dev/null)
-    local mtu=$(get_current_mtu)
-    local pubkey=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null)
-    local ssh_port=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1)
-    ssh_port=${ssh_port:-22}
-    local status=""
-    systemctl is-active --quiet dnstt.service 2>/dev/null && status="${C_GREEN}● RUNNING${C_RESET}" || status="${C_RED}● STOPPED${C_RESET}"
-    echo -e "\n  ${C_YELLOW}Status:${C_RESET} $status"
-    echo -e "  ${C_YELLOW}Domain:${C_RESET} ${C_WHITE}$domain${C_RESET}"
-    echo -e "  ${C_YELLOW}MTU:${C_RESET} ${C_WHITE}$mtu${C_RESET}"
-    echo -e "  ${C_YELLOW}SSH Port:${C_RESET} ${C_WHITE}$ssh_port${C_RESET}"
-    echo -e "  ${C_YELLOW}Public Key:${C_RESET} ${C_GREEN}$pubkey${C_RESET}"
-    press_enter
+    echo -e "${C_GREEN}✅ DNSTT uninstalled${C_RESET}"; press_enter
 }
 
 dnstt_main_menu() {
@@ -1003,13 +838,11 @@ dnstt_main_menu() {
         local cp=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null || echo "Not set")
         echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
         echo -e "${C_BOLD}${C_PURPLE}                    📡 DNSTT MANAGEMENT${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo ""
+        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}\n"
         echo -e "  ${C_CYAN}Status:${C_RESET} $st"
         echo -e "  ${C_CYAN}Domain:${C_RESET} ${C_YELLOW}$cd${C_RESET}"
         echo -e "  ${C_CYAN}MTU:${C_RESET} ${C_YELLOW}$cm${C_RESET}"
-        echo -e "  ${C_CYAN}Public Key:${C_RESET} ${C_GREEN}${cp:0:35}...${C_RESET}"
-        echo ""
+        echo -e "  ${C_CYAN}Key:${C_RESET} ${C_GREEN}${cp:0:35}...${C_RESET}\n"
         echo -e "  ${C_GREEN}1)${C_RESET} Domain Management"
         echo -e "  ${C_GREEN}2)${C_RESET} Public Key Management"
         echo -e "  ${C_GREEN}3)${C_RESET} MTU Settings"
@@ -1033,12 +866,10 @@ dnstt_domain_menu() {
     while true; do
         clear; show_banner
         local cd=$(cat "$DB_DIR/domain.txt" 2>/dev/null || echo "Not set")
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}                    🌐 DOMAIN MANAGEMENT${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "\n  ${C_CYAN}Current:${C_RESET} ${C_YELLOW}$cd${C_RESET}\n"
+        echo -e "${C_BOLD}${C_PURPLE}═══ 🌐 DOMAIN MANAGEMENT ═══${C_RESET}\n"
+        echo -e "  Current: ${C_YELLOW}$cd${C_RESET}\n"
         echo -e "  ${C_GREEN}1)${C_RESET} Set Custom Domain"
-        echo -e "  ${C_GREEN}2)${C_RESET} Auto-Generate Domain"
+        echo -e "  ${C_GREEN}2)${C_RESET} Auto-Generate"
         echo -e "\n  ${C_RED}0)${C_RESET} Return"
         read -p "👉 Choice: " c
         case $c in
@@ -1054,12 +885,10 @@ dnstt_key_menu() {
     while true; do
         clear; show_banner
         local cp=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null || echo "Not set")
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}                    🔑 PUBLIC KEY MANAGEMENT${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "\n  ${C_CYAN}Current:${C_RESET}\n  ${C_GREEN}$cp${C_RESET}\n"
+        echo -e "${C_BOLD}${C_PURPLE}═══ 🔑 PUBLIC KEY MANAGEMENT ═══${C_RESET}\n"
+        echo -e "  Current:\n  ${C_GREEN}$cp${C_RESET}\n"
         echo -e "  ${C_GREEN}1)${C_RESET} Set Custom Public Key"
-        echo -e "  ${C_GREEN}2)${C_RESET} Regenerate Keys (Auto)"
+        echo -e "  ${C_GREEN}2)${C_RESET} Regenerate Keys"
         echo -e "\n  ${C_RED}0)${C_RESET} Return"
         read -p "👉 Choice: " c
         case $c in
@@ -1075,22 +904,20 @@ dnstt_mtu_menu() {
     while true; do
         clear; show_banner
         local cm=$(get_current_mtu)
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}                    📡 MTU CONFIG${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "\n  ${C_CYAN}Current:${C_RESET} ${C_YELLOW}$cm${C_RESET}\n"
+        echo -e "${C_BOLD}${C_PURPLE}═══ 📡 MTU CONFIG ═══${C_RESET}\n"
+        echo -e "  Current: ${C_YELLOW}$cm${C_RESET}\n"
         echo -e "  ${C_GREEN}1)${C_RESET} 512  ${C_GREEN}4)${C_RESET} 1400"
         echo -e "  ${C_GREEN}2)${C_RESET} 900  ${C_GREEN}5)${C_RESET} 1500"
         echo -e "  ${C_GREEN}3)${C_RESET} 1200 ${C_GREEN}6)${C_RESET} Custom"
         echo -e "\n  ${C_RED}0)${C_RESET} Return"
         read -p "👉 Choice: " c
         case $c in
-            1) echo "512" > "$MTU_CONFIG"; set_dnstt_mtu "512"; press_enter ;;
-            2) echo "900" > "$MTU_CONFIG"; set_dnstt_mtu "900"; press_enter ;;
-            3) echo "1200" > "$MTU_CONFIG"; set_dnstt_mtu "1200"; press_enter ;;
-            4) echo "1400" > "$MTU_CONFIG"; set_dnstt_mtu "1400"; press_enter ;;
-            5) echo "1500" > "$MTU_CONFIG"; set_dnstt_mtu "1500"; press_enter ;;
-            6) read -p "MTU (512-1500): " cm2; echo "$cm2" > "$MTU_CONFIG"; set_dnstt_mtu "$cm2"; press_enter ;;
+            1) set_dnstt_mtu "512"; press_enter ;;
+            2) set_dnstt_mtu "900"; press_enter ;;
+            3) set_dnstt_mtu "1200"; press_enter ;;
+            4) set_dnstt_mtu "1400"; press_enter ;;
+            5) set_dnstt_mtu "1500"; press_enter ;;
+            6) read -p "MTU (512-1500): " cm2; set_dnstt_mtu "$cm2"; press_enter ;;
             0) return ;;
         esac
     done
@@ -1110,17 +937,14 @@ set_dnstt_mtu() {
 dnstt_speed_menu() {
     while true; do
         clear; show_banner
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}                    ⚡ SPEED BOOSTERS${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo ""
+        echo -e "${C_BOLD}${C_PURPLE}═══ ⚡ SPEED BOOSTERS ═══${C_RESET}\n"
         echo -e "  ${C_GREEN}[1]${C_RESET} Standard (1000x)"
         echo -e "  ${C_GREEN}[2]${C_RESET} Medium (2000x)"
         echo -e "  ${C_GREEN}[3]${C_RESET} High (3000x)"
         echo -e "  ${C_GREEN}[4]${C_RESET} Ultra (5000x)"
         echo -e "  ${C_GREEN}[5]${C_RESET} Extreme (10000x)"
-        echo -e "  ${C_GREEN}[6]${C_RESET} Ultra Plus (768MB)"
-        echo -e "  ${C_GREEN}[7]${C_RESET} Extreme Plus (1GB)"
+        echo -e "  ${C_GREEN}[6]${C_RESET} Ultra Plus"
+        echo -e "  ${C_GREEN}[7]${C_RESET} Extreme Plus"
         echo -e "\n  ${C_RED}[0]${C_RESET} Return"
         read -p "👉 Choice: " c
         case $c in
@@ -1136,9 +960,117 @@ dnstt_speed_menu() {
     done
 }
 
-# ========== FIREWALL ==========
+set_custom_dnstt_domain() {
+    clear; show_banner
+    [ ! -f "$DNSTT_SERVICE_FILE" ] && { echo -e "\n${C_RED}❌ DNSTT not installed.${C_RESET}"; press_enter; return; }
+    local cd=$(cat "$DB_DIR/domain.txt" 2>/dev/null || echo "Not set")
+    echo -e "\n${C_CYAN}Current: ${C_YELLOW}$cd${C_RESET}\n"
+    read -p "👉 New domain: " new_domain
+    [[ -z "$new_domain" ]] && return
+    [[ ! "$new_domain" =~ ^[a-zA-Z0-9.-]+$ ]] && { echo -e "${C_RED}❌ Invalid.${C_RESET}"; press_enter; return; }
+    read -p "👉 Confirm? (y/n): " confirm
+    [[ "$confirm" != "y" ]] && return
+    echo "$new_domain" > "$DB_DIR/domain.txt"
+    local mtu=$(get_current_mtu)
+    local ssh_port=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1)
+    ssh_port=${ssh_port:-22}
+    systemctl stop dnstt.service 2>/dev/null
+    sed -i "s|ExecStart=.*|ExecStart=$DNSTT_BINARY -udp :5300 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $mtu $new_domain 127.0.0.1:$ssh_port|" "$DNSTT_SERVICE_FILE"
+    [ -f "$DNSTT_CONFIG_FILE" ] && sed -i "s|TUNNEL_DOMAIN=.*|TUNNEL_DOMAIN=\"$new_domain\"|" "$DNSTT_CONFIG_FILE"
+    systemctl daemon-reload; systemctl restart dnstt.service
+    sleep 2
+    systemctl is-active --quiet dnstt.service && echo -e "\n${C_GREEN}✅ $new_domain${C_RESET}" || echo -e "\n${C_RED}❌ Failed${C_RESET}"
+    press_enter
+}
+
+change_dnstt_domain() {
+    clear; show_banner
+    [ ! -f "$DNSTT_SERVICE_FILE" ] && { echo -e "\n${C_RED}❌ DNSTT not installed.${C_RESET}"; press_enter; return; }
+    [ -f "$DB_DIR/domain.txt" ] && { local old=$(cat "$DB_DIR/domain.txt"); local olds=$(echo "$old" | cut -d. -f1); curl -s -X DELETE "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/$olds/NS/" -H "Authorization: Token $DESEC_TOKEN" >/dev/null 2>&1; }
+    local rand=$(head /dev/urandom | tr -dc 'a-z0-9' | head -c 3)
+    local ns_sub="ns-$rand"; local tun_sub="tun-$rand"
+    local ip=$(curl -s -4 icanhazip.com)
+    local ns_data="[{\"subname\":\"$ns_sub\",\"type\":\"A\",\"ttl\":3600,\"records\":[\"$ip\"]}]"
+    curl -s -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$ns_data" >/dev/null 2>&1
+    local ns_rec="[{\"subname\":\"$tun_sub\",\"type\":\"NS\",\"ttl\":3600,\"records\":[\"$ns_sub.$DESEC_DOMAIN.\"]}]"
+    local resp=$(curl -s -w "%{http_code}" -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$ns_rec")
+    local http=${resp: -3}
+    if [[ "$http" -eq 201 ]]; then
+        local new_domain="$tun_sub.$DESEC_DOMAIN"
+        echo "$new_domain" > "$DB_DIR/domain.txt"
+        local mtu=$(get_current_mtu)
+        local ssh_port=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1)
+        ssh_port=${ssh_port:-22}
+        systemctl stop dnstt.service 2>/dev/null
+        sed -i "s|ExecStart=.*|ExecStart=$DNSTT_BINARY -udp :5300 -privkey-file $DNSTT_KEYS_DIR/server.key -mtu $mtu $new_domain 127.0.0.1:$ssh_port|" "$DNSTT_SERVICE_FILE"
+        [ -f "$DNSTT_CONFIG_FILE" ] && sed -i "s|TUNNEL_DOMAIN=.*|TUNNEL_DOMAIN=\"$new_domain\"|" "$DNSTT_CONFIG_FILE"
+        systemctl daemon-reload; systemctl restart dnstt.service
+        echo -e "\n${C_GREEN}✅ $new_domain${C_RESET}"
+    else echo -e "\n${C_RED}❌ HTTP: $http${C_RESET}"; fi
+    press_enter
+}
+
+set_custom_dnstt_public_key() {
+    clear; show_banner
+    [ ! -f "$DNSTT_SERVICE_FILE" ] && { echo -e "\n${C_RED}❌ DNSTT not installed.${C_RESET}"; press_enter; return; }
+    local cp=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null || echo "Not set")
+    echo -e "\n${C_CYAN}Current:${C_RESET}\n${C_YELLOW}$cp${C_RESET}\n"
+    read -p "👉 New public key: " custom_pubkey
+    [[ -z "$custom_pubkey" ]] && return
+    [[ ${#custom_pubkey} -lt 30 ]] && { echo -e "${C_RED}❌ Too short.${C_RESET}"; press_enter; return; }
+    read -p "👉 Confirm? (y/n): " confirm
+    [[ "$confirm" != "y" ]] && return
+    [ -f "$DNSTT_KEYS_DIR/server.pub" ] && cp "$DNSTT_KEYS_DIR/server.pub" "$DNSTT_KEYS_DIR/server.pub.bak.$(date +%s)"
+    echo "$custom_pubkey" > "$DNSTT_KEYS_DIR/server.pub"
+    chmod 644 "$DNSTT_KEYS_DIR/server.pub"
+    [ -f "$DNSTT_CONFIG_FILE" ] && sed -i "s|PUBLIC_KEY=.*|PUBLIC_KEY=\"$custom_pubkey\"|" "$DNSTT_CONFIG_FILE"
+    systemctl restart dnstt.service 2>/dev/null
+    sleep 2
+    systemctl is-active --quiet dnstt.service && echo -e "\n${C_GREEN}✅ Key updated!${C_RESET}" || echo -e "\n${C_RED}❌ Failed${C_RESET}"
+    press_enter
+}
+
+regenerate_dnstt_keys() {
+    clear; show_banner
+    [ ! -f "$DNSTT_SERVICE_FILE" ] && { echo -e "\n${C_RED}❌ DNSTT not installed.${C_RESET}"; press_enter; return; }
+    read -p "⚠️ Generate NEW keys? (y/n): " confirm
+    [[ "$confirm" != "y" ]] && return
+    systemctl stop dnstt.service 2>/dev/null
+    [ -f "$DNSTT_KEYS_DIR/server.key" ] && { cp "$DNSTT_KEYS_DIR/server.key" "$DNSTT_KEYS_DIR/server.key.bak.$(date +%s)"; cp "$DNSTT_KEYS_DIR/server.pub" "$DNSTT_KEYS_DIR/server.pub.bak.$(date +%s)"; }
+    cd "$DNSTT_KEYS_DIR"; rm -f server.key server.pub
+    if ! "$DNSTT_BINARY" -gen-key -privkey-file server.key -pubkey-file server.pub 2>/dev/null; then
+        openssl rand -hex 32 > server.key
+        cat server.key | sha256sum | awk '{print $1}' > server.pub
+    fi
+    chmod 600 server.key; chmod 644 server.pub
+    local new_pubkey=$(cat server.pub 2>/dev/null)
+    [ -f "$DNSTT_CONFIG_FILE" ] && sed -i "s|PUBLIC_KEY=.*|PUBLIC_KEY=\"$new_pubkey\"|" "$DNSTT_CONFIG_FILE"
+    systemctl restart dnstt.service
+    sleep 2
+    systemctl is-active --quiet dnstt.service && echo -e "\n${C_GREEN}✅ New keys!${C_RESET}\n${C_CYAN}$new_pubkey${C_RESET}" || echo -e "\n${C_RED}❌ Failed${C_RESET}"
+    press_enter
+}
+
+show_dnstt_full_details() {
+    clear; show_banner
+    [ ! -f "$DB_DIR/domain.txt" ] && { echo -e "\n${C_YELLOW}Not installed${C_RESET}"; press_enter; return; }
+    local domain=$(cat "$DB_DIR/domain.txt" 2>/dev/null)
+    local mtu=$(get_current_mtu)
+    local pubkey=$(cat "$DNSTT_KEYS_DIR/server.pub" 2>/dev/null)
+    local ssh_port=$(ss -tlnp 2>/dev/null | grep sshd | awk '{print $4}' | cut -d: -f2 | head -1)
+    ssh_port=${ssh_port:-22}
+    local status=""
+    systemctl is-active --quiet dnstt.service 2>/dev/null && status="${C_GREEN}● RUNNING${C_RESET}" || status="${C_RED}● STOPPED${C_RESET}"
+    echo -e "\n  ${C_YELLOW}Status:${C_RESET} $status"
+    echo -e "  ${C_YELLOW}Domain:${C_RESET} ${C_WHITE}$domain${C_RESET}"
+    echo -e "  ${C_YELLOW}MTU:${C_RESET} ${C_WHITE}$mtu${C_RESET}"
+    echo -e "  ${C_YELLOW}SSH Port:${C_RESET} ${C_WHITE}$ssh_port${C_RESET}"
+    echo -e "  ${C_YELLOW}Public Key:${C_RESET} ${C_GREEN}$pubkey${C_RESET}"
+    press_enter
+}
+
 configure_dnstt_firewall() {
-    echo -e "\n${C_BLUE}🔥 Configuring firewall...${C_RESET}"
+    echo -e "\n${C_BLUE}🔥 Firewall...${C_RESET}"
     ! command -v iptables &>/dev/null && ff_apt_install iptables iptables-persistent
     iptables -t nat -F 2>/dev/null || true
     iptables -F 2>/dev/null || true
@@ -1150,10 +1082,9 @@ configure_dnstt_firewall() {
     command -v netfilter-persistent &>/dev/null && netfilter-persistent save >/dev/null 2>&1
     mkdir -p /etc/iptables
     iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
-    echo -e "${C_GREEN}✅ Firewall configured${C_RESET}"
+    echo -e "${C_GREEN}✅ Firewall${C_RESET}"
 }
 
-# ========== OPTIMIZATIONS ==========
 apply_buffer_optimization() {
     cat >> /etc/sysctl.conf << 'EOF'
 net.core.rmem_max=1073741824
@@ -1194,7 +1125,6 @@ EOF
 # ========== PROTOCOLS ==========
 install_badvpn() {
     clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🚀 Installing badvpn ---${C_RESET}"
     ff_apt_install cmake make gcc git build-essential libssl-dev
     cd /tmp; rm -rf badvpn
     git clone https://github.com/ambrop72/badvpn.git 2>/dev/null
@@ -1212,21 +1142,17 @@ Restart=always
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload; systemctl enable badvpn.service 2>/dev/null; systemctl start badvpn.service
-    echo -e "${C_GREEN}✅ badvpn on port 7300${C_RESET}"
-    press_enter
+    echo -e "${C_GREEN}✅ badvpn 7300${C_RESET}"; press_enter
 }
 
 uninstall_badvpn() {
     systemctl stop badvpn.service 2>/dev/null; systemctl disable badvpn.service 2>/dev/null
     rm -f "$BADVPN_SERVICE_FILE" "$BADVPN_BIN"
-    systemctl daemon-reload
-    echo -e "${C_GREEN}✅ badvpn uninstalled${C_RESET}"; press_enter
+    systemctl daemon-reload; echo -e "${C_GREEN}✅ Removed${C_RESET}"; press_enter
 }
 
 install_udp_custom() {
     clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🚀 Installing udp-custom ---${C_RESET}"
-    mkdir -p /usr/local/bin
     local arch=$(uname -m)
     if [[ "$arch" == "x86_64" ]]; then curl -sL -o "$UDP_CUSTOM_BIN" "https://github.com/voltrontech/udp-custom/releases/latest/download/udp-custom-linux-amd64"
     else curl -sL -o "$UDP_CUSTOM_BIN" "https://github.com/voltrontech/udp-custom/releases/latest/download/udp-custom-linux-arm64"; fi
@@ -1243,32 +1169,25 @@ Restart=always
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload; systemctl enable udp-custom.service 2>/dev/null; systemctl start udp-custom.service
-    echo -e "${C_GREEN}✅ udp-custom installed${C_RESET}"; press_enter
+    echo -e "${C_GREEN}✅ udp-custom${C_RESET}"; press_enter
 }
 
 uninstall_udp_custom() {
     systemctl stop udp-custom.service 2>/dev/null; systemctl disable udp-custom.service 2>/dev/null
     rm -f "$UDP_CUSTOM_SERVICE_FILE" "$UDP_CUSTOM_BIN"
-    systemctl daemon-reload
-    echo -e "${C_GREEN}✅ udp-custom uninstalled${C_RESET}"; press_enter
+    systemctl daemon-reload; echo -e "${C_GREEN}✅ Removed${C_RESET}"; press_enter
 }
 
 install_ssl_tunnel() {
     clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🔒 Installing SSL Tunnel ---${C_RESET}"
     ff_apt_install haproxy openssl
     mkdir -p "$SSL_CERT_DIR"
     openssl req -x509 -newkey rsa:2048 -nodes -days 365 -keyout "$SSL_CERT_DIR/voltrontech.key" -out "$SSL_CERT_DIR/voltrontech.crt" -subj "/CN=VOLTRON TECH" 2>/dev/null
     cat "$SSL_CERT_DIR/voltrontech.crt" "$SSL_CERT_DIR/voltrontech.key" > "$SSL_CERT_FILE" 2>/dev/null
     cat > "$HAPROXY_CONFIG" << EOF
 global
-    log /dev/log local0
-    chroot /var/lib/haproxy
-    user haproxy
-    group haproxy
     daemon
 defaults
-    log global
     mode tcp
     timeout connect 5000
     timeout client 50000
@@ -1280,24 +1199,23 @@ backend ssh_backend
     server ssh_server 127.0.0.1:22
 EOF
     systemctl restart haproxy
-    echo -e "${C_GREEN}✅ SSL Tunnel on port 444${C_RESET}"; press_enter
+    echo -e "${C_GREEN}✅ SSL 444${C_RESET}"; press_enter
 }
 
 uninstall_ssl_tunnel() {
     systemctl stop haproxy 2>/dev/null
     ff_apt_purge haproxy
     rm -f "$HAPROXY_CONFIG" "$SSL_CERT_FILE"
-    echo -e "${C_GREEN}✅ SSL uninstalled${C_RESET}"; press_enter
+    echo -e "${C_GREEN}✅ Removed${C_RESET}"; press_enter
 }
 
 install_falcon_proxy() {
     clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🦅 Installing Falcon Proxy ---${C_RESET}"
     local arch=$(uname -m)
     if [[ "$arch" == "x86_64" ]]; then curl -sL -o "$FALCONPROXY_BINARY" "https://github.com/firewallfalcons/FirewallFalcon-Manager/releases/latest/download/falconproxy"
     else curl -sL -o "$FALCONPROXY_BINARY" "https://github.com/firewallfalcons/FirewallFalcon-Manager/releases/latest/download/falconproxyarm"; fi
     chmod +x "$FALCONPROXY_BINARY"
-    read -p "👉 Port(s) [8080]: " ports; ports=${ports:-8080}
+    read -p "Port [8080]: " ports; ports=${ports:-8080}
     cat > "$FALCONPROXY_SERVICE_FILE" << EOF
 [Unit]
 Description=Falcon Proxy
@@ -1310,26 +1228,24 @@ Restart=always
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload; systemctl enable falconproxy.service 2>/dev/null; systemctl start falconproxy.service
-    echo -e "${C_GREEN}✅ Falcon Proxy on port $ports${C_RESET}"; press_enter
+    echo -e "${C_GREEN}✅ Falcon $ports${C_RESET}"; press_enter
 }
 
 uninstall_falcon_proxy() {
     systemctl stop falconproxy.service 2>/dev/null; systemctl disable falconproxy.service 2>/dev/null
     rm -f "$FALCONPROXY_SERVICE_FILE" "$FALCONPROXY_BINARY"
-    systemctl daemon-reload
-    echo -e "${C_GREEN}✅ Falcon uninstalled${C_RESET}"; press_enter
+    systemctl daemon-reload; echo -e "${C_GREEN}✅ Removed${C_RESET}"; press_enter
 }
 
 install_zivpn() {
     clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 🛡️ Installing ZiVPN ---${C_RESET}"
     local arch=$(uname -m)
     if [[ "$arch" == "x86_64" ]]; then curl -sL -o "$ZIVPN_BIN" "https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-amd64"
     else curl -sL -o "$ZIVPN_BIN" "https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-arm64"; fi
     chmod +x "$ZIVPN_BIN"
     mkdir -p "$ZIVPN_DIR"
     openssl req -x509 -newkey rsa:4096 -nodes -days 365 -keyout "$ZIVPN_DIR/server.key" -out "$ZIVPN_DIR/server.crt" -subj "/CN=ZiVPN" 2>/dev/null
-    read -p "Passwords (comma-sep) [user1,user2]: " passwords; passwords=${passwords:-user1,user2}
+    read -p "Passwords [user1,user2]: " passwords; passwords=${passwords:-user1,user2}
     IFS=',' read -ra pass_array <<< "$passwords"
     json_passwords=$(printf '"%s",' "${pass_array[@]}")
     json_passwords="[${json_passwords%,}]"
@@ -1348,20 +1264,18 @@ Restart=always
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload; systemctl enable zivpn.service 2>/dev/null; systemctl start zivpn.service
-    echo -e "${C_GREEN}✅ ZiVPN on port 5667${C_RESET}"; press_enter
+    echo -e "${C_GREEN}✅ ZiVPN 5667${C_RESET}"; press_enter
 }
 
 uninstall_zivpn() {
     systemctl stop zivpn.service 2>/dev/null; systemctl disable zivpn.service 2>/dev/null
     rm -f "$ZIVPN_SERVICE_FILE" "$ZIVPN_BIN"
     rm -rf "$ZIVPN_DIR"
-    systemctl daemon-reload
-    echo -e "${C_GREEN}✅ ZiVPN uninstalled${C_RESET}"; press_enter
+    systemctl daemon-reload; echo -e "${C_GREEN}✅ Removed${C_RESET}"; press_enter
 }
 
 install_xui_panel() {
     clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}--- 💻 Installing X-UI ---${C_RESET}"
     bash <(curl -Ls https://raw.githubusercontent.com/alireza0/x-ui/master/install.sh)
     press_enter
 }
@@ -1370,7 +1284,7 @@ uninstall_xui_panel() {
     command -v x-ui &>/dev/null && x-ui uninstall
     rm -f /usr/local/bin/x-ui
     rm -rf /etc/x-ui /usr/local/x-ui
-    echo -e "${C_GREEN}✅ X-UI uninstalled${C_RESET}"; press_enter
+    echo -e "${C_GREEN}✅ Removed${C_RESET}"; press_enter
 }
 
 protocol_menu() {
@@ -1383,34 +1297,31 @@ protocol_menu() {
         local fs=""; systemctl is-active --quiet falconproxy 2>/dev/null && fs="${C_GREEN}● RUNNING${C_RESET}" || fs="${C_DIM}● STOPPED${C_RESET}"
         local zs=""; systemctl is-active --quiet zivpn 2>/dev/null && zs="${C_GREEN}● RUNNING${C_RESET}" || zs="${C_DIM}● STOPPED${C_RESET}"
         local xs=""; command -v x-ui &>/dev/null && xs="${C_GREEN}● INSTALLED${C_RESET}" || xs="${C_DIM}● NOT INSTALLED${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}              🔌 PROTOCOL MANAGEMENT${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo ""
-        echo -e "  ${C_GREEN}1)${C_RESET} badvpn (UDP 7300)        $bs"
-        echo -e "  ${C_GREEN}2)${C_RESET} udp-custom              $us"
-        echo -e "  ${C_GREEN}3)${C_RESET} SSL Tunnel (HAProxy)    $hs"
-        echo -e "  ${C_GREEN}4)${C_RESET} DNSTT (Port 53)         $ds"
-        echo -e "  ${C_GREEN}5)${C_RESET} Falcon Proxy            $fs"
-        echo -e "  ${C_GREEN}6)${C_RESET} ZiVPN                   $zs"
-        echo -e "  ${C_GREEN}7)${C_RESET} X-UI Panel              $xs"
+        echo -e "${C_BOLD}${C_PURPLE}═══ 🔌 PROTOCOL MANAGEMENT ═══${C_RESET}\n"
+        echo -e "  ${C_GREEN}1)${C_RESET} badvpn $bs"
+        echo -e "  ${C_GREEN}2)${C_RESET} udp-custom $us"
+        echo -e "  ${C_GREEN}3)${C_RESET} SSL HAProxy $hs"
+        echo -e "  ${C_GREEN}4)${C_RESET} DNSTT $ds"
+        echo -e "  ${C_GREEN}5)${C_RESET} Falcon Proxy $fs"
+        echo -e "  ${C_GREEN}6)${C_RESET} ZiVPN $zs"
+        echo -e "  ${C_GREEN}7)${C_RESET} X-UI $xs"
         echo -e "\n  ${C_RED}0)${C_RESET} Return"
         read -p "👉 Select: " choice
         case $choice in
-            1) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_badvpn || uninstall_badvpn ;;
-            2) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_udp_custom || uninstall_udp_custom ;;
-            3) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_ssl_tunnel || uninstall_ssl_tunnel ;;
-            4) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_GREEN}2)${C_RESET} Manage\n  ${C_RED}3)${C_RESET} Uninstall"; read -p "👉 " sub; case $sub in 1) install_dnstt ;; 2) dnstt_main_menu ;; 3) uninstall_dnstt ;; esac ;;
-            5) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_falcon_proxy || uninstall_falcon_proxy ;;
-            6) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_zivpn || uninstall_zivpn ;;
-            7) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_xui_panel || uninstall_xui_panel ;;
+            1) echo "1)Install 2)Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_badvpn || uninstall_badvpn ;;
+            2) echo "1)Install 2)Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_udp_custom || uninstall_udp_custom ;;
+            3) echo "1)Install 2)Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_ssl_tunnel || uninstall_ssl_tunnel ;;
+            4) echo "1)Install 2)Manage 3)Uninstall"; read -p "👉 " sub; case $sub in 1) install_dnstt ;; 2) dnstt_main_menu ;; 3) uninstall_dnstt ;; esac ;;
+            5) echo "1)Install 2)Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_falcon_proxy || uninstall_falcon_proxy ;;
+            6) echo "1)Install 2)Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_zivpn || uninstall_zivpn ;;
+            7) echo "1)Install 2)Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_xui_panel || uninstall_xui_panel ;;
             0) return ;;
             *) sleep 2 ;;
         esac
     done
 }
 
-# ========== DYNAMIC BANNER ==========
+# ========== DYNAMIC BANNER (Match User per-user — FIXED) ==========
 update_ssh_banners_config() {
     if [[ ! -f "$BANNER_ENABLED_FILE" ]]; then
         rm -f "$SSHD_FF_CONFIG" 2>/dev/null
@@ -1418,25 +1329,35 @@ update_ssh_banners_config() {
         return
     fi
     mkdir -p "$BANNER_DIR" /etc/ssh/sshd_config.d
+    local tmp="/tmp/voltron-banners.conf"
+    echo "# Voltron Tech - Dynamic Banners" > "$tmp"
+    echo "# Generated: $(date)" >> "$tmp"
+    echo "" >> "$tmp"
     if [[ -f "$DB_FILE" ]]; then
         while IFS=: read -r user pass expiry limit bandwidth_gb _rest; do
             [[ -z "$user" || "$user" == \#* ]] && continue
             [[ ! -f "$BANNER_DIR/${user}.txt" ]] && generate_user_banner "$user" "$expiry" "$limit" "$bandwidth_gb"
+            [[ ! -f "$BANNER_DIR/${user}.txt" ]] && continue
+            echo "Match User $user" >> "$tmp"
+            echo "    Banner /etc/voltrontech/banners/${user}.txt" >> "$tmp"
+            echo "" >> "$tmp"
         done < "$DB_FILE"
     fi
-    cat > "$SSHD_FF_CONFIG" << 'EOF'
-# Voltron Tech - Dynamic Banners
-Match User *
-    Banner /etc/voltrontech/banners/%u.txt
-EOF
-    grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null || \
-        echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
-    if sshd -t 2>/dev/null; then
-        systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+    chmod 644 "$tmp" 2>/dev/null
+    if ! cmp -s "$tmp" "$SSHD_FF_CONFIG" 2>/dev/null; then
+        mv "$tmp" "$SSHD_FF_CONFIG"
+        chmod 644 "$SSHD_FF_CONFIG"
+        grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null || \
+            echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
+        if sshd -t 2>/dev/null; then
+            systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+        else
+            echo -e "${C_RED}⚠️ SSH config test failed, removing${C_RESET}"
+            rm -f "$SSHD_FF_CONFIG"
+            systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+        fi
     else
-        echo -e "${C_RED}⚠️ SSH config test failed, removing banner config${C_RESET}"
-        rm -f "$SSHD_FF_CONFIG"
-        systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+        rm -f "$tmp"
     fi
 }
 
@@ -1448,6 +1369,7 @@ enable_dynamic_banner() {
         while IFS=: read -r user pass expiry limit bandwidth_gb _rest; do
             [[ -z "$user" || "$user" == \#* ]] && continue
             generate_user_banner "$user" "$expiry" "$limit" "$bandwidth_gb"
+            chmod 644 "$BANNER_DIR/${user}.txt" 2>/dev/null
             ((count++))
         done < "$DB_FILE"
     fi
@@ -1455,6 +1377,8 @@ enable_dynamic_banner() {
     if sshd -t 2>/dev/null; then
         systemctl restart voltrontech-limiter 2>/dev/null
         echo -e "\n${C_GREEN}✅ Dynamic Banner ENABLED ($count users)${C_RESET}"
+        echo -e "${C_CYAN}📌 Banner itaonekana kwenye terminal (PuTTY, Termux, JuiceSSH)${C_RESET}"
+        echo -e "${C_CYAN}📌 VPN client apps (HTTP Injector, NapsternetV) hazionyeshi banner${C_RESET}"
     else
         rm -f "$SSHD_FF_CONFIG"
         systemctl restart sshd 2>/dev/null
@@ -1472,12 +1396,11 @@ disable_dynamic_banner() {
 
 preview_dynamic_ssh_banner() {
     [[ ! -f "$BANNER_ENABLED_FILE" ]] && { echo -e "\n${C_RED}❌ Not enabled${C_RESET}"; press_enter; return; }
-    _select_user_interface "--- 📝 Preview Dynamic Banner ---"
+    _select_user_interface "--- 📝 Preview ---"
     local u=$SELECTED_USER
     [[ -z "$u" || "$u" == "NO_USERS" ]] && return
-    echo -e "\n${C_CYAN}--- Banner for '$u' ---${C_RESET}\n"
-    if [[ -f "$BANNER_DIR/${u}.txt" ]]; then
-        cat "$BANNER_DIR/${u}.txt"
+    echo -e "\n${C_CYAN}--- Banner '$u' ---${C_RESET}\n"
+    if [[ -f "$BANNER_DIR/${u}.txt" ]]; then cat "$BANNER_DIR/${u}.txt"
     else
         local line=$(grep "^$u:" "$DB_FILE")
         generate_user_banner "$u" "$(echo "$line"|cut -d: -f3)" "$(echo "$line"|cut -d: -f4)" "$(echo "$line"|cut -d: -f5)"
@@ -1490,15 +1413,11 @@ ssh_banner_menu() {
     while true; do
         clear; show_banner
         local st=""; [[ -f "$BANNER_ENABLED_FILE" ]] && st="${C_GREEN}● ENABLED${C_RESET}" || st="${C_RED}● DISABLED${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}           🎨 DYNAMIC BANNER MANAGEMENT${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo ""
-        echo -e "  ${C_CYAN}Status:${C_RESET} $st"
-        echo ""
+        echo -e "${C_BOLD}${C_PURPLE}═══ 🎨 DYNAMIC BANNER ═══${C_RESET}\n"
+        echo -e "  Status: $st\n"
         echo -e "  ${C_GREEN}1)${C_RESET} Enable"
         echo -e "  ${C_RED}2)${C_RESET} Disable"
-        echo -e "  ${C_GREEN}3)${C_RESET} Preview (Select User)"
+        echo -e "  ${C_GREEN}3)${C_RESET} Preview"
         echo -e "\n  ${C_RED}0)${C_RESET} Return"
         read -p "👉 Choice: " c
         case $c in
@@ -1531,20 +1450,14 @@ web_panel_menu() {
         local dns_ip=$(dig +short "$WEB_PANEL_API_DOMAIN" 2>/dev/null | tail -1)
         if [[ "$dns_ip" == "$current_ip" ]] && [[ -n "$dns_ip" ]]; then dns_status="${C_GREEN}● OK${C_RESET}"
         else dns_status="${C_YELLOW}● NOT SET${C_RESET}"; fi
-
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}              🌐 WEB PANEL MANAGEMENT${C_RESET}"
-        echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-        echo ""
-        echo -e "  ${C_CYAN}API Domain:${C_RESET}   ${C_YELLOW}$WEB_PANEL_API_DOMAIN${C_RESET}"
-        echo -e "  ${C_CYAN}VPS IP:${C_RESET}       ${C_YELLOW}$current_ip${C_RESET}"
-        echo ""
-        echo -e "  ${C_CYAN}API:${C_RESET}          $api_status"
-        echo -e "  ${C_CYAN}Nginx:${C_RESET}        $nginx_status"
-        echo -e "  ${C_CYAN}SSL:${C_RESET}          $ssl_status"
-        echo -e "  ${C_CYAN}DNS:${C_RESET}          $dns_status"
-        echo ""
-        echo -e "${C_BOLD}${C_PURPLE}───────────────────────────────────────────────────────────────${C_RESET}"
+        echo -e "${C_BOLD}${C_PURPLE}═══ 🌐 WEB PANEL MANAGEMENT ═══${C_RESET}\n"
+        echo -e "  API Domain:   ${C_YELLOW}$WEB_PANEL_API_DOMAIN${C_RESET}"
+        echo -e "  VPS IP:       ${C_YELLOW}$current_ip${C_RESET}\n"
+        echo -e "  API:          $api_status"
+        echo -e "  Nginx:        $nginx_status"
+        echo -e "  SSL:          $ssl_status"
+        echo -e "  DNS:          $dns_status\n"
+        echo -e "${C_PURPLE}─────────────────────────────────────────${C_RESET}"
         echo -e "  ${C_GREEN}[ 1]${C_RESET} 🚀 Full Setup (API + DNS + Nginx + SSL)"
         echo -e "  ${C_GREEN}[ 2]${C_RESET} 📥 Install API Only"
         echo -e "  ${C_GREEN}[ 3]${C_RESET} 🌐 Setup DNS Only"
@@ -1555,10 +1468,8 @@ web_panel_menu() {
         echo -e "  ${C_GREEN}[ 8]${C_RESET} 🔑 View API Info"
         echo -e "  ${C_GREEN}[ 9]${C_RESET} 🔄 Restart API"
         echo -e "  ${C_GREEN}[10]${C_RESET} 📝 Copy for Lovable AI"
-        echo -e ""
         echo -e "  ${C_RED}[11]${C_RESET} 🗑️  Remove Web Panel"
         echo -e "  ${C_RED}[ 0]${C_RESET} Return"
-        echo ""
         read -p "👉 Select: " choice
         case $choice in
             1) web_panel_full_setup ;;
@@ -1594,21 +1505,73 @@ web_panel_full_setup() {
 web_panel_install_api() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 📥 Installing API Server ---${C_RESET}\n"
+
     if [ -f "/etc/systemd/system/voltrontech-api.service" ]; then
-        read -p "Reinstall? (y/n): " reinstall
+        echo -e "${C_YELLOW}⚠️  API already installed${C_RESET}"
+        read -p "👉 Reinstall? (y/n): " reinstall
         [[ "$reinstall" != "y" ]] && return
         systemctl stop voltrontech-api 2>/dev/null
+        systemctl disable voltrontech-api 2>/dev/null
+        rm -f /etc/systemd/system/voltrontech-api.service
+        systemctl daemon-reload
     fi
+
     local API_KEY="voltron_$(head /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 32)"
-    ff_apt_install python3 python3-pip python3-venv curl jq
+
+    echo -e "${C_BLUE}[1/8] Installing dependencies...${C_RESET}"
+    ff_apt_update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -o Dpkg::Use-Pty=0 \
+        python3 python3-pip python3-venv python3-full curl jq 2>&1 | tail -2
+
+    if ! command -v python3 &>/dev/null; then
+        echo -e "${C_RED}❌ python3 install failed!${C_RESET}"
+        press_enter; return 1
+    fi
+    echo -e "${C_GREEN}✅ $(python3 --version)${C_RESET}"
+
+    echo -e "\n${C_BLUE}[2/8] Creating directory...${C_RESET}"
     mkdir -p "$API_DIR"
-    cd "$API_DIR"
-    [ ! -d "venv" ] && python3 -m venv venv
+    cd "$API_DIR" || { echo -e "${C_RED}❌ Cannot cd${C_RESET}"; press_enter; return 1; }
+
+    echo -e "\n${C_BLUE}[3/8] Virtual environment...${C_RESET}"
+    rm -rf venv
+    if ! python3 -m venv venv; then
+        echo -e "${C_RED}❌ venv failed! Install python3-venv python3-full${C_RESET}"
+        press_enter; return 1
+    fi
     source venv/bin/activate
-    pip install -q --upgrade pip
-    pip install -q flask flask-cors gunicorn
+    pip install --upgrade pip 2>&1 | tail -1
+    echo -e "${C_BLUE}Installing Flask + Gunicorn...${C_RESET}"
+    if ! pip install flask flask-cors gunicorn 2>&1 | tail -2; then
+        echo -e "${C_RED}❌ pip install failed${C_RESET}"
+        deactivate; press_enter; return 1
+    fi
     deactivate
+    echo -e "${C_GREEN}✅ venv ready${C_RESET}"
+
+    echo -e "\n${C_BLUE}[4/8] Writing API code...${C_RESET}"
     web_panel_create_api_code
+    if [ ! -f "$API_DIR/api.py" ]; then
+        echo -e "${C_RED}❌ api.py not created!${C_RESET}"
+        press_enter; return 1
+    fi
+    if ! python3 -m py_compile "$API_DIR/api.py" 2>/dev/null; then
+        echo -e "${C_RED}❌ api.py has syntax error!${C_RESET}"
+        python3 -m py_compile "$API_DIR/api.py"
+        press_enter; return 1
+    fi
+    echo -e "${C_GREEN}✅ api.py valid${C_RESET}"
+
+    echo -e "\n${C_BLUE}[5/8] Checking port $API_PORT...${C_RESET}"
+    local port_owner=$(ss -tlnp 2>/dev/null | grep ":$API_PORT " | awk '{print $NF}' | head -1)
+    if [ -n "$port_owner" ]; then
+        echo -e "${C_YELLOW}⚠️ Port $API_PORT in use. Killing...${C_RESET}"
+        fuser -k ${API_PORT}/tcp 2>/dev/null
+        sleep 1
+    fi
+    echo -e "${C_GREEN}✅ Port free${C_RESET}"
+
+    echo -e "\n${C_BLUE}[6/8] Systemd service...${C_RESET}"
     local SERVER_HOST=$(cat "$DB_DIR/domain.txt" 2>/dev/null || echo "vpn.voltrontechtx.shop")
     cat > /etc/systemd/system/voltrontech-api.service << EOF
 [Unit]
@@ -1622,31 +1585,58 @@ WorkingDirectory=$API_DIR
 Environment="API_KEY=$API_KEY"
 Environment="DB_DIR=$DB_DIR"
 Environment="SERVER_HOST=$SERVER_HOST"
-Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ExecStart=$API_DIR/venv/bin/gunicorn --workers 4 --bind 0.0.0.0:$API_PORT --timeout 120 api:app
+Environment="PATH=$API_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=$API_DIR/venv/bin/gunicorn --workers 2 --bind 0.0.0.0:$API_PORT --timeout 120 --access-logfile /var/log/voltrontech-api.log --error-logfile /var/log/voltrontech-api.log api:app
 Restart=always
 RestartSec=5
+StandardOutput=append:/var/log/voltrontech-api.log
+StandardError=append:/var/log/voltrontech-api.log
 
 [Install]
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
     systemctl enable voltrontech-api >/dev/null 2>&1
+
+    echo -e "\n${C_BLUE}[7/8] Starting API...${C_RESET}"
+    touch /var/log/voltrontech-api.log
     systemctl start voltrontech-api
-    sleep 3
+    sleep 5
+
+    echo -e "\n${C_BLUE}[8/8] Verifying...${C_RESET}"
     if systemctl is-active --quiet voltrontech-api; then
-        local SERVER_IP=$(curl -s -4 icanhazip.com)
-        cat > "$API_INFO_FILE" << EOF
+        local test_resp=$(curl -s http://localhost:$API_PORT/api/health 2>/dev/null)
+        if echo "$test_resp" | grep -q '"success":true'; then
+            local SERVER_IP=$(curl -s -4 icanhazip.com)
+            cat > "$API_INFO_FILE" << EOF
 API_URL=http://$SERVER_IP:$API_PORT
 API_KEY=$API_KEY
 EOF
-        echo "$API_KEY" > "$API_KEY_FILE"
-        chmod 600 "$API_KEY_FILE"
-        echo -e "\n${C_GREEN}✅ API: http://$SERVER_IP:$API_PORT${C_RESET}"
-        echo -e "${C_GREEN}🔑 Key: $API_KEY${C_RESET}"
+            echo "$API_KEY" > "$API_KEY_FILE"
+            chmod 600 "$API_KEY_FILE"
+            echo ""
+            echo -e "${C_GREEN}═══════════════════════════════════════════════════════════════${C_RESET}"
+            echo -e "${C_GREEN}           ✅ API SERVER INSTALLED & RUNNING!${C_RESET}"
+            echo -e "${C_GREEN}═══════════════════════════════════════════════════════════════${C_RESET}\n"
+            echo -e "  ${C_CYAN}🌐 URL:${C_RESET}  ${C_YELLOW}http://$SERVER_IP:$API_PORT${C_RESET}"
+            echo -e "  ${C_CYAN}🔑 Key:${C_RESET}  ${C_GREEN}$API_KEY${C_RESET}"
+        else
+            echo -e "\n${C_YELLOW}⚠️  Service running lakini health check failed${C_RESET}"
+            echo -e "${C_CYAN}Response: $test_resp${C_RESET}"
+            echo -e "\n${C_BLUE}Last 20 log lines:${C_RESET}"
+            tail -20 /var/log/voltrontech-api.log
+        fi
     else
-        echo -e "\n${C_RED}❌ Failed${C_RESET}"
-        journalctl -u voltrontech-api -n 20 --no-pager
+        echo -e "\n${C_RED}❌ API failed to start!${C_RESET}"
+        echo -e "\n${C_YELLOW}--- systemctl status ---${C_RESET}"
+        systemctl status voltrontech-api --no-pager -l 2>&1 | head -20
+        echo -e "\n${C_YELLOW}--- Last 30 log lines ---${C_RESET}"
+        journalctl -u voltrontech-api -n 30 --no-pager
+        echo -e "\n${C_YELLOW}--- API log ---${C_RESET}"
+        tail -30 /var/log/voltrontech-api.log 2>/dev/null
+        echo -e "\n${C_CYAN}Debug manually:${C_RESET}"
+        echo "  cd $API_DIR && source venv/bin/activate && python3 api.py"
     fi
     press_enter
 }
@@ -1654,6 +1644,7 @@ EOF
 web_panel_create_api_code() {
     cat > "$API_DIR/api.py" << 'APIEOF'
 #!/usr/bin/env python3
+"""Voltron Tech API Server v11.0"""
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from functools import wraps
@@ -1775,7 +1766,7 @@ def now_iso(): return datetime.now().isoformat()
 
 @app.route('/api/health')
 def health():
-    return jsonify({'success': True, 'status': 'ok', 'service': 'Voltron Tech API', 'version': '10.13', 'protocols_active': len(get_protocols()), 'timestamp': now_iso()})
+    return jsonify({'success': True, 'status': 'ok', 'service': 'Voltron Tech API', 'version': '11.0', 'protocols_active': len(get_protocols()), 'timestamp': now_iso()})
 
 @app.route('/api/trial/check', methods=['POST'])
 @require_api_key
@@ -1841,6 +1832,157 @@ def ulist():
         r.append({'username': u['username'], 'expiry': u['expiry'], 'limit': int(u['limit']), 'bandwidth_limit': float(u['bandwidth']), 'bandwidth_used_gb': round(ub / 1073741824, 2), 'status': get_status(u['username']), 'online': get_online(u['username'])})
     return jsonify({'success': True, 'timestamp': now_iso(), 'users': r, 'total': len(r)})
 
+@app.route('/api/users/create', methods=['POST'])
+@require_api_key
+def users_create():
+    d = request.get_json() or {}
+    u = d.get('username', '').strip().lower()
+    p = d.get('password', '').strip()
+    days = int(d.get('days', 30))
+    limit = int(d.get('limit', DEFAULT_LIMIT))
+    bw = float(d.get('bandwidth', 0))
+    if not u or len(u) < 3 or len(u) > 20: return jsonify({'success': False, 'error': 'Username 3-20 chars'}), 400
+    if not u.replace('-', '').replace('_', '').isalnum(): return jsonify({'success': False, 'error': 'Invalid chars'}), 400
+    if not p or len(p) < 4: return jsonify({'success': False, 'error': 'Password too short'}), 400
+    if user_exists(u): return jsonify({'success': False, 'error': 'User exists'}), 400
+    try:
+        run_safe(['useradd', '-m', '-s', '/usr/sbin/nologin', u])
+        run_safe(['usermod', '-aG', 'ffusers', u])
+        subprocess.run(['chpasswd'], input=f'{u}:{p}', text=True, capture_output=True)
+        e = (datetime.now() + timedelta(days=days)).strftime('%Y-%m-%d')
+        run_safe(['chage', '-E', e, u])
+        with open(DB_FILE, 'a') as f: f.write(f'{u}:{p}:{e}:{limit}:{bw}:0:ACTIVE\n')
+        return jsonify({'success': True, 'message': f'User {u} created', 'account': {'username': u, 'password': p, 'expiry': e, 'limit': limit, 'bandwidth': bw}})
+    except Exception as ex:
+        return jsonify({'success': False, 'error': str(ex)}), 500
+
+@app.route('/api/users/delete', methods=['POST'])
+@require_api_key
+def users_delete():
+    d = request.get_json() or {}
+    u = d.get('username', '').strip()
+    if not u: return jsonify({'success': False, 'error': 'Username required'}), 400
+    if not user_exists(u) and not any(x['username'] == u for x in read_users()):
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+    try:
+        run_shell(f'killall -u {u} -9 2>/dev/null')
+        run_safe(['userdel', '-r', u])
+        run_shell(f'rm -f {BANDWIDTH_DIR}/{u}.usage')
+        run_shell(f'rm -rf {BANDWIDTH_DIR}/pidtrack/{u}')
+        run_shell(f"sed -i '/^{u}:/d' {DB_FILE}")
+        return jsonify({'success': True, 'message': f'User {u} deleted'})
+    except Exception as ex:
+        return jsonify({'success': False, 'error': str(ex)}), 500
+
+@app.route('/api/users/lock', methods=['POST'])
+@require_api_key
+def users_lock():
+    d = request.get_json() or {}
+    u = d.get('username', '').strip()
+    if not u: return jsonify({'success': False, 'error': 'Username required'}), 400
+    if not user_exists(u): return jsonify({'success': False, 'error': 'User not found'}), 404
+    try:
+        run_safe(['usermod', '-L', u])
+        run_shell(f'killall -u {u} -9 2>/dev/null')
+        return jsonify({'success': True, 'message': f'User {u} locked'})
+    except Exception as ex:
+        return jsonify({'success': False, 'error': str(ex)}), 500
+
+@app.route('/api/users/unlock', methods=['POST'])
+@require_api_key
+def users_unlock():
+    d = request.get_json() or {}
+    u = d.get('username', '').strip()
+    if not u: return jsonify({'success': False, 'error': 'Username required'}), 400
+    if not user_exists(u): return jsonify({'success': False, 'error': 'User not found'}), 404
+    try:
+        run_safe(['usermod', '-U', u])
+        return jsonify({'success': True, 'message': f'User {u} unlocked'})
+    except Exception as ex:
+        return jsonify({'success': False, 'error': str(ex)}), 500
+
+@app.route('/api/users/edit', methods=['POST'])
+@require_api_key
+def users_edit():
+    d = request.get_json() or {}
+    u = d.get('username', '').strip()
+    if not u or not user_exists(u): return jsonify({'success': False, 'error': 'User not found'}), 404
+    try:
+        line = run_shell(f"grep '^{u}:' {DB_FILE}")
+        if not line: return jsonify({'success': False, 'error': 'DB entry missing'}), 404
+        parts = line.split(':')
+        cur_pass = parts[1] if len(parts) > 1 else ''
+        cur_exp = parts[2] if len(parts) > 2 else ''
+        cur_limit = parts[3] if len(parts) > 3 else '999'
+        cur_bw = parts[4] if len(parts) > 4 else '0'
+        new_pass = d.get('password', cur_pass)
+        days = d.get('days')
+        new_limit = d.get('limit', cur_limit)
+        new_bw = d.get('bandwidth', cur_bw)
+        if new_pass and new_pass != cur_pass:
+            subprocess.run(['chpasswd'], input=f'{u}:{new_pass}', text=True, capture_output=True)
+        if days:
+            new_exp = (datetime.now() + timedelta(days=int(days))).strftime('%Y-%m-%d')
+            run_safe(['chage', '-E', new_exp, u])
+            cur_exp = new_exp
+        run_shell(f"sed -i 's|^{u}:.*|{u}:{new_pass}:{cur_exp}:{new_limit}:{new_bw}:0:ACTIVE|' {DB_FILE}")
+        return jsonify({'success': True, 'message': f'User {u} updated', 'account': {'username': u, 'password': new_pass, 'expiry': cur_exp, 'limit': int(new_limit), 'bandwidth': float(new_bw)}})
+    except Exception as ex:
+        return jsonify({'success': False, 'error': str(ex)}), 500
+
+@app.route('/api/users/renew', methods=['POST'])
+@require_api_key
+def users_renew():
+    d = request.get_json() or {}
+    u = d.get('username', '').strip()
+    days = int(d.get('days', 30))
+    if not u or not user_exists(u): return jsonify({'success': False, 'error': 'User not found'}), 404
+    try:
+        new_exp = (datetime.now() + timedelta(days=days)).strftime('%Y-%m-%d')
+        run_safe(['chage', '-E', new_exp, u])
+        run_safe(['usermod', '-U', u])
+        line = run_shell(f"grep '^{u}:' {DB_FILE}")
+        parts = line.split(':')
+        run_shell(f"sed -i 's|^{u}:.*|{u}:{parts[1]}:{new_exp}:{parts[3]}:{parts[4]}:0:ACTIVE|' {DB_FILE}")
+        return jsonify({'success': True, 'message': f'User {u} renewed to {new_exp}', 'expiry': new_exp})
+    except Exception as ex:
+        return jsonify({'success': False, 'error': str(ex)}), 500
+
+@app.route('/api/users/reset_bandwidth', methods=['POST'])
+@require_api_key
+def users_reset_bw():
+    d = request.get_json() or {}
+    u = d.get('username', '').strip()
+    if not u or not user_exists(u): return jsonify({'success': False, 'error': 'User not found'}), 404
+    try:
+        run_shell(f'echo "0" > {BANDWIDTH_DIR}/{u}.usage')
+        run_safe(['usermod', '-U', u])
+        return jsonify({'success': True, 'message': f'Bandwidth reset for {u}'})
+    except Exception as ex:
+        return jsonify({'success': False, 'error': str(ex)}), 500
+
+@app.route('/api/cleanup/expired', methods=['POST'])
+@require_api_key
+def cleanup_expired_api():
+    try:
+        users = read_users()
+        deleted = []
+        for x in users:
+            try:
+                exp = datetime.strptime(x['expiry'], '%Y-%m-%d')
+                if exp < datetime.now():
+                    u = x['username']
+                    run_shell(f'killall -u {u} -9 2>/dev/null')
+                    run_safe(['userdel', '-r', u])
+                    run_shell(f'rm -f {BANDWIDTH_DIR}/{u}.usage')
+                    run_shell(f"sed -i '/^{u}:/d' {DB_FILE}")
+                    deleted.append(u)
+            except Exception:
+                pass
+        return jsonify({'success': True, 'deleted': deleted, 'count': len(deleted)})
+    except Exception as ex:
+        return jsonify({'success': False, 'error': str(ex)}), 500
+
 @app.route('/api/protocols/status')
 @require_api_key
 def pstat():
@@ -1880,7 +2022,7 @@ web_panel_dns_setup() {
     echo -e "  ${C_CYAN}API Domain:${C_RESET}  ${C_YELLOW}$WEB_PANEL_API_DOMAIN${C_RESET}\n"
     local existing=$(dig +short "$WEB_PANEL_API_DOMAIN" 2>/dev/null | tail -1)
     if [[ "$existing" == "$ip" ]]; then
-        echo -e "${C_GREEN}✅ DNS record exists${C_RESET}"; press_enter; return 0
+        echo -e "${C_GREEN}✅ DNS exists${C_RESET}"; press_enter; return 0
     fi
     local api_sub=$(echo "$WEB_PANEL_API_DOMAIN" | cut -d. -f1)
     local api_data="[{\"subname\":\"$api_sub\",\"type\":\"A\",\"ttl\":3600,\"records\":[\"$ip\"]}]"
@@ -1892,7 +2034,7 @@ web_panel_dns_setup() {
         curl -s -X PATCH "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/$api_sub/A/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "{\"records\":[\"$ip\"],\"ttl\":3600}" >/dev/null 2>&1
         echo -e "${C_GREEN}✅ DNS updated${C_RESET}"
     else
-        echo -e "${C_RED}❌ Failed (HTTP $http_code)${C_RESET}"
+        echo -e "${C_RED}❌ Failed HTTP $http_code${C_RESET}"
     fi
     press_enter
 }
@@ -1945,14 +2087,14 @@ web_panel_ssl_setup() {
     local ssl_email
     if [ -f "$WEB_PANEL_SSL_EMAIL_FILE" ]; then ssl_email=$(cat "$WEB_PANEL_SSL_EMAIL_FILE")
     else
-        read -p "👉 Email (or Enter to skip): " ssl_email
+        read -p "👉 Email (or Enter skip): " ssl_email
         [ -n "$ssl_email" ] && echo "$ssl_email" > "$WEB_PANEL_SSL_EMAIL_FILE"
     fi
     local cmd
     if [ -n "$ssl_email" ]; then cmd="certbot --nginx -d $WEB_PANEL_API_DOMAIN --non-interactive --agree-tos -m $ssl_email --redirect"
     else cmd="certbot --nginx -d $WEB_PANEL_API_DOMAIN --non-interactive --agree-tos --register-unsafely-without-email --redirect"; fi
     if eval "$cmd" 2>&1 | tee /tmp/certbot_webpanel.log | grep -q "Successfully"; then
-        echo -e "\n${C_GREEN}✅ SSL installed! https://$WEB_PANEL_API_DOMAIN${C_RESET}"
+        echo -e "\n${C_GREEN}✅ SSL! https://$WEB_PANEL_API_DOMAIN${C_RESET}"
         systemctl enable certbot.timer &>/dev/null; systemctl start certbot.timer &>/dev/null
     else
         echo -e "\n${C_RED}❌ SSL failed${C_RESET}"; tail -15 /tmp/certbot_webpanel.log
@@ -2009,16 +2151,23 @@ web_panel_view_api_info() {
     echo -e "${C_BOLD}${C_PURPLE}--- 🔑 API Information ---${C_RESET}\n"
     [ ! -f "$API_INFO_FILE" ] && { echo -e "${C_RED}❌ Not installed${C_RESET}"; press_enter; return; }
     echo -e "  ${C_YELLOW}🌐 HTTPS:${C_RESET}    ${C_GREEN}https://$WEB_PANEL_API_DOMAIN${C_RESET}"
-    echo -e "  ${C_YELLOW}🔑 API Key:${C_RESET}  ${C_GREEN}$(cat "$API_KEY_FILE" 2>/dev/null)${C_RESET}"
-    echo -e "  ${C_YELLOW}📊 Limit:${C_RESET}    ${C_WHITE}999${C_RESET}"
+    echo -e "  ${C_YELLOW}🔑 Key:${C_RESET}      ${C_GREEN}$(cat "$API_KEY_FILE" 2>/dev/null)${C_RESET}"
     echo -e "\n  ${C_YELLOW}📋 Endpoints:${C_RESET}"
+    echo "    GET  /api/health"
     echo "    POST /api/trial/check"
     echo "    POST /api/trial/create"
     echo "    GET  /api/trial/status/<username>"
-    echo "    GET  /api/protocols/status"
     echo "    GET  /api/users/list"
+    echo "    POST /api/users/create"
+    echo "    POST /api/users/delete"
+    echo "    POST /api/users/lock"
+    echo "    POST /api/users/unlock"
+    echo "    POST /api/users/edit"
+    echo "    POST /api/users/renew"
+    echo "    POST /api/users/reset_bandwidth"
+    echo "    POST /api/cleanup/expired"
+    echo "    GET  /api/protocols/status"
     echo "    GET  /api/dashboard/info"
-    echo "    GET  /api/health"
     press_enter
 }
 
@@ -2080,7 +2229,6 @@ SSH_CONF
     fi
     systemctl reload sshd 2>/dev/null || systemctl reload ssh 2>/dev/null
 }
-_connect_banner_to_ssh
 
 while true; do
     [[ ! -s "$DB_FILE" ]] && { sleep "$SCAN_INTERVAL"; continue; }
@@ -2096,7 +2244,6 @@ while true; do
         [[ -z "$status" ]] && status="ACTIVE"
         [[ "$limit" =~ ^[0-9]+$ ]] || limit=999
         [[ "$bandwidth_gb" =~ ^[0-9]+\.?[0-9]*$ ]] || bandwidth_gb=0
-        [[ "$traffic_used" =~ ^[0-9]+\.?[0-9]*$ ]] || traffic_used=0
         online_count=$(pgrep -c -u "$user" sshd 2>/dev/null || echo 0)
         [[ "$online_count" =~ ^[0-9]+$ ]] || online_count=0
         user_locked=false; is_expired=false; bw_exhausted=false
@@ -2155,6 +2302,7 @@ while true; do
             bf="$BANNER_DIR/${user}.txt"; tf="${bf}.tmp"
             printf "%s" "$banner_content" > "$tf"
             if ! cmp -s "$tf" "$bf" 2>/dev/null; then mv "$tf" "$bf"; else rm -f "$tf"; fi
+            chmod 644 "$bf" 2>/dev/null
         fi
         [[ -z "$bandwidth_gb" || "$bandwidth_gb" == "0" ]] && continue
         accumulated=$accum_disp
@@ -2334,7 +2482,6 @@ show_vps_dashboard() {
     local SSH_ST=$(systemctl is-active sshd 2>/dev/null || systemctl is-active ssh 2>/dev/null || echo "inactive")
     local DNSTT_ST=$(systemctl is-active dnstt 2>/dev/null || echo "inactive")
     local API_ST=$(systemctl is-active voltrontech-api 2>/dev/null || echo "inactive")
-
     make_bar() {
         local p=$1; local w=20
         local f=$((p * w / 100)); [[ $f -gt $w ]] && f=$w
@@ -2345,7 +2492,6 @@ show_vps_dashboard() {
         printf "%${e}s" | tr ' ' '░'
         printf "]${C_RESET} ${p}%%"
     }
-
     echo ""
     echo -e "${C_BOLD}${C_PURPLE}╔═══════════════════════════════════════════════════════════════════════════╗${C_RESET}"
     echo -e "${C_BOLD}${C_PURPLE}║${C_RESET}  ${C_BOLD}${C_WHITE}🖥️  VPS DASHBOARD${C_RESET}                                                       ${C_BOLD}${C_PURPLE}║${C_RESET}"
@@ -2374,12 +2520,9 @@ show_vps_dashboard() {
     [[ "$rc" != "0" ]] && show_vps_dashboard
 }
 
-# ========== DATA USAGE ==========
 show_vpn_data_usage() {
     clear; show_banner
-    echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_BOLD}${C_PURPLE}                 📊 VPN DATA USAGE${C_RESET}"
-    echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}\n"
+    echo -e "${C_BOLD}${C_PURPLE}═══ 📊 VPN DATA USAGE ═══${C_RESET}\n"
     [[ ! -s "$DB_FILE" ]] && { echo -e "${C_YELLOW}ℹ️ No users.${C_RESET}"; press_enter; return; }
     printf "${C_BOLD}${C_WHITE}%-15s | %-12s | %-10s${C_RESET}\n" "USERNAME" "USED" "STATUS"
     echo -e "${C_WHITE}──────────────────────────────────────────${C_RESET}"
@@ -2395,7 +2538,6 @@ show_vpn_data_usage() {
     press_enter
 }
 
-# ========== AUTO REBOOT ==========
 auto_reboot_menu() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- 🔄 Auto-Reboot ---${C_RESET}\n"
@@ -2414,7 +2556,6 @@ auto_reboot_menu() {
     esac
 }
 
-# ========== CACHE CLEANER ==========
 enable_cache_cleaner() {
     echo -e "\n${C_BLUE}🔧 ENABLING CACHE CLEANER${C_RESET}"
     touch /var/log/voltron-cache.log 2>/dev/null
@@ -2442,7 +2583,6 @@ EOF
 }
 
 disable_cache_cleaner() {
-    echo -e "\n${C_BLUE}🛑 DISABLING CACHE CLEANER${C_RESET}"
     rm -f "$CACHE_CRON_FILE" 2>/dev/null
     crontab -l 2>/dev/null | grep -v "voltron-cache-clean" | crontab - 2>/dev/null
     echo -e "${C_GREEN}✅ Disabled${C_RESET}"
@@ -2452,11 +2592,10 @@ disable_cache_cleaner() {
 cache_cleaner_menu() {
     while true; do
         clear; show_banner
-        echo -e "${C_BOLD}${C_PURPLE}           🧹 AUTO CACHE CLEANER${C_RESET}\n"
+        echo -e "${C_BOLD}${C_PURPLE}           🧹 CACHE CLEANER${C_RESET}\n"
         local st="${C_RED}DISABLED${C_RESET}"
         [ -f "$CACHE_CRON_FILE" ] && st="${C_GREEN}ENABLED${C_RESET}"
-        echo -e "  ${C_CYAN}Status:${C_RESET} $st"
-        echo -e "  ${C_CYAN}Schedule:${C_RESET} ${C_YELLOW}Daily 12:00 AM${C_RESET}\n"
+        echo -e "  Status: $st\n"
         echo -e "  ${C_GREEN}1)${C_RESET} Enable"
         echo -e "  ${C_RED}2)${C_RESET} Disable"
         echo -e "  ${C_RED}0)${C_RESET} Return"
@@ -2470,7 +2609,6 @@ cache_cleaner_menu() {
     done
 }
 
-# ========== ORPHAN CLEANUP ==========
 find_orphan_users() {
     local -a orphans=()
     while IFS=: read -r username _ uid _ _ home shell; do
@@ -2487,7 +2625,7 @@ find_orphan_users() {
 orphan_cleanup_menu() {
     while true; do
         clear; show_banner
-        echo -e "${C_BOLD}${C_PURPLE}           🔍 ORPHAN USER CLEANUP${C_RESET}\n"
+        echo -e "${C_BOLD}${C_PURPLE}           🔍 ORPHAN CLEANUP${C_RESET}\n"
         mapfile -t orphan_list < <(find_orphan_users)
         if [ ${#orphan_list[@]} -eq 0 ]; then
             echo -e "  ${C_GREEN}✅ No orphans.${C_RESET}"
@@ -2511,7 +2649,6 @@ orphan_cleanup_menu() {
     done
 }
 
-# ========== SYSTEM UTILITIES ==========
 system_utilities_menu() {
     while true; do
         clear; show_banner
@@ -2543,7 +2680,6 @@ system_utilities_menu() {
     done
 }
 
-# ========== INITIAL SETUP ==========
 initial_setup() {
     echo -e "\n${C_BLUE}🔧 Initial setup...${C_RESET}\n"
     ff_apt_install curl wget bc iptables openssl dnsutils jq at 2>/dev/null
@@ -2555,7 +2691,6 @@ initial_setup() {
     echo -e "${C_GREEN}✅ Initial setup complete${C_RESET}"
 }
 
-# ========== UNINSTALL ==========
 uninstall_script() {
     clear; show_banner
     echo -e "${C_RED}       💥 UNINSTALL VOLTRON TECH${C_RESET}\n"
@@ -2582,7 +2717,6 @@ uninstall_script() {
     exit 0
 }
 
-# ========== MAIN MENU ==========
 main_menu() {
     while true; do
         show_banner
@@ -2638,7 +2772,6 @@ main_menu() {
     done
 }
 
-# ========== STARTUP ==========
 if [[ $EUID -ne 0 ]]; then
     echo -e "${C_RED}❌ Run as root!${C_RESET}"
     exit 1
