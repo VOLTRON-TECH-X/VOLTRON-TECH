@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================
-# VOLTRON TECH ULTIMATE v10.13 — COMPLETE (FINAL)
+# VOLTRON TECH ULTIMATE v10.13 — COMPLETE (FINAL FIXED)
 # ================================================================
 
 C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_UL=$'\033[4m'
@@ -254,11 +254,8 @@ create_user() {
     chage -E "$expire_date" "$username"
     echo "$username:$password:$expire_date:$limit:$bandwidth_gb:0:ACTIVE" >> "$DB_FILE"
     local bw_display="Unlimited"; [[ "$bandwidth_gb" != "0" ]] && bw_display="${bandwidth_gb} GB"
-    
-    # Unda banner kila wakati + update config kama imewashwa
     generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"
     [[ -f "$BANNER_ENABLED_FILE" ]] && update_ssh_banners_config
-    
     clear; show_banner
     echo -e "${C_GREEN}✅ User '$username' created!${C_RESET}\n"
     echo -e "  👤 Username: ${C_YELLOW}$username${C_RESET}"
@@ -517,7 +514,7 @@ create_trial_account() {
     press_enter
 }
 
-# ========== SSH MANAGER CONFIG ==========
+# ========== CLIENT CONFIG (SSH MANAGER) ==========
 client_config_menu() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
@@ -736,19 +733,7 @@ JSONEOF
     press_enter
 }
 
-# ========== DNSTT BINARY ==========
-download_dnstt_binary() {
-    local arch=$(uname -m) url=""
-    if [[ "$arch" == "x86_64" ]]; then url="https://dnstt.network/dnstt-server-linux-amd64"
-    elif [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then url="https://dnstt.network/dnstt-server-linux-arm64"
-    else echo -e "${C_RED}❌ Unsupported: $arch${C_RESET}"; return 1; fi
-    curl -sL "$url" -o "$DNSTT_BINARY"; chmod +x "$DNSTT_BINARY"
-    if [[ "$arch" == "x86_64" ]]; then curl -sL "https://dnstt.network/dnstt-client-linux-amd64" -o "$DNSTT_CLIENT"
-    else curl -sL "https://dnstt.network/dnstt-client-linux-arm64" -o "$DNSTT_CLIENT"; fi
-    chmod +x "$DNSTT_CLIENT"
-    echo -e "${C_GREEN}✅ Binaries downloaded${C_RESET}"
-}
-
+# ========== SPEED BOOSTERS (7 — BUFFER VALUES SAHIHI) ==========
 apply_booster_standard_ultimate() {
     echo -e "\n${C_BLUE}⚡ STANDARD BOOSTER (1000x)${C_RESET}"
     modprobe tcp_bbr 2>/dev/null; modprobe sch_cake 2>/dev/null
@@ -861,6 +846,19 @@ apply_booster_extreme_plus() {
     sysctl -w net.core.wmem_max=1073741824 >/dev/null 2>&1
     ulimit -n 12582912 2>/dev/null
     echo -e "${C_GREEN}✅ Extreme Plus applied (buffer 12582912)${C_RESET}"
+}
+
+# ========== DNSTT FUNCTIONS ==========
+download_dnstt_binary() {
+    local arch=$(uname -m) url=""
+    if [[ "$arch" == "x86_64" ]]; then url="https://dnstt.network/dnstt-server-linux-amd64"
+    elif [[ "$arch" == "aarch64" || "$arch" == "arm64" ]]; then url="https://dnstt.network/dnstt-server-linux-arm64"
+    else echo -e "${C_RED}❌ Unsupported: $arch${C_RESET}"; return 1; fi
+    curl -sL "$url" -o "$DNSTT_BINARY"; chmod +x "$DNSTT_BINARY"
+    if [[ "$arch" == "x86_64" ]]; then curl -sL "https://dnstt.network/dnstt-client-linux-amd64" -o "$DNSTT_CLIENT"
+    else curl -sL "https://dnstt.network/dnstt-client-linux-arm64" -o "$DNSTT_CLIENT"; fi
+    chmod +x "$DNSTT_CLIENT"
+    echo -e "${C_GREEN}✅ Binaries downloaded${C_RESET}"
 }
 
 mtu_selection_during_install() {
@@ -991,7 +989,6 @@ uninstall_dnstt() {
     echo -e "${C_GREEN}✅ Uninstalled${C_RESET}"; press_enter
 }
 
-# ========== DNSTT MAIN MENU ==========
 dnstt_main_menu() {
     while true; do
         clear; show_banner
@@ -1080,7 +1077,6 @@ set_dnstt_mtu() {
     [ -f "$DNSTT_SERVICE_FILE" ] && { sed -i "s/-mtu [0-9]*/-mtu $m/g" "$DNSTT_SERVICE_FILE"; systemctl daemon-reload; systemctl restart dnstt.service 2>/dev/null; echo -e "${C_GREEN}✅ MTU: $m${C_RESET}"; }
 }
 
-# ========== SPEED MENU (WIMA) ==========
 dnstt_speed_menu() {
     while true; do
         clear; show_banner
@@ -1117,6 +1113,7 @@ dnstt_speed_menu() {
                 echo -e "  UDP wmem_min:   $(sysctl -n net.ipv4.udp_wmem_min 2>/dev/null)"
                 echo -e "  rmem_max:       $(sysctl -n net.core.rmem_max 2>/dev/null)"
                 echo -e "  wmem_max:       $(sysctl -n net.core.wmem_max 2>/dev/null)"
+                echo -e "  Backlog:        $(sysctl -n net.core.netdev_max_backlog 2>/dev/null)"
                 press_enter ;;
             9)
                 read -p "Reset? (y/n): " confirm
@@ -1217,7 +1214,7 @@ configure_dnstt_firewall() {
     echo -e "${C_GREEN}✅ Firewall${C_RESET}"
 }
 
-# ========== PROTOCOL MENU (FIXED inactive) ==========
+# ========== PROTOCOL MENU (FIXED) ==========
 protocol_menu() {
     while true; do
         clear; show_banner
@@ -1227,7 +1224,6 @@ protocol_menu() {
         local ds=$(systemctl is-active dnstt 2>/dev/null); [[ -z "$ds" ]] && ds="inactive"
         local fs=$(systemctl is-active falconproxy 2>/dev/null); [[ -z "$fs" ]] && fs="inactive"
         local zs=$(systemctl is-active zivpn 2>/dev/null); [[ -z "$zs" ]] && zs="inactive"
-        
         local bs_col="$C_DIM"; [[ "$bs" == "active" ]] && bs_col="$C_GREEN"
         local us_col="$C_DIM"; [[ "$us" == "active" ]] && us_col="$C_GREEN"
         local hs_col="$C_DIM"; [[ "$hs" == "active" ]] && hs_col="$C_GREEN"
@@ -1235,7 +1231,6 @@ protocol_menu() {
         local fs_col="$C_DIM"; [[ "$fs" == "active" ]] && fs_col="$C_GREEN"
         local zs_col="$C_DIM"; [[ "$zs" == "active" ]] && zs_col="$C_GREEN"
         local xs=""; command -v x-ui &>/dev/null && xs="${C_GREEN}● INSTALLED${C_RESET}" || xs="${C_DIM}● NOT INSTALLED${C_RESET}"
-        
         echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
         echo -e "${C_BOLD}${C_PURPLE}              🔌 PROTOCOL MANAGEMENT${C_RESET}"
         echo -e "${C_BOLD}${C_PURPLE}═══════════════════════════════════════════════════════════════${C_RESET}"
@@ -1286,9 +1281,9 @@ Restart=always
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload; systemctl enable badvpn.service 2>/dev/null; systemctl start badvpn.service
-    echo -e "${C_GREEN}✅ badvpn 7300${C_RESET}"; press_enter
+    echo "✅ badvpn"; press_enter
 }
-uninstall_badvpn() { systemctl stop badvpn.service 2>/dev/null; systemctl disable badvpn.service 2>/dev/null; rm -f "$BADVPN_SERVICE_FILE" "$BADVPN_BIN"; systemctl daemon-reload; echo "✅ Removed"; press_enter; }
+uninstall_badvpn() { systemctl stop badvpn.service 2>/dev/null; systemctl disable badvpn.service 2>/dev/null; rm -f "$BADVPN_SERVICE_FILE" "$BADVPN_BIN"; systemctl daemon-reload; echo "✅"; press_enter; }
 
 install_udp_custom() {
     clear; show_banner
@@ -1309,7 +1304,7 @@ EOF
     systemctl daemon-reload; systemctl enable udp-custom.service 2>/dev/null; systemctl start udp-custom.service
     echo "✅ udp-custom"; press_enter
 }
-uninstall_udp_custom() { systemctl stop udp-custom.service 2>/dev/null; systemctl disable udp-custom.service 2>/dev/null; rm -f "$UDP_CUSTOM_SERVICE_FILE" "$UDP_CUSTOM_BIN"; systemctl daemon-reload; echo "✅ Removed"; press_enter; }
+uninstall_udp_custom() { systemctl stop udp-custom.service 2>/dev/null; systemctl disable udp-custom.service 2>/dev/null; rm -f "$UDP_CUSTOM_SERVICE_FILE" "$UDP_CUSTOM_BIN"; systemctl daemon-reload; echo "✅"; press_enter; }
 
 install_ssl_tunnel() {
     clear; show_banner
@@ -1334,7 +1329,7 @@ EOF
     systemctl restart haproxy
     echo "✅ SSL 444"; press_enter
 }
-uninstall_ssl_tunnel() { systemctl stop haproxy 2>/dev/null; ff_apt_purge haproxy; rm -f "$HAPROXY_CONFIG" "$SSL_CERT_FILE"; echo "✅ Removed"; press_enter; }
+uninstall_ssl_tunnel() { systemctl stop haproxy 2>/dev/null; ff_apt_purge haproxy; rm -f "$HAPROXY_CONFIG" "$SSL_CERT_FILE"; echo "✅"; press_enter; }
 
 install_falcon_proxy() {
     clear; show_banner
@@ -1354,9 +1349,9 @@ Restart=always
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload; systemctl enable falconproxy.service 2>/dev/null; systemctl start falconproxy.service
-    echo "✅ Falcon $p"; press_enter
+    echo "✅ Falcon"; press_enter
 }
-uninstall_falcon_proxy() { systemctl stop falconproxy.service 2>/dev/null; systemctl disable falconproxy.service 2>/dev/null; rm -f "$FALCONPROXY_SERVICE_FILE" "$FALCONPROXY_BINARY"; systemctl daemon-reload; echo "✅ Removed"; press_enter; }
+uninstall_falcon_proxy() { systemctl stop falconproxy.service 2>/dev/null; systemctl disable falconproxy.service 2>/dev/null; rm -f "$FALCONPROXY_SERVICE_FILE" "$FALCONPROXY_BINARY"; systemctl daemon-reload; echo "✅"; press_enter; }
 
 install_zivpn() {
     clear; show_banner
@@ -1382,19 +1377,18 @@ Restart=always
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload; systemctl enable zivpn.service 2>/dev/null; systemctl start zivpn.service
-    echo "✅ ZiVPN 5667"; press_enter
+    echo "✅ ZiVPN"; press_enter
 }
-uninstall_zivpn() { systemctl stop zivpn.service 2>/dev/null; systemctl disable zivpn.service 2>/dev/null; rm -f "$ZIVPN_SERVICE_FILE" "$ZIVPN_BIN"; rm -rf "$ZIVPN_DIR"; systemctl daemon-reload; echo "✅ Removed"; press_enter; }
+uninstall_zivpn() { systemctl stop zivpn.service 2>/dev/null; systemctl disable zivpn.service 2>/dev/null; rm -f "$ZIVPN_SERVICE_FILE" "$ZIVPN_BIN"; rm -rf "$ZIVPN_DIR"; systemctl daemon-reload; echo "✅"; press_enter; }
 
 install_xui_panel() { clear; show_banner; bash <(curl -Ls https://raw.githubusercontent.com/alireza0/x-ui/master/install.sh); press_enter; }
-uninstall_xui_panel() { command -v x-ui &>/dev/null && x-ui uninstall; rm -f /usr/local/bin/x-ui; rm -rf /etc/x-ui /usr/local/x-ui; echo "✅ Removed"; press_enter; }
+uninstall_xui_panel() { command -v x-ui &>/dev/null && x-ui uninstall; rm -f /usr/local/bin/x-ui; rm -rf /etc/x-ui /usr/local/x-ui; echo "✅"; press_enter; }
 
-# ========== DYNAMIC BANNER (IMARA) ==========
+# ========== DYNAMIC BANNER ==========
 update_ssh_banners_config() {
     grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null || \
         echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
     mkdir -p "$BANNER_DIR" /etc/ssh/sshd_config.d
-
     if [[ ! -f "$BANNER_ENABLED_FILE" ]]; then
         rm -f "$SSHD_FF_CONFIG" 2>/dev/null
         if sshd -t 2>/dev/null; then
@@ -1402,7 +1396,6 @@ update_ssh_banners_config() {
         fi
         return
     fi
-
     local tmp="/tmp/voltron-banners.conf"
     {
         echo "# Voltron Tech - Dynamic Banners"
@@ -1420,9 +1413,7 @@ update_ssh_banners_config() {
             done < "$DB_FILE"
         fi
     } > "$tmp"
-
     chmod 644 "$tmp"
-
     if ! cmp -s "$tmp" "$SSHD_FF_CONFIG" 2>/dev/null; then
         mv "$tmp" "$SSHD_FF_CONFIG"
         chmod 644 "$SSHD_FF_CONFIG"
@@ -1448,13 +1439,11 @@ enable_dynamic_banner() {
     update_ssh_banners_config
     if sshd -t 2>/dev/null; then
         systemctl restart voltrontech-limiter 2>/dev/null
-        echo -e "\n${C_GREEN}✅ Dynamic Banner ENABLED ($count users)${C_RESET}"
-        echo -e "${C_CYAN}📌 Banner inaonekana kwenye terminal (PuTTY, Termux, JuiceSSH)${C_RESET}"
-        echo -e "${C_CYAN}📌 VPN client apps (HTTP Injector, NapsternetV) hazionyeshi banner${C_RESET}"
+        echo -e "\n${C_GREEN}✅ Enabled ($count users)${C_RESET}"
     else
         rm -f "$SSHD_FF_CONFIG"
         systemctl restart sshd 2>/dev/null
-        echo -e "\n${C_RED}❌ SSH config error${C_RESET}"
+        echo -e "\n${C_RED}❌ Error${C_RESET}"
     fi
     press_enter
 }
@@ -1470,7 +1459,7 @@ preview_dynamic_ssh_banner() {
     _select_user_interface "--- Preview ---"
     local u=$SELECTED_USER
     [[ -z "$u" || "$u" == "NO_USERS" ]] && return
-    [[ -f "$BANNER_DIR/${u}.txt" ]] && cat "$BANNER_DIR/${u}.txt" || echo -e "${C_RED}Not found${C_RESET}"
+    [[ -f "$BANNER_DIR/${u}.txt" ]] && cat "$BANNER_DIR/${u}.txt" || echo "Not found"
     press_enter
 }
 
@@ -1480,16 +1469,16 @@ ssh_banner_menu() {
         local st=""; [[ -f "$BANNER_ENABLED_FILE" ]] && st="${C_GREEN}● ENABLED${C_RESET}" || st="${C_RED}● DISABLED${C_RESET}"
         echo -e "${C_BOLD}${C_PURPLE}═══ 🎨 DYNAMIC BANNER ═══${C_RESET}\n"
         echo -e "  Status: $st\n"
-        echo -e "  ${C_GREEN}1)${C_RESET} Enable"
-        echo -e "  ${C_RED}2)${C_RESET} Disable"
-        echo -e "  ${C_GREEN}3)${C_RESET} Preview"
-        echo -e "\n  ${C_RED}0)${C_RESET} Return"
+        echo "  1) Enable"
+        echo "  2) Disable"
+        echo "  3) Preview"
+        echo "  0) Return"
         read -p "👉 " c
         case $c in 1) enable_dynamic_banner ;; 2) disable_dynamic_banner ;; 3) preview_dynamic_ssh_banner ;; 0) return ;; esac
     done
 }
 
-# ========== LIMITER (same banner) ==========
+# ========== LIMITER (SAME BANNER) ==========
 create_limiter_service() {
     cat > "$LIMITER_SCRIPT" << 'LIMEOF'
 #!/bin/bash
@@ -1501,7 +1490,6 @@ BANNER_ENABLED_FILE="/etc/voltrontech/banners_enabled"
 SCAN=15
 mkdir -p "$BW_DIR" "$PID_DIR" "$BANNER_DIR"
 shopt -s nullglob
-
 while true; do
     [[ ! -s "$DB_FILE" ]] && { sleep $SCAN; continue; }
     ts=$(date +%s)
@@ -1509,7 +1497,6 @@ while true; do
     [[ -f "$BANNER_ENABLED_FILE" ]] && dyn=true
     declare -A lk=()
     while read -r u _ s _; do [[ "$s" == "L" ]] && lk["$u"]=1; done < <(passwd -Sa 2>/dev/null)
-
     while IFS=: read -r user pass expiry limit bw traffic status; do
         [[ -z "$user" || "$user" == \#* ]] && continue
         [[ -z "$status" ]] && status="ACTIVE"
@@ -1786,7 +1773,7 @@ system_utilities_menu() {
     done
 }
 
-# ========== WEB PANEL (FULL) ==========
+# ========== WEB PANEL ==========
 web_panel_menu() {
     while true; do
         clear; show_banner
@@ -1799,24 +1786,20 @@ web_panel_menu() {
         local dip=$(dig +short "$WEB_PANEL_API_DOMAIN" 2>/dev/null | tail -1)
         local dns_st=""; [[ "$dip" == "$ip" ]] && dns_st="${C_GREEN}● OK${C_RESET}" || dns_st="${C_YELLOW}● NOT SET${C_RESET}"
         echo -e "${C_BOLD}${C_PURPLE}═══ 🌐 WEB PANEL ═══${C_RESET}\n"
-        echo -e "  Domain: $WEB_PANEL_API_DOMAIN"
-        echo -e "  VPS IP: $ip\n"
-        echo -e "  API:   $api_st"
-        echo -e "  Nginx: $ng_st"
-        echo -e "  SSL:   $ssl_st"
-        echo -e "  DNS:   $dns_st\n"
-        echo -e "  ${C_GREEN}[ 1]${C_RESET} 🚀 Full Setup"
-        echo -e "  ${C_GREEN}[ 2]${C_RESET} 📥 API Only"
-        echo -e "  ${C_GREEN}[ 3]${C_RESET} 🌐 DNS Only"
-        echo -e "  ${C_GREEN}[ 4]${C_RESET} ⚙️  Nginx Only"
-        echo -e "  ${C_GREEN}[ 5]${C_RESET} 🔒 SSL Only"
-        echo -e "  ${C_GREEN}[ 6]${C_RESET} 🧪 Test"
-        echo -e "  ${C_GREEN}[ 7]${C_RESET} 📋 Logs"
-        echo -e "  ${C_GREEN}[ 8]${C_RESET} 🔑 API Info"
-        echo -e "  ${C_GREEN}[ 9]${C_RESET} 🔄 Restart API"
-        echo -e "  ${C_GREEN}[10]${C_RESET} 📝 Copy for Lovable"
-        echo -e "  ${C_RED}[11]${C_RESET} 🗑️  Remove"
-        echo -e "  ${C_RED}[ 0]${C_RESET} Return"
+        echo -e "  Domain: $WEB_PANEL_API_DOMAIN\n  VPS IP: $ip\n"
+        echo -e "  API:   $api_st\n  Nginx: $ng_st\n  SSL:   $ssl_st\n  DNS:   $dns_st\n"
+        echo "  [ 1] 🚀 Full Setup"
+        echo "  [ 2] 📥 API Only"
+        echo "  [ 3] 🌐 DNS Only"
+        echo "  [ 4] ⚙️  Nginx Only"
+        echo "  [ 5] 🔒 SSL Only"
+        echo "  [ 6] 🧪 Test"
+        echo "  [ 7] 📋 Logs"
+        echo "  [ 8] 🔑 API Info"
+        echo "  [ 9] 🔄 Restart API"
+        echo "  [10] 📝 Copy for Lovable"
+        echo "  [11] 🗑️  Remove"
+        echo "  [ 0] Return"
         read -p "👉 " c
         case $c in
             1) web_panel_full_setup ;; 2) web_panel_install_api ;; 3) web_panel_dns_setup ;;
@@ -2246,7 +2229,7 @@ web_panel_test_all() {
     echo -e "${C_BLUE}[6/6] API key...${C_RESET}"
     if [ -n "$key" ]; then
         curl -s -H "X-API-Key: $key" "https://$WEB_PANEL_API_DOMAIN/api/protocols/status" 2>/dev/null | grep -q '"success":true' && { echo -e "     ${C_GREEN}✅${C_RESET}"; p=$((p+1)); } || { echo -e "     ${C_RED}❌${C_RESET}"; f=$((f+1)); }
-    else echo -e "     ${C_RED}❌ No key${C_RESET}"; f=$((f+1)); fi
+    else echo -e "     ${C_RED}❌${C_RESET}"; f=$((f+1)); fi
     echo ""
     [[ $f -eq 0 ]] && echo -e "${C_GREEN}✅ ALL PASSED ($p/6)${C_RESET}" || echo -e "${C_YELLOW}⚠️ Passed: $p/6 Failed: $f${C_RESET}"
     press_enter
@@ -2268,9 +2251,8 @@ web_panel_view_logs() {
 web_panel_view_api_info() {
     clear; show_banner
     [ ! -f "$API_KEY_FILE" ] && { echo "❌ Not installed"; press_enter; return; }
-    echo -e "  🌐 https://$WEB_PANEL_API_DOMAIN"
-    echo -e "  🔑 $(cat "$API_KEY_FILE")"
-    echo ""; echo "Endpoints:"
+    echo -e "  🌐 https://$WEB_PANEL_API_DOMAIN\n  🔑 $(cat "$API_KEY_FILE")\n"
+    echo "Endpoints:"
     echo "  POST /api/trial/check"
     echo "  POST /api/trial/create"
     echo "  GET  /api/trial/status/<user>"
@@ -2321,7 +2303,6 @@ initial_setup() {
     echo -e "${C_GREEN}✅ Setup complete${C_RESET}"
 }
 
-# ========== UNINSTALL ==========
 uninstall_script() {
     clear; show_banner
     read -p "Type YES to uninstall: " c
@@ -2352,15 +2333,14 @@ main_menu() {
         printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "3" "Edit User" "9" "Cleanup Expired"
         printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "4" "Lock User" "10" "Bulk Create"
         printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "5" "Unlock User" "11" "View Bandwidth"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "6" "Trial Account" "12" "📱 Client Config"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "6" "Trial Account" "12" "Orphan Cleanup"
         echo ""
         echo -e "${C_PURPLE}═══ 🔌 PROTOCOLS & SERVICES ═══${C_RESET}"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "13" "Protocols" "19" "Web Panel"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "14" "DNSTT Manage" "20" "System Utilities"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "15" "Speed Boosters" "21" "Restart Services"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "16" "VPS Dashboard" "22" "Orphan Cleanup"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s\n" "17" "Dynamic Banner"
-        printf "  ${C_GREEN}%2s${C_RESET}) %-25s\n" "18" "📱 SSH Manager Config"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "13" "Protocols" "18" "Web Panel"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "14" "DNSTT Manage" "19" "System Utilities"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "15" "Speed Boosters" "20" "Restart Services"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s  ${C_GREEN}%2s${C_RESET}) %-25s\n" "16" "VPS Dashboard" "21" "📱 Client Config"
+        printf "  ${C_GREEN}%2s${C_RESET}) %-25s\n" "17" "🎨 Dynamic Banner"
         echo ""
         echo -e "${C_PURPLE}═══ 🔥 DANGER ZONE ═══${C_RESET}"
         printf "  ${C_RED}%2s${C_RESET}) %-28s  ${C_RED}%2s${C_RESET}) %-25s\n" "99" "Uninstall" "0" "Exit"
@@ -2370,12 +2350,12 @@ main_menu() {
             1) create_user ;; 2) delete_user ;; 3) edit_user ;; 4) lock_user ;;
             5) unlock_user ;; 6) create_trial_account ;; 7) list_users ;; 8) renew_user ;;
             9) cleanup_expired ;; 10) bulk_create_users ;; 11) view_user_bandwidth ;;
-            12) client_config_menu ;;
+            12) orphan_cleanup_menu ;;
             13) protocol_menu ;; 14) dnstt_main_menu ;; 15) dnstt_speed_menu ;;
-            16) show_vps_dashboard ;; 17) ssh_banner_menu ;; 18) client_config_menu ;;
-            19) web_panel_menu ;; 20) system_utilities_menu ;;
-            21) echo "Restarting..."; systemctl restart dnstt badvpn udp-custom haproxy zivpn falconproxy voltrontech-limiter voltron-traffic voltrontech-api 2>/dev/null; echo "✅"; press_enter ;;
-            22) orphan_cleanup_menu ;;
+            16) show_vps_dashboard ;; 17) ssh_banner_menu ;; 18) web_panel_menu ;;
+            19) system_utilities_menu ;;
+            20) echo "Restarting..."; systemctl restart dnstt badvpn udp-custom haproxy zivpn falconproxy voltrontech-limiter voltron-traffic voltrontech-api 2>/dev/null; echo "✅"; press_enter ;;
+            21) client_config_menu ;;
             99) uninstall_script ;;
             0) echo -e "\n${C_GREEN}👋 Goodbye!${C_RESET}\n"; exit 0 ;;
             *) echo "❌ Invalid"; sleep 2 ;;
