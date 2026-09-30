@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================
-# VOLTRON TECH ULTIMATE v10.14 — COMPLETE (FIXED)
+# VOLTRON TECH ULTIMATE v10.15 — COMPLETE (BANNER FIXED)
 # ================================================================
 
 C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_UL=$'\033[4m'
@@ -75,7 +75,7 @@ show_banner() {
     refresh_banner_cache
     [[ -t 1 ]] && clear
     echo
-    echo -e "${C_PURPLE}   VOLTRON TECH ULTIMATE v10.14 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
+    echo -e "${C_PURPLE}   VOLTRON TECH ULTIMATE v10.15 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
     echo -e "${C_BLUE}   ─────────────────────────────────────────────────────────${C_RESET}"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "OS" "$BANNER_CACHE_OS_NAME" "Uptime: $BANNER_CACHE_UP_TIME"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "Memory" "${BANNER_CACHE_RAM_USAGE}% Used" "Online: ${C_WHITE}${BANNER_CACHE_ONLINE_USERS}${C_RESET}"
@@ -239,27 +239,57 @@ sync_all_banners() {
     fi
 }
 
-# ========== BANNER CONFIG — FIXED (Match User * — SSH HAIGOMI) ==========
+# ═══════════════════════════════════════════════════════════════════════
+# FIXED: update_ssh_banners_config (ile iliyokosekana kwenye v10.14)
+# - Inahamisha Include JUU ya sshd_config
+# - Inazima Banner /etc/bannerssh
+# - Inaweka PrintMotd yes
+# - Inaandika Match User * block halisi
+# ═══════════════════════════════════════════════════════════════════════
 update_ssh_banners_config() {
-    grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null || echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
+    if [[ ! -f /etc/ssh/sshd_config.voltron.bak ]]; then
+        cp /etc/ssh/sshd_config /etc/ssh/sshd_config.voltron.bak 2>/dev/null
+    fi
+
     mkdir -p "$BANNER_DIR" /etc/ssh/sshd_config.d
 
-    # Futa config za zamani za per-user (zilikuwa zinasababisha SSH kugoma)
+    # FIX #1: Zima Banner /etc/bannerssh
+    if grep -q "^Banner /etc/bannerssh" /etc/ssh/sshd_config 2>/dev/null; then
+        sed -i 's|^Banner /etc/bannerssh|#Banner /etc/bannerssh  # Disabled by Voltron|' /etc/ssh/sshd_config
+    fi
+
+    # FIX #2: Enable PrintMotd yes
+    sed -i 's/^#*PrintMotd.*/PrintMotd yes/' /etc/ssh/sshd_config 2>/dev/null
+    grep -q "^PrintMotd" /etc/ssh/sshd_config || echo "PrintMotd yes" >> /etc/ssh/sshd_config
+
+    # FIX #3: Hamisha Include JUU ya sshd_config
+    if grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null; then
+        local include_line=$(grep -n "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config | head -1 | cut -d: -f1)
+        if [[ "$include_line" -gt 5 ]]; then
+            sed -i '/^Include \/etc\/ssh\/sshd_config.d/d' /etc/ssh/sshd_config
+            sed -i '1i Include /etc/ssh/sshd_config.d/*.conf' /etc/ssh/sshd_config
+        fi
+    else
+        sed -i '1i Include /etc/ssh/sshd_config.d/*.conf' /etc/ssh/sshd_config
+    fi
+
+    # Futa config za per-user za zamani
     rm -f /etc/ssh/sshd_config.d/voltron-user-*.conf 2>/dev/null
 
+    # Kama banner haija-enable, futa config na urudi
     if [[ ! -f "$BANNER_ENABLED_FILE" ]]; then
         rm -f "$SSHD_FF_CONFIG" 2>/dev/null
-        sshd -t 2>/dev/null && systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+        if sshd -t 2>/dev/null; then
+            systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+        fi
         return
     fi
 
-    # Unda banner files kwa users wote
     sync_all_banners
 
-    # Unda config MPYA — Match User * (universal, haigomi SSH)
+    # Andika Match User * block HALISI
     cat > "$SSHD_FF_CONFIG" << 'EOF'
 # Voltron Tech - Dynamic Banner
-# Match User * — universal, inatumia %u (username) kupata banner yake
 Match User *
     Banner /etc/voltrontech/banners/%u.txt
 EOF
@@ -274,21 +304,24 @@ EOF
 }
 
 enable_dynamic_banner() {
-    mkdir -p "$BANNER_DIR"; touch "$BANNER_ENABLED_FILE"
+    clear; show_banner
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_PURPLE}           🎨 ENABLING DYNAMIC BANNER${C_RESET}"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+
+    mkdir -p "$BANNER_DIR"
+    echo "enabled" > "$BANNER_ENABLED_FILE"
+    chmod 644 "$BANNER_ENABLED_FILE"
+
     sync_all_banners
     update_ssh_banners_config
-    if sshd -t 2>/dev/null; then
-        systemctl restart voltrontech-limiter 2>/dev/null
-        local count=$(grep -c . "$DB_FILE" 2>/dev/null || echo 0)
-        echo -e "\n${C_GREEN}✅ Dynamic Banner ENABLED${C_RESET}"
-        echo -e "${C_CYAN}📌 Users $count — wote wanaona banner${C_RESET}"
-        echo -e "${C_CYAN}📌 Account mpya — banner inaundwa automatic${C_RESET}"
-        echo -e "${C_CYAN}📌 Banners zinaupdate kila sekunde 15${C_RESET}"
-    else
-        rm -f "$SSHD_FF_CONFIG"
-        systemctl restart sshd 2>/dev/null
-        echo -e "\n${C_RED}❌ SSH config error${C_RESET}"
-    fi
+    systemctl restart voltrontech-limiter 2>/dev/null
+
+    local count=$(grep -c . "$DB_FILE" 2>/dev/null || echo 0)
+    echo -e "${C_GREEN}✅ Dynamic Banner ENABLED${C_RESET}"
+    echo -e "${C_CYAN}📌 Users: $count${C_RESET}"
+    echo -e "${C_CYAN}📌 SSH config: $(sshd -T 2>&1 | grep -i banner)${C_RESET}"
+    echo -e "${C_CYAN}📌 Banner updates kila sekunde 15 (limiter)${C_RESET}"
     press_enter
 }
 
@@ -306,6 +339,64 @@ preview_dynamic_ssh_banner() {
     press_enter
 }
 
+# ═══════════════════════════════════════════════════════════════════════
+# NEW: diagnose_banner (kwa ku-debug)
+# ═══════════════════════════════════════════════════════════════════════
+diagnose_banner() {
+    clear; show_banner
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_PURPLE}           🔍 BANNER DIAGNOSTIC${C_RESET}"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+
+    echo -e "${C_BLUE}[1] SSH version:${C_RESET}"
+    echo -e "    $(ssh -V 2>&1)"
+    echo ""
+
+    echo -e "${C_BLUE}[2] sshd_config ordering:${C_RESET}"
+    grep -n "^Include\|^Banner\|^PrintMotd\|^Match" /etc/ssh/sshd_config 2>/dev/null | sed 's/^/    /'
+    echo ""
+
+    echo -e "${C_BLUE}[3] Banner config file:${C_RESET}"
+    if [[ -f "$SSHD_FF_CONFIG" ]]; then
+        cat "$SSHD_FF_CONFIG" | sed 's/^/    /'
+    else
+        echo -e "    ${C_RED}❌ HAIPO${C_RESET}"
+    fi
+    echo ""
+
+    echo -e "${C_BLUE}[4] sshd -T effective:${C_RESET}"
+    sshd -T 2>&1 | grep -iE "banner|printmotd" | sed 's/^/    /'
+    echo ""
+
+    echo -e "${C_BLUE}[5] Test kwa user wa kwanza:${C_RESET}"
+    local tu=$(cut -d: -f1 "$DB_FILE" 2>/dev/null | head -1)
+    if [[ -n "$tu" ]]; then
+        echo -e "    User: $tu"
+        sshd -T -C user="$tu",host=localhost,addr=127.0.0.1 2>&1 | grep -i banner | sed 's/^/    /'
+    else
+        echo -e "    ${C_YELLOW}⚠️ Hakuna users${C_RESET}"
+    fi
+    echo ""
+
+    echo -e "${C_BLUE}[6] Banner files:${C_RESET}"
+    ls "$BANNER_DIR"/ 2>/dev/null | sed 's/^/    /' || echo -e "    ${C_RED}❌ Folder haipo${C_RESET}"
+    echo ""
+
+    echo -e "${C_BLUE}[7] Banners enabled flag:${C_RESET}"
+    if [[ -f "$BANNER_ENABLED_FILE" ]]; then
+        echo -e "    ${C_GREEN}✅ Ipo${C_RESET} (size: $(stat -c %s "$BANNER_ENABLED_FILE") bytes)"
+    else
+        echo -e "    ${C_RED}❌ HAIPO${C_RESET}"
+    fi
+    echo ""
+
+    echo -e "${C_BLUE}[8] Limiter status:${C_RESET}"
+    echo -e "    $(systemctl is-active voltrontech-limiter 2>/dev/null)"
+    echo ""
+
+    press_enter
+}
+
 ssh_banner_menu() {
     while true; do
         clear; show_banner
@@ -317,6 +408,7 @@ ssh_banner_menu() {
         echo -e "  ${C_GREEN} 1)${C_RESET} Enable Dynamic Banner"
         echo -e "  ${C_RED} 2)${C_RESET} Disable Dynamic Banner"
         echo -e "  ${C_GREEN} 3)${C_RESET} Preview Banner"
+        echo -e "  ${C_GREEN} 4)${C_RESET} 🔍 Diagnose Banner"
         echo ""
         echo -e "  ${C_RED} 0)${C_RESET} Return"
         echo ""
@@ -325,6 +417,7 @@ ssh_banner_menu() {
             1) enable_dynamic_banner ;;
             2) disable_dynamic_banner ;;
             3) preview_dynamic_ssh_banner ;;
+            4) diagnose_banner ;;
             0) return ;;
         esac
     done
@@ -627,7 +720,6 @@ create_trial_account() {
     press_enter
 }
 
-# ========== CLIENT CONFIG ==========
 client_config_menu() {
     clear; show_banner
     echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
@@ -1383,7 +1475,7 @@ uninstall_zivpn() { systemctl stop zivpn.service 2>/dev/null; systemctl disable 
 install_xui_panel() { clear; show_banner; bash <(curl -Ls https://raw.githubusercontent.com/alireza0/x-ui/master/install.sh); press_enter; }
 uninstall_xui_panel() { command -v x-ui &>/dev/null && x-ui uninstall; rm -f /usr/local/bin/x-ui; rm -rf /etc/x-ui /usr/local/x-ui; echo "✅"; press_enter; }
 
-# ========== WEB PANEL MENU ==========
+# ========== WEB PANEL (kama v10.14 — haijabadilishwa) ==========
 web_panel_menu() {
     while true; do
         clear; show_banner
@@ -1443,38 +1535,28 @@ web_panel_menu() {
     done
 }
 
-# ========== CHANGE API DOMAIN ==========
 web_panel_change_domain() {
     clear; show_banner
     echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
     echo -e "${C_PURPLE}              🌐 CHANGE API DOMAIN${C_RESET}"
     echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
     echo -e "  ${C_CYAN}Current domain${C_RESET} : ${C_YELLOW}$WEB_PANEL_API_DOMAIN${C_RESET}\n"
-    echo -e "  ${C_YELLOW}⚠️  Hii itabadilisha:${C_RESET}"
-    echo -e "     • API domain kwenye script"
-    echo -e "     • Nginx config"
-    echo -e "     • DNS record (deSEC)"
-    echo -e "     • SSL certificate (Let's Encrypt)"
-    echo ""
     read -p "👉 New domain (or '0' cancel): " new_domain
     [[ "$new_domain" == "0" || -z "$new_domain" ]] && return
     [[ ! "$new_domain" =~ ^[a-zA-Z0-9.-]+$ ]] && { echo -e "${C_RED}❌ Invalid domain${C_RESET}"; press_enter; return; }
-
     read -p "👉 Confirm change to '$new_domain'? (y/n): " confirm
     [[ "$confirm" != "y" ]] && { echo "Cancelled"; press_enter; return; }
 
     local old_domain="$WEB_PANEL_API_DOMAIN"
     WEB_PANEL_API_DOMAIN="$new_domain"
-    sed -i "s|^WEB_PANEL_API_DOMAIN=.*|WEB_PANEL_API_DOMAIN=\"$new_domain\"|" /usr/local/bin/menu
+    sed -i "s|^WEB_PANEL_API_DOMAIN=.*|WEB_PANEL_API_DOMAIN=\"$new_domain\"|" /usr/local/bin/menu 2>/dev/null
 
     if [ -f "$WEB_PANEL_NGINX_CONFIG" ]; then
         sed -i "s|server_name $old_domain;|server_name $new_domain;|g" "$WEB_PANEL_NGINX_CONFIG"
-        echo -e "${C_GREEN}✅ Nginx config updated${C_RESET}"
     fi
 
     if [ -d "/etc/letsencrypt/live/$old_domain" ]; then
         certbot delete --cert-name "$old_domain" --non-interactive 2>/dev/null
-        echo -e "${C_GREEN}✅ Old SSL removed${C_RESET}"
     fi
 
     local ip=$(curl -s -4 icanhazip.com 2>/dev/null)
@@ -1483,24 +1565,15 @@ web_panel_change_domain() {
     local r=$(curl -s -w "%{http_code}" -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$data" 2>/dev/null)
     local hc=$(echo "$r" | tail -1)
     if [[ "$hc" -eq 201 ]] || [[ "$hc" -eq 200 ]]; then
-        echo -e "${C_GREEN}✅ DNS created: $new_domain → $ip${C_RESET}"
+        echo -e "${C_GREEN}✅ DNS created${C_RESET}"
         sleep 5
     elif [[ "$hc" -eq 409 ]]; then
         curl -s -X PATCH "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/$sub/A/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "{\"records\":[\"$ip\"],\"ttl\":3600}" >/dev/null 2>&1
-        echo -e "${C_GREEN}✅ DNS updated${C_RESET}"
     fi
 
     nginx -t 2>&1 | grep -q successful && systemctl reload nginx
     systemctl restart voltrontech-api 2>/dev/null
-
-    echo -e "\n${C_GREEN}═══════════════════════════════════════════════════════════════════${C_RESET}"
-    echo -e "${C_GREEN}           ✅ DOMAIN CHANGED!${C_RESET}"
-    echo -e "${C_GREEN}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
-    echo -e "  ${C_CYAN}New domain${C_RESET} : ${C_YELLOW}$new_domain${C_RESET}"
-    echo ""
-    echo -e "${C_YELLOW}📌 Hatua zinazofuata:${C_RESET}"
-    echo -e "  1) Setup SSL: Web Panel → 5"
-    echo -e "  2) Test: Web Panel → 6"
+    echo -e "\n${C_GREEN}✅ DOMAIN CHANGED${C_RESET}"
     press_enter
 }
 
@@ -1571,7 +1644,7 @@ EOF
     press_enter
 }
 
-# ========== API CODE — WITH BANNER ENDPOINTS ==========
+# ========== API CODE ==========
 web_panel_create_api_code() {
     cat > "$API_DIR/api.py" << 'APIEOF'
 #!/usr/bin/env python3
@@ -1672,34 +1745,12 @@ def create_user_banner(username, expiry, limit, bw):
 <center><font color="#000000">🔌 <b>Sessions      :</b> 0/{limit}</font></center><br>
 <center><font color="#6BCB77" size="4"><b>📌 Status : ✅ ACTIVE</b></font></center><br>
 <br>
-<center><font color="#6BCB77" size="4"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>
-<center><font color="#000000">📱 Telegram  : https://t.me/voltrontech</font></center><br>
-<center><font color="#000000">💬 WhatsApp  : https://chat.whatsapp.com/EZtAFt9dmS5DVKbNN5iSPz</font></center><br>
-<br>
 <center><font color="#9B59B6">‎▬▬▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b>  🌍VOLTRON VPN🌍 </b></font><font color="#9B59B6">‎۩ஜ▬▬▬▬▬</font></center><br>"""
         banner_file = f'{BANNER_DIR}/{username}.txt'
         with open(banner_file, 'w') as f: f.write(content)
         os.chmod(banner_file, 0o644)
         return True
     except Exception: return False
-
-def setup_sshd_banner_config():
-    try:
-        os.makedirs('/etc/ssh/sshd_config.d', exist_ok=True)
-        with open('/etc/ssh/sshd_config.d/voltron-auto-banner.conf', 'w') as f:
-            f.write('# Voltron Tech - Dynamic Banner\n')
-            f.write('Match User *\n')
-            f.write('    Banner /etc/voltrontech/banners/%u.txt\n')
-        os.chmod('/etc/ssh/sshd_config.d/voltron-auto-banner.conf', 0o644)
-        run_shell('grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config || echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config')
-        test = run_shell('sshd -t 2>&1').strip()
-        if test:
-            try: os.remove('/etc/ssh/sshd_config.d/voltron-auto-banner.conf')
-            except: pass
-            return False, test
-        run_shell('systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null')
-        return True, ''
-    except Exception as ex: return False, str(ex)
 
 def get_protocols(username=None, password=None, limit=DEFAULT_LIMIT):
     p = {}
@@ -1730,7 +1781,7 @@ def get_protocols(username=None, password=None, limit=DEFAULT_LIMIT):
 def now_iso(): return datetime.now().isoformat()
 
 @app.route('/api/health')
-def health(): return jsonify({'success': True, 'status': 'ok', 'version': '11.0', 'protocols_active': len(get_protocols()), 'timestamp': now_iso()})
+def health(): return jsonify({'success': True, 'status': 'ok', 'version': '10.15', 'protocols_active': len(get_protocols()), 'timestamp': now_iso()})
 
 @app.route('/api/trial/check', methods=['POST'])
 @require_api_key
@@ -1949,8 +2000,6 @@ def banner_enable():
             if not os.path.exists(banner_file):
                 if create_user_banner(u['username'], u['expiry'], u['limit'], u['bandwidth']):
                     created += 1
-        ok, err = setup_sshd_banner_config()
-        if not ok: return jsonify({'success': False, 'error': f'SSH config error: {err}'}), 500
         run_shell('systemctl restart voltrontech-limiter 2>/dev/null')
         return jsonify({'success': True, 'message': 'Dynamic banner enabled', 'users_total': len(read_users()), 'banners_created': created, 'timestamp': now_iso()})
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
@@ -2096,10 +2145,10 @@ web_panel_view_api_info() {
     echo "  GET  /api/dashboard/info"
     echo ""
     echo -e "${C_CYAN}🆕 Banner endpoints:${C_RESET}"
-    echo "  GET  /api/banner/status          — Angalia hali"
-    echo "  POST /api/banner/enable          — Washa banner (kwa wote)"
-    echo "  POST /api/banner/disable         — Zima banner"
-    echo "  GET  /api/banner/user/<user>     — Angalia banner ya user"
+    echo "  GET  /api/banner/status"
+    echo "  POST /api/banner/enable"
+    echo "  POST /api/banner/disable"
+    echo "  GET  /api/banner/user/<user>"
     press_enter
 }
 
@@ -2224,11 +2273,6 @@ while true; do
             bc+="<center><font color=\"#000000\">📱 Telegram  : https://t.me/voltrontech</font></center><br>"
             bc+="<center><font color=\"#000000\">💬 WhatsApp  : https://chat.whatsapp.com/EZtAFt9dmS5DVKbNN5iSPz</font></center><br>"
             bc+="<br>"
-            bc+="<center><font color=\"#FF6B6B\" size=\"4\"><b>⚠️ IMPORTANT NOTICE ⚠️</b></font></center><br>"
-            bc+="<center><font color=\"#000000\">• Account expires on: $expiry</font></center><br>"
-            bc+="<center><font color=\"#000000\">• No torrent or illegal activity</font></center><br>"
-            bc+="<center><font color=\"#000000\">• Account sharing is prohibited</font></center><br>"
-            bc+="<br>"
             bc+="<center><font color=\"#9B59B6\">‎▬▬▬▬▬ஜ۩</font><font color=\"#FF6B6B\" size=\"8\"><b>  🌍VOLTRON VPN🌍 </b></font><font color=\"#9B59B6\">‎۩ஜ▬▬▬▬▬</font></center><br>"
 
             bf="$BANNER_DIR/${user}.txt"; tf="${bf}.tmp"
@@ -2266,8 +2310,6 @@ while true; do
 
         nt=$((acc+dt))
         printf "%s\n" "$nt" > "$uf"
-        tg=$(awk "BEGIN{printf \"%.2f\", $nt/1073741824}" 2>/dev/null)
-        [[ -n "$tg" ]] && sed -i "s/^$user:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*/$user:$pass:$expiry:$limit:$bw:$tg:$status/" "$DB_FILE" 2>/dev/null
     done < "$DB_FILE"
     sleep $SCAN
 done
@@ -2291,42 +2333,9 @@ EOF
     systemctl restart voltrontech-limiter --no-block &>/dev/null
 }
 
-create_traffic_monitor() {
-    cat > "$TRAFFIC_SCRIPT" <<'EOF'
-#!/bin/bash
-DB_FILE="/etc/voltrontech/users.db"
-TRAFFIC_DIR="/etc/voltrontech/traffic"
-mkdir -p "$TRAFFIC_DIR"
-while true; do
-    [[ -f "$DB_FILE" ]] && while IFS=: read -r u p e l tl tu s; do
-        [[ -z "$u" ]] && continue
-        id "$u" &>/dev/null || continue
-        tf="$TRAFFIC_DIR/$u"
-        [[ -f "$tf" ]] && cb=$(cat "$tf" 2>/dev/null || echo 0) && cg=$(echo "scale=3; $cb/1073741824" | bc 2>/dev/null || echo 0) && sed -i "s/^$u:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*/$u:$p:$e:$l:$tl:$cg:$s/" "$DB_FILE" 2>/dev/null
-    done < "$DB_FILE"
-    sleep 60
-done
-EOF
-    chmod +x "$TRAFFIC_SCRIPT"
-    cat > "$TRAFFIC_SERVICE" <<EOF
-[Unit]
-Description=Voltron Traffic
-After=network.target
-[Service]
-Type=simple
-ExecStart=$TRAFFIC_SCRIPT
-Restart=always
-[Install]
-WantedBy=multi-user.target
-EOF
-    systemctl daemon-reload
-    systemctl enable voltron-traffic.service 2>/dev/null
-    systemctl restart voltron-traffic.service 2>/dev/null
-}
-
 # ========== BACKUP ==========
 backup_user_data() { clear; show_banner; read -p "Path [/root/vt.tar.gz]: " p; p=${p:-/root/vt.tar.gz}; tar -czf "$p" -C "$(dirname "$DB_DIR")" "$(basename "$DB_DIR")" 2>/dev/null && echo "✅ $p" || echo "❌"; press_enter; }
-restore_user_data() { clear; show_banner; read -p "Path: " p; [ ! -f "$p" ] && { echo "❌"; press_enter; return; }; read -p "Confirm? (y/n): " c; [[ "$c" == "y" ]] && { local td=$(mktemp -d); tar -xzf "$p" -C "$td" 2>/dev/null; [ -f "$td/voltrontech/users.db" ] && cp "$td/voltrontech/users.db" "$DB_FILE"; rm -rf "$td"; echo "✅"; }; press_enter; }
+restore_user_data() { clear; show_banner; read -p "Path: " p; [ ! -f "$p" ] && { echo "❌"; press_enter; return; }; read -p "Confirm? (y/n): " c; [[ "$c" == "y" ]] && { local td=$(mktemp -d); tar -xzf "$p" -C "$td" 2>/dev/null; [ -f "$td/voltrontech/users.db" ] && cp "$td/voltrontech/users.db" "$DB_FILE"; rm -rf "$td"; echo "✅"; update_ssh_banners_config; }; press_enter; }
 
 # ========== DNS ==========
 dns_menu() { clear; show_banner; [ -f "$DNS_INFO_FILE" ] && { source "$DNS_INFO_FILE"; echo "Existing: $FULL_DOMAIN"; read -p "Delete? (y/n): " c; [[ "$c" == "y" ]] && { curl -s -X DELETE "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/$SUBDOMAIN/A/" -H "Authorization: Token $DESEC_TOKEN" >/dev/null; rm -f "$DNS_INFO_FILE"; }; } || { read -p "Generate? (y/n): " c; [[ "$c" == "y" ]] && generate_dns_record; }; press_enter; }
@@ -2491,6 +2500,39 @@ initial_setup() {
     create_traffic_monitor
     systemctl enable atd &>/dev/null; systemctl start atd &>/dev/null
     echo -e "${C_GREEN}✅ Setup complete${C_RESET}"
+}
+
+create_traffic_monitor() {
+    cat > "$TRAFFIC_SCRIPT" <<'EOF'
+#!/bin/bash
+DB_FILE="/etc/voltrontech/users.db"
+TRAFFIC_DIR="/etc/voltrontech/traffic"
+mkdir -p "$TRAFFIC_DIR"
+while true; do
+    [[ -f "$DB_FILE" ]] && while IFS=: read -r u p e l tl tu s; do
+        [[ -z "$u" ]] && continue
+        id "$u" &>/dev/null || continue
+        tf="$TRAFFIC_DIR/$u"
+        [[ -f "$tf" ]] && cb=$(cat "$tf" 2>/dev/null || echo 0) && cg=$(echo "scale=3; $cb/1073741824" | bc 2>/dev/null || echo 0) && sed -i "s/^$u:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*/$u:$p:$e:$l:$tl:$cg:$s/" "$DB_FILE" 2>/dev/null
+    done < "$DB_FILE"
+    sleep 60
+done
+EOF
+    chmod +x "$TRAFFIC_SCRIPT"
+    cat > "$TRAFFIC_SERVICE" <<EOF
+[Unit]
+Description=Voltron Traffic
+After=network.target
+[Service]
+Type=simple
+ExecStart=$TRAFFIC_SCRIPT
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable voltron-traffic.service 2>/dev/null
+    systemctl restart voltron-traffic.service 2>/dev/null
 }
 
 uninstall_script() {
