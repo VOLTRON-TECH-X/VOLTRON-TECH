@@ -240,20 +240,17 @@ sync_all_banners() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════
-# FIXED: update_ssh_banners_config (ile iliyokosekana kwenye v10.14)
-# - Inahamisha Include JUU ya sshd_config
-# - Inazima Banner /etc/bannerssh
-# - Inaweka PrintMotd yes
-# - Inaandika Match User * block halisi
+# FIXED: update_ssh_banners_config (ile function iliyokosekana!)
 # ═══════════════════════════════════════════════════════════════════════
 update_ssh_banners_config() {
+    # Backup sshd_config mara moja tu
     if [[ ! -f /etc/ssh/sshd_config.voltron.bak ]]; then
         cp /etc/ssh/sshd_config /etc/ssh/sshd_config.voltron.bak 2>/dev/null
     fi
 
     mkdir -p "$BANNER_DIR" /etc/ssh/sshd_config.d
 
-    # FIX #1: Zima Banner /etc/bannerssh
+    # FIX #1: Zima Banner /etc/bannerssh inayoshinda dynamic banner
     if grep -q "^Banner /etc/bannerssh" /etc/ssh/sshd_config 2>/dev/null; then
         sed -i 's|^Banner /etc/bannerssh|#Banner /etc/bannerssh  # Disabled by Voltron|' /etc/ssh/sshd_config
     fi
@@ -262,7 +259,7 @@ update_ssh_banners_config() {
     sed -i 's/^#*PrintMotd.*/PrintMotd yes/' /etc/ssh/sshd_config 2>/dev/null
     grep -q "^PrintMotd" /etc/ssh/sshd_config || echo "PrintMotd yes" >> /etc/ssh/sshd_config
 
-    # FIX #3: Hamisha Include JUU ya sshd_config
+    # FIX #3: Hamisha Include JUU ya sshd_config (muhimu!)
     if grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null; then
         local include_line=$(grep -n "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config | head -1 | cut -d: -f1)
         if [[ "$include_line" -gt 5 ]]; then
@@ -273,10 +270,10 @@ update_ssh_banners_config() {
         sed -i '1i Include /etc/ssh/sshd_config.d/*.conf' /etc/ssh/sshd_config
     fi
 
-    # Futa config za per-user za zamani
+    # FIX #4: Futa config za per-user za zamani
     rm -f /etc/ssh/sshd_config.d/voltron-user-*.conf 2>/dev/null
 
-    # Kama banner haija-enable, futa config na urudi
+    # FIX #5: Kama banner haija-enable, futa config na urudi
     if [[ ! -f "$BANNER_ENABLED_FILE" ]]; then
         rm -f "$SSHD_FF_CONFIG" 2>/dev/null
         if sshd -t 2>/dev/null; then
@@ -285,9 +282,10 @@ update_ssh_banners_config() {
         return
     fi
 
+    # FIX #6: Generate banners kwa users wote
     sync_all_banners
 
-    # Andika Match User * block HALISI
+    # FIX #7: Andika Match User * block HALISI (si comments!)
     cat > "$SSHD_FF_CONFIG" << 'EOF'
 # Voltron Tech - Dynamic Banner
 Match User *
@@ -295,6 +293,7 @@ Match User *
 EOF
     chmod 644 "$SSHD_FF_CONFIG"
 
+    # FIX #8: Validate kabla ya reload — kama kuna error, rollback
     if sshd -t 2>/dev/null; then
         systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
     else
@@ -310,6 +309,7 @@ enable_dynamic_banner() {
     echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
 
     mkdir -p "$BANNER_DIR"
+    # Andika content kwenye flag (si tupu!)
     echo "enabled" > "$BANNER_ENABLED_FILE"
     chmod 644 "$BANNER_ENABLED_FILE"
 
@@ -319,9 +319,10 @@ enable_dynamic_banner() {
 
     local count=$(grep -c . "$DB_FILE" 2>/dev/null || echo 0)
     echo -e "${C_GREEN}✅ Dynamic Banner ENABLED${C_RESET}"
-    echo -e "${C_CYAN}📌 Users: $count${C_RESET}"
+    echo -e "${C_CYAN}📌 Users: $count — wote wanaona banner${C_RESET}"
     echo -e "${C_CYAN}📌 SSH config: $(sshd -T 2>&1 | grep -i banner)${C_RESET}"
-    echo -e "${C_CYAN}📌 Banner updates kila sekunde 15 (limiter)${C_RESET}"
+    echo -e "${C_CYAN}📌 Banners zinaupdate kila sekunde 15 (limiter)${C_RESET}"
+    echo -e "${C_CYAN}📌 Users wapya — banner inaundwa automatically${C_RESET}"
     press_enter
 }
 
@@ -340,7 +341,7 @@ preview_dynamic_ssh_banner() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════
-# NEW: diagnose_banner (kwa ku-debug)
+# NEW: diagnose_banner — ku-debug kama banner haionekani
 # ═══════════════════════════════════════════════════════════════════════
 diagnose_banner() {
     clear; show_banner
@@ -356,7 +357,7 @@ diagnose_banner() {
     grep -n "^Include\|^Banner\|^PrintMotd\|^Match" /etc/ssh/sshd_config 2>/dev/null | sed 's/^/    /'
     echo ""
 
-    echo -e "${C_BLUE}[3] Banner config file:${C_RESET}"
+    echo -e "${C_BLUE}[3] Banner config file ($SSHD_FF_CONFIG):${C_RESET}"
     if [[ -f "$SSHD_FF_CONFIG" ]]; then
         cat "$SSHD_FF_CONFIG" | sed 's/^/    /'
     else
@@ -364,7 +365,7 @@ diagnose_banner() {
     fi
     echo ""
 
-    echo -e "${C_BLUE}[4] sshd -T effective:${C_RESET}"
+    echo -e "${C_BLUE}[4] sshd -T effective config:${C_RESET}"
     sshd -T 2>&1 | grep -iE "banner|printmotd" | sed 's/^/    /'
     echo ""
 
@@ -379,12 +380,12 @@ diagnose_banner() {
     echo ""
 
     echo -e "${C_BLUE}[6] Banner files:${C_RESET}"
-    ls "$BANNER_DIR"/ 2>/dev/null | sed 's/^/    /' || echo -e "    ${C_RED}❌ Folder haipo${C_RESET}"
+    ls -la "$BANNER_DIR"/ 2>/dev/null | sed 's/^/    /' || echo -e "    ${C_RED}❌ Folder haipo${C_RESET}"
     echo ""
 
     echo -e "${C_BLUE}[7] Banners enabled flag:${C_RESET}"
     if [[ -f "$BANNER_ENABLED_FILE" ]]; then
-        echo -e "    ${C_GREEN}✅ Ipo${C_RESET} (size: $(stat -c %s "$BANNER_ENABLED_FILE") bytes)"
+        echo -e "    ${C_GREEN}✅ Ipo${C_RESET} (size: $(stat -c %s "$BANNER_ENABLED_FILE") bytes, content: [$(cat "$BANNER_ENABLED_FILE")])"
     else
         echo -e "    ${C_RED}❌ HAIPO${C_RESET}"
     fi
@@ -392,6 +393,15 @@ diagnose_banner() {
 
     echo -e "${C_BLUE}[8] Limiter status:${C_RESET}"
     echo -e "    $(systemctl is-active voltrontech-limiter 2>/dev/null)"
+    echo ""
+
+    echo -e "${C_BLUE}[9] User shells:${C_RESET}"
+    if [[ -f "$DB_FILE" ]]; then
+        while IFS=: read -r u _ _; do
+            [[ -z "$u" ]] && continue
+            grep "^$u:" /etc/passwd | sed 's/^/    /'
+        done < "$DB_FILE" | head -10
+    fi
     echo ""
 
     press_enter
@@ -1475,7 +1485,7 @@ uninstall_zivpn() { systemctl stop zivpn.service 2>/dev/null; systemctl disable 
 install_xui_panel() { clear; show_banner; bash <(curl -Ls https://raw.githubusercontent.com/alireza0/x-ui/master/install.sh); press_enter; }
 uninstall_xui_panel() { command -v x-ui &>/dev/null && x-ui uninstall; rm -f /usr/local/bin/x-ui; rm -rf /etc/x-ui /usr/local/x-ui; echo "✅"; press_enter; }
 
-# ========== WEB PANEL (kama v10.14 — haijabadilishwa) ==========
+# ========== WEB PANEL ==========
 web_panel_menu() {
     while true; do
         clear; show_banner
@@ -1749,8 +1759,7 @@ def create_user_banner(username, expiry, limit, bw):
         banner_file = f'{BANNER_DIR}/{username}.txt'
         with open(banner_file, 'w') as f: f.write(content)
         os.chmod(banner_file, 0o644)
-        return True
-    except Exception: return False
+        return True    except Exception: return False
 
 def get_protocols(username=None, password=None, limit=DEFAULT_LIMIT):
     p = {}
@@ -2144,7 +2153,7 @@ web_panel_view_api_info() {
     echo "  GET  /api/protocols/status"
     echo "  GET  /api/dashboard/info"
     echo ""
-    echo -e "${C_CYAN}🆕 Banner endpoints:${C_RESET}"
+    echo -e "${C_CYAN}Banner endpoints:${C_RESET}"
     echo "  GET  /api/banner/status"
     echo "  POST /api/banner/enable"
     echo "  POST /api/banner/disable"
