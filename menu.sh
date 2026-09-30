@@ -1,6 +1,6 @@
 #!/bin/bash
 # ================================================================
-# VOLTRON TECH ULTIMATE v10.13 — COMPLETE (FINAL)
+# VOLTRON TECH ULTIMATE v10.14 — COMPLETE (FINAL)
 # ================================================================
 
 C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_UL=$'\033[4m'
@@ -75,7 +75,7 @@ show_banner() {
     refresh_banner_cache
     [[ -t 1 ]] && clear
     echo
-    echo -e "${C_PURPLE}   VOLTRON TECH ULTIMATE v10.13 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
+    echo -e "${C_PURPLE}   VOLTRON TECH ULTIMATE v10.14 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
     echo -e "${C_BLUE}   ─────────────────────────────────────────────────────────${C_RESET}"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "OS" "$BANNER_CACHE_OS_NAME" "Uptime: $BANNER_CACHE_UP_TIME"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "Memory" "${BANNER_CACHE_RAM_USAGE}% Used" "Online: ${C_WHITE}${BANNER_CACHE_ONLINE_USERS}${C_RESET}"
@@ -226,6 +226,17 @@ EOF
     chmod 644 "$BANNER_DIR/${username}.txt" 2>/dev/null
 }
 
+sync_all_banners() {
+    mkdir -p "$BANNER_DIR"
+    if [[ -f "$DB_FILE" ]]; then
+        while IFS=: read -r user pass expiry limit bw _rest; do
+            [[ -z "$user" || "$user" == \#* ]] && continue
+            [[ ! -f "$BANNER_DIR/${user}.txt" ]] && generate_user_banner "$user" "$expiry" "$limit" "$bw"
+            chmod 644 "$BANNER_DIR/${user}.txt" 2>/dev/null
+        done < "$DB_FILE"
+    fi
+}
+
 create_user() {
     clear; show_banner
     echo -e "${C_BOLD}${C_PURPLE}--- ✨ Create New SSH User ---${C_RESET}"
@@ -255,6 +266,7 @@ create_user() {
     local bw_display="Unlimited"; [[ "$bandwidth_gb" != "0" ]] && bw_display="${bandwidth_gb} GB"
 
     generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"
+    sync_all_banners
     update_ssh_banners_config
 
     clear; show_banner
@@ -413,6 +425,7 @@ bulk_create_users() {
         printf "  ${C_GREEN}%-20s${C_RESET} | ${C_YELLOW}%-15s${C_RESET} | ${C_CYAN}%-12s${C_RESET}\n" "$u" "$p" "$ed"
         ((created++))
     done
+    sync_all_banners
     update_ssh_banners_config
     echo -e "\n${C_GREEN}✅ Created $created users${C_RESET}"
     press_enter
@@ -509,6 +522,7 @@ create_trial_account() {
     echo "$username:$password:$expire_date:$limit:$bandwidth_gb:0:ACTIVE" >> "$DB_FILE"
     echo "$TRIAL_CLEANUP_SCRIPT $username" | at now + ${duration_hours} hours 2>/dev/null
     generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"
+    sync_all_banners
     update_ssh_banners_config
     clear; show_banner
     echo -e "${C_GREEN}✅ Trial created!${C_RESET}\n"
@@ -1108,177 +1122,7 @@ configure_dnstt_firewall() {
     echo -e "${C_GREEN}✅ Firewall configured${C_RESET}"
 }
 
-# ========== PROTOCOL MENU (WIMA, BILA MABANO, RUNNING/STOPPED) ==========
-protocol_menu() {
-    while true; do
-        clear; show_banner
-        local bs=$(systemctl is-active badvpn 2>/dev/null); [[ -z "$bs" ]] && bs="inactive"
-        local us=$(systemctl is-active udp-custom 2>/dev/null); [[ -z "$us" ]] && us="inactive"
-        local hs=$(systemctl is-active haproxy 2>/dev/null); [[ -z "$hs" ]] && hs="inactive"
-        local ds=$(systemctl is-active dnstt 2>/dev/null); [[ -z "$ds" ]] && ds="inactive"
-        local fs=$(systemctl is-active falconproxy 2>/dev/null); [[ -z "$fs" ]] && fs="inactive"
-        local zs=$(systemctl is-active zivpn 2>/dev/null); [[ -z "$zs" ]] && zs="inactive"
-
-        local bs_st=""; [[ "$bs" == "active" ]] && bs_st="${C_GREEN}RUNNING${C_RESET}" || bs_st="${C_GRAY}STOPPED${C_RESET}"
-        local us_st=""; [[ "$us" == "active" ]] && us_st="${C_GREEN}RUNNING${C_RESET}" || us_st="${C_GRAY}STOPPED${C_RESET}"
-        local hs_st=""; [[ "$hs" == "active" ]] && hs_st="${C_GREEN}RUNNING${C_RESET}" || hs_st="${C_GRAY}STOPPED${C_RESET}"
-        local ds_st=""; [[ "$ds" == "active" ]] && ds_st="${C_GREEN}RUNNING${C_RESET}" || ds_st="${C_GRAY}STOPPED${C_RESET}"
-        local fs_st=""; [[ "$fs" == "active" ]] && fs_st="${C_GREEN}RUNNING${C_RESET}" || fs_st="${C_GRAY}STOPPED${C_RESET}"
-        local zs_st=""; [[ "$zs" == "active" ]] && zs_st="${C_GREEN}RUNNING${C_RESET}" || zs_st="${C_GRAY}STOPPED${C_RESET}"
-        local xs=""; command -v x-ui &>/dev/null && xs="${C_GREEN}INSTALLED${C_RESET}" || xs="${C_GRAY}NOT INSTALLED${C_RESET}"
-
-        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_PURPLE}              🔌 PROTOCOL MANAGEMENT${C_RESET}"
-        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
-        echo -e "  ${C_GREEN} 1)${C_RESET} badvpn (UDP 7300)       $bs_st"
-        echo -e "  ${C_GREEN} 2)${C_RESET} udp-custom              $us_st"
-        echo -e "  ${C_GREEN} 3)${C_RESET} SSL Tunnel (HAProxy)    $hs_st"
-        echo -e "  ${C_GREEN} 4)${C_RESET} DNSTT (Port 53)         $ds_st"
-        echo -e "  ${C_GREEN} 5)${C_RESET} Falcon Proxy            $fs_st"
-        echo -e "  ${C_GREEN} 6)${C_RESET} ZiVPN                   $zs_st"
-        echo -e "  ${C_GREEN} 7)${C_RESET} X-UI Panel              $xs"
-        echo ""
-        echo -e "  ${C_RED} 0)${C_RESET} Return"
-        echo ""
-        read -p "👉 Select: " choice
-        case $choice in
-            1) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_badvpn || uninstall_badvpn ;;
-            2) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_udp_custom || uninstall_udp_custom ;;
-            3) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_ssl_tunnel || uninstall_ssl_tunnel ;;
-            4) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_GREEN}2)${C_RESET} Manage\n  ${C_RED}3)${C_RESET} Uninstall"; read -p "👉 " sub
-               case $sub in 1) install_dnstt ;; 2) dnstt_main_menu ;; 3) uninstall_dnstt ;; esac ;;
-            5) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_falcon_proxy || uninstall_falcon_proxy ;;
-            6) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_zivpn || uninstall_zivpn ;;
-            7) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_xui_panel || uninstall_xui_panel ;;
-            0) return ;;
-            *) sleep 2 ;;
-        esac
-    done
-}
-
-install_badvpn() {
-    clear; show_banner
-    ff_apt_install cmake make gcc git build-essential libssl-dev
-    cd /tmp; rm -rf badvpn
-    git clone https://github.com/ambrop72/badvpn.git 2>/dev/null
-    cd badvpn; cmake . 2>/dev/null; make 2>/dev/null
-    cp badvpn-udpgw "$BADVPN_BIN" 2>/dev/null
-    cat > "$BADVPN_SERVICE_FILE" <<EOF
-[Unit]
-Description=BadVPN
-After=network.target
-[Service]
-Type=simple
-ExecStart=$BADVPN_BIN --listen-addr 0.0.0.0:7300 --max-clients 1000
-Restart=always
-[Install]
-WantedBy=multi-user.target
-EOF
-    systemctl daemon-reload; systemctl enable badvpn.service 2>/dev/null; systemctl start badvpn.service
-    echo "✅"; press_enter
-}
-uninstall_badvpn() { systemctl stop badvpn.service 2>/dev/null; systemctl disable badvpn.service 2>/dev/null; rm -f "$BADVPN_SERVICE_FILE" "$BADVPN_BIN"; systemctl daemon-reload; echo "✅"; press_enter; }
-
-install_udp_custom() {
-    clear; show_banner
-    local a=$(uname -m)
-    [[ "$a" == "x86_64" ]] && curl -sL -o "$UDP_CUSTOM_BIN" "https://github.com/voltrontech/udp-custom/releases/latest/download/udp-custom-linux-amd64" || curl -sL -o "$UDP_CUSTOM_BIN" "https://github.com/voltrontech/udp-custom/releases/latest/download/udp-custom-linux-arm64"
-    chmod +x "$UDP_CUSTOM_BIN"
-    cat > "$UDP_CUSTOM_SERVICE_FILE" <<EOF
-[Unit]
-Description=UDP Custom
-After=network.target
-[Service]
-Type=simple
-ExecStart=$UDP_CUSTOM_BIN server -exclude 53,5300
-Restart=always
-[Install]
-WantedBy=multi-user.target
-EOF
-    systemctl daemon-reload; systemctl enable udp-custom.service 2>/dev/null; systemctl start udp-custom.service
-    echo "✅"; press_enter
-}
-uninstall_udp_custom() { systemctl stop udp-custom.service 2>/dev/null; systemctl disable udp-custom.service 2>/dev/null; rm -f "$UDP_CUSTOM_SERVICE_FILE" "$UDP_CUSTOM_BIN"; systemctl daemon-reload; echo "✅"; press_enter; }
-
-install_ssl_tunnel() {
-    clear; show_banner
-    ff_apt_install haproxy openssl
-    mkdir -p "$SSL_CERT_DIR"
-    openssl req -x509 -newkey rsa:2048 -nodes -days 365 -keyout "$SSL_CERT_DIR/v.key" -out "$SSL_CERT_DIR/v.crt" -subj "/CN=VOLTRON" 2>/dev/null
-    cat "$SSL_CERT_DIR/v.crt" "$SSL_CERT_DIR/v.key" > "$SSL_CERT_FILE" 2>/dev/null
-    cat > "$HAPROXY_CONFIG" <<EOF
-global
-    daemon
-defaults
-    mode tcp
-    timeout connect 5000
-    timeout client 50000
-    timeout server 50000
-frontend ssh_ssl_in
-    bind *:444 ssl crt $SSL_CERT_FILE
-    default_backend ssh_backend
-backend ssh_backend
-    server ssh_server 127.0.0.1:22
-EOF
-    systemctl restart haproxy
-    echo "✅"; press_enter
-}
-uninstall_ssl_tunnel() { systemctl stop haproxy 2>/dev/null; ff_apt_purge haproxy; rm -f "$HAPROXY_CONFIG" "$SSL_CERT_FILE"; echo "✅"; press_enter; }
-
-install_falcon_proxy() {
-    clear; show_banner
-    local a=$(uname -m)
-    [[ "$a" == "x86_64" ]] && curl -sL -o "$FALCONPROXY_BINARY" "https://github.com/firewallfalcons/FirewallFalcon-Manager/releases/latest/download/falconproxy" || curl -sL -o "$FALCONPROXY_BINARY" "https://github.com/firewallfalcons/FirewallFalcon-Manager/releases/latest/download/falconproxyarm"
-    chmod +x "$FALCONPROXY_BINARY"
-    read -p "Port [8080]: " p; p=${p:-8080}
-    cat > "$FALCONPROXY_SERVICE_FILE" <<EOF
-[Unit]
-Description=Falcon Proxy
-After=network.target
-[Service]
-Type=simple
-ExecStart=$FALCONPROXY_BINARY -p $p
-Restart=always
-[Install]
-WantedBy=multi-user.target
-EOF
-    systemctl daemon-reload; systemctl enable falconproxy.service 2>/dev/null; systemctl start falconproxy.service
-    echo "✅"; press_enter
-}
-uninstall_falcon_proxy() { systemctl stop falconproxy.service 2>/dev/null; systemctl disable falconproxy.service 2>/dev/null; rm -f "$FALCONPROXY_SERVICE_FILE" "$FALCONPROXY_BINARY"; systemctl daemon-reload; echo "✅"; press_enter; }
-
-install_zivpn() {
-    clear; show_banner
-    local a=$(uname -m)
-    [[ "$a" == "x86_64" ]] && curl -sL -o "$ZIVPN_BIN" "https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-amd64" || curl -sL -o "$ZIVPN_BIN" "https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-arm64"
-    chmod +x "$ZIVPN_BIN"; mkdir -p "$ZIVPN_DIR"
-    openssl req -x509 -newkey rsa:4096 -nodes -days 365 -keyout "$ZIVPN_DIR/server.key" -out "$ZIVPN_DIR/server.crt" -subj "/CN=ZiVPN" 2>/dev/null
-    read -p "Passwords [user1,user2]: " pw; pw=${pw:-user1,user2}
-    IFS=',' read -ra pa <<< "$pw"
-    jp=$(printf '"%s",' "${pa[@]}"); jp="[${jp%,}]"
-    cat > "$ZIVPN_CONFIG_FILE" <<EOF
-{"listen":":5667","cert":"$ZIVPN_DIR/server.crt","key":"$ZIVPN_DIR/server.key","obfs":"zivpn","auth":{"mode":"passwords","config":$jp}}
-EOF
-    cat > "$ZIVPN_SERVICE_FILE" <<EOF
-[Unit]
-Description=ZiVPN
-After=network.target
-[Service]
-Type=simple
-ExecStart=$ZIVPN_BIN server -c $ZIVPN_CONFIG_FILE
-Restart=always
-[Install]
-WantedBy=multi-user.target
-EOF
-    systemctl daemon-reload; systemctl enable zivpn.service 2>/dev/null; systemctl start zivpn.service
-    echo "✅"; press_enter
-}
-uninstall_zivpn() { systemctl stop zivpn.service 2>/dev/null; systemctl disable zivpn.service 2>/dev/null; rm -f "$ZIVPN_SERVICE_FILE" "$ZIVPN_BIN"; rm -rf "$ZIVPN_DIR"; systemctl daemon-reload; echo "✅"; press_enter; }
-
-install_xui_panel() { clear; show_banner; bash <(curl -Ls https://raw.githubusercontent.com/alireza0/x-ui/master/install.sh); press_enter; }
-uninstall_xui_panel() { command -v x-ui &>/dev/null && x-ui uninstall; rm -f /usr/local/bin/x-ui; rm -rf /etc/x-ui /usr/local/x-ui; echo "✅"; press_enter; }
-
-# ========== DYNAMIC BANNER ==========
+# ========== DYNAMIC BANNER (Banner %u — SSH HAIGOMI) ==========
 update_ssh_banners_config() {
     grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config 2>/dev/null || echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config
     mkdir -p "$BANNER_DIR" /etc/ssh/sshd_config.d
@@ -1289,54 +1133,35 @@ update_ssh_banners_config() {
         return
     fi
 
-    local tmp="/tmp/voltron-banners.conf"
-    {
-        echo "# Voltron Tech - Dynamic Banners"
-        echo "# Generated: $(date)"
-        echo ""
-        if [[ -f "$DB_FILE" ]]; then
-            while IFS=: read -r user pass expiry limit bandwidth_gb _rest; do
-                [[ -z "$user" || "$user" == \#* ]] && continue
-                [[ ! -f "$BANNER_DIR/${user}.txt" ]] && generate_user_banner "$user" "$expiry" "$limit" "$bandwidth_gb"
-                chmod 644 "$BANNER_DIR/${user}.txt" 2>/dev/null
-                [[ ! -f "$BANNER_DIR/${user}.txt" ]] && continue
-                echo "Match User $user"
-                echo "    Banner /etc/voltrontech/banners/${user}.txt"
-                echo ""
-            done < "$DB_FILE"
-        fi
-    } > "$tmp"
-    chmod 644 "$tmp"
+    # Unda banner files kwa users wote kwanza
+    sync_all_banners
 
-    if ! cmp -s "$tmp" "$SSHD_FF_CONFIG" 2>/dev/null; then
-        mv "$tmp" "$SSHD_FF_CONFIG"
-        chmod 644 "$SSHD_FF_CONFIG"
-        if sshd -t 2>/dev/null; then
-            systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-        else
-            rm -f "$SSHD_FF_CONFIG"
-            systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-        fi
+    # Tumia Banner %u — haiwezi kugoma SSH
+    cat > "$SSHD_FF_CONFIG" << 'EOF'
+# Voltron Tech - Dynamic Banner
+# %u = username — inasoma /etc/voltrontech/banners/<username>.txt
+Banner /etc/voltrontech/banners/%u.txt
+EOF
+    chmod 644 "$SSHD_FF_CONFIG"
+
+    if sshd -t 2>/dev/null; then
+        systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
     else
-        rm -f "$tmp"
+        rm -f "$SSHD_FF_CONFIG"
+        systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
     fi
 }
 
 enable_dynamic_banner() {
     mkdir -p "$BANNER_DIR"; touch "$BANNER_ENABLED_FILE"
-    local count=0
-    if [[ -f "$DB_FILE" ]]; then
-        while IFS=: read -r user pass expiry limit bandwidth_gb _rest; do
-            [[ -z "$user" || "$user" == \#* ]] && continue
-            generate_user_banner "$user" "$expiry" "$limit" "$bandwidth_gb"
-            ((count++))
-        done < "$DB_FILE"
-    fi
+    sync_all_banners
     update_ssh_banners_config
     if sshd -t 2>/dev/null; then
         systemctl restart voltrontech-limiter 2>/dev/null
-        echo -e "\n${C_GREEN}✅ Dynamic Banner ENABLED ($count users)${C_RESET}"
-        echo -e "${C_CYAN}📌 Users wote (wa sasa na wapya) wanaona banner${C_RESET}"
+        local count=$(grep -c . "$DB_FILE" 2>/dev/null || echo 0)
+        echo -e "\n${C_GREEN}✅ Dynamic Banner ENABLED${C_RESET}"
+        echo -e "${C_CYAN}📌 Users $count — wote wanaona banner${C_RESET}"
+        echo -e "${C_CYAN}📌 Account mpya — banner inaundwa automatic${C_RESET}"
         echo -e "${C_CYAN}📌 Banners zinaupdate kila sekunde 15${C_RESET}"
     else
         rm -f "$SSHD_FF_CONFIG"
@@ -1707,7 +1532,7 @@ orphan_cleanup_menu() {
     press_enter
 }
 
-# ========== SYSTEM UTILITIES (WIMA) ==========
+# ========== SYSTEM UTILITIES ==========
 system_utilities_menu() {
     while true; do
         clear; show_banner
@@ -1736,7 +1561,174 @@ system_utilities_menu() {
     done
 }
 
-# ========== WEB PANEL (WIMA) ==========
+# ========== PROTOCOL MENU (WIMA, RUNNING/STOPPED) ==========
+protocol_menu() {
+    while true; do
+        clear; show_banner
+        local bs=$(systemctl is-active badvpn 2>/dev/null); [[ -z "$bs" ]] && bs="inactive"
+        local us=$(systemctl is-active udp-custom 2>/dev/null); [[ -z "$us" ]] && us="inactive"
+        local hs=$(systemctl is-active haproxy 2>/dev/null); [[ -z "$hs" ]] && hs="inactive"
+        local ds=$(systemctl is-active dnstt 2>/dev/null); [[ -z "$ds" ]] && ds="inactive"
+        local fs=$(systemctl is-active falconproxy 2>/dev/null); [[ -z "$fs" ]] && fs="inactive"
+        local zs=$(systemctl is-active zivpn 2>/dev/null); [[ -z "$zs" ]] && zs="inactive"
+        local bs_st=""; [[ "$bs" == "active" ]] && bs_st="${C_GREEN}RUNNING${C_RESET}" || bs_st="${C_GRAY}STOPPED${C_RESET}"
+        local us_st=""; [[ "$us" == "active" ]] && us_st="${C_GREEN}RUNNING${C_RESET}" || us_st="${C_GRAY}STOPPED${C_RESET}"
+        local hs_st=""; [[ "$hs" == "active" ]] && hs_st="${C_GREEN}RUNNING${C_RESET}" || hs_st="${C_GRAY}STOPPED${C_RESET}"
+        local ds_st=""; [[ "$ds" == "active" ]] && ds_st="${C_GREEN}RUNNING${C_RESET}" || ds_st="${C_GRAY}STOPPED${C_RESET}"
+        local fs_st=""; [[ "$fs" == "active" ]] && fs_st="${C_GREEN}RUNNING${C_RESET}" || fs_st="${C_GRAY}STOPPED${C_RESET}"
+        local zs_st=""; [[ "$zs" == "active" ]] && zs_st="${C_GREEN}RUNNING${C_RESET}" || zs_st="${C_GRAY}STOPPED${C_RESET}"
+        local xs=""; command -v x-ui &>/dev/null && xs="${C_GREEN}INSTALLED${C_RESET}" || xs="${C_GRAY}NOT INSTALLED${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+        echo -e "${C_PURPLE}              🔌 PROTOCOL MANAGEMENT${C_RESET}"
+        echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+        echo -e "  ${C_GREEN} 1)${C_RESET} badvpn (UDP 7300)       $bs_st"
+        echo -e "  ${C_GREEN} 2)${C_RESET} udp-custom              $us_st"
+        echo -e "  ${C_GREEN} 3)${C_RESET} SSL Tunnel (HAProxy)    $hs_st"
+        echo -e "  ${C_GREEN} 4)${C_RESET} DNSTT (Port 53)         $ds_st"
+        echo -e "  ${C_GREEN} 5)${C_RESET} Falcon Proxy            $fs_st"
+        echo -e "  ${C_GREEN} 6)${C_RESET} ZiVPN                   $zs_st"
+        echo -e "  ${C_GREEN} 7)${C_RESET} X-UI Panel              $xs"
+        echo ""
+        echo -e "  ${C_RED} 0)${C_RESET} Return"
+        echo ""
+        read -p "👉 Select: " choice
+        case $choice in
+            1) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_badvpn || uninstall_badvpn ;;
+            2) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_udp_custom || uninstall_udp_custom ;;
+            3) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_ssl_tunnel || uninstall_ssl_tunnel ;;
+            4) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_GREEN}2)${C_RESET} Manage\n  ${C_RED}3)${C_RESET} Uninstall"; read -p "👉 " sub
+               case $sub in 1) install_dnstt ;; 2) dnstt_main_menu ;; 3) uninstall_dnstt ;; esac ;;
+            5) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_falcon_proxy || uninstall_falcon_proxy ;;
+            6) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_zivpn || uninstall_zivpn ;;
+            7) echo -e "\n  ${C_GREEN}1)${C_RESET} Install\n  ${C_RED}2)${C_RESET} Uninstall"; read -p "👉 " sub; [ "$sub" == "1" ] && install_xui_panel || uninstall_xui_panel ;;
+            0) return ;;
+        esac
+    done
+}
+
+install_badvpn() {
+    clear; show_banner
+    ff_apt_install cmake make gcc git build-essential libssl-dev
+    cd /tmp; rm -rf badvpn
+    git clone https://github.com/ambrop72/badvpn.git 2>/dev/null
+    cd badvpn; cmake . 2>/dev/null; make 2>/dev/null
+    cp badvpn-udpgw "$BADVPN_BIN" 2>/dev/null
+    cat > "$BADVPN_SERVICE_FILE" <<EOF
+[Unit]
+Description=BadVPN
+After=network.target
+[Service]
+Type=simple
+ExecStart=$BADVPN_BIN --listen-addr 0.0.0.0:7300 --max-clients 1000
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload; systemctl enable badvpn.service 2>/dev/null; systemctl start badvpn.service
+    echo "✅"; press_enter
+}
+uninstall_badvpn() { systemctl stop badvpn.service 2>/dev/null; systemctl disable badvpn.service 2>/dev/null; rm -f "$BADVPN_SERVICE_FILE" "$BADVPN_BIN"; systemctl daemon-reload; echo "✅"; press_enter; }
+
+install_udp_custom() {
+    clear; show_banner
+    local a=$(uname -m)
+    [[ "$a" == "x86_64" ]] && curl -sL -o "$UDP_CUSTOM_BIN" "https://github.com/voltrontech/udp-custom/releases/latest/download/udp-custom-linux-amd64" || curl -sL -o "$UDP_CUSTOM_BIN" "https://github.com/voltrontech/udp-custom/releases/latest/download/udp-custom-linux-arm64"
+    chmod +x "$UDP_CUSTOM_BIN"
+    cat > "$UDP_CUSTOM_SERVICE_FILE" <<EOF
+[Unit]
+Description=UDP Custom
+After=network.target
+[Service]
+Type=simple
+ExecStart=$UDP_CUSTOM_BIN server -exclude 53,5300
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload; systemctl enable udp-custom.service 2>/dev/null; systemctl start udp-custom.service
+    echo "✅"; press_enter
+}
+uninstall_udp_custom() { systemctl stop udp-custom.service 2>/dev/null; systemctl disable udp-custom.service 2>/dev/null; rm -f "$UDP_CUSTOM_SERVICE_FILE" "$UDP_CUSTOM_BIN"; systemctl daemon-reload; echo "✅"; press_enter; }
+
+install_ssl_tunnel() {
+    clear; show_banner
+    ff_apt_install haproxy openssl
+    mkdir -p "$SSL_CERT_DIR"
+    openssl req -x509 -newkey rsa:2048 -nodes -days 365 -keyout "$SSL_CERT_DIR/v.key" -out "$SSL_CERT_DIR/v.crt" -subj "/CN=VOLTRON" 2>/dev/null
+    cat "$SSL_CERT_DIR/v.crt" "$SSL_CERT_DIR/v.key" > "$SSL_CERT_FILE" 2>/dev/null
+    cat > "$HAPROXY_CONFIG" <<EOF
+global
+    daemon
+defaults
+    mode tcp
+    timeout connect 5000
+    timeout client 50000
+    timeout server 50000
+frontend ssh_ssl_in
+    bind *:444 ssl crt $SSL_CERT_FILE
+    default_backend ssh_backend
+backend ssh_backend
+    server ssh_server 127.0.0.1:22
+EOF
+    systemctl restart haproxy
+    echo "✅"; press_enter
+}
+uninstall_ssl_tunnel() { systemctl stop haproxy 2>/dev/null; ff_apt_purge haproxy; rm -f "$HAPROXY_CONFIG" "$SSL_CERT_FILE"; echo "✅"; press_enter; }
+
+install_falcon_proxy() {
+    clear; show_banner
+    local a=$(uname -m)
+    [[ "$a" == "x86_64" ]] && curl -sL -o "$FALCONPROXY_BINARY" "https://github.com/firewallfalcons/FirewallFalcon-Manager/releases/latest/download/falconproxy" || curl -sL -o "$FALCONPROXY_BINARY" "https://github.com/firewallfalcons/FirewallFalcon-Manager/releases/latest/download/falconproxyarm"
+    chmod +x "$FALCONPROXY_BINARY"
+    read -p "Port [8080]: " p; p=${p:-8080}
+    cat > "$FALCONPROXY_SERVICE_FILE" <<EOF
+[Unit]
+Description=Falcon Proxy
+After=network.target
+[Service]
+Type=simple
+ExecStart=$FALCONPROXY_BINARY -p $p
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload; systemctl enable falconproxy.service 2>/dev/null; systemctl start falconproxy.service
+    echo "✅"; press_enter
+}
+uninstall_falcon_proxy() { systemctl stop falconproxy.service 2>/dev/null; systemctl disable falconproxy.service 2>/dev/null; rm -f "$FALCONPROXY_SERVICE_FILE" "$FALCONPROXY_BINARY"; systemctl daemon-reload; echo "✅"; press_enter; }
+
+install_zivpn() {
+    clear; show_banner
+    local a=$(uname -m)
+    [[ "$a" == "x86_64" ]] && curl -sL -o "$ZIVPN_BIN" "https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-amd64" || curl -sL -o "$ZIVPN_BIN" "https://github.com/zahidbd2/udp-zivpn/releases/download/udp-zivpn_1.4.9/udp-zivpn-linux-arm64"
+    chmod +x "$ZIVPN_BIN"; mkdir -p "$ZIVPN_DIR"
+    openssl req -x509 -newkey rsa:4096 -nodes -days 365 -keyout "$ZIVPN_DIR/server.key" -out "$ZIVPN_DIR/server.crt" -subj "/CN=ZiVPN" 2>/dev/null
+    read -p "Passwords [user1,user2]: " pw; pw=${pw:-user1,user2}
+    IFS=',' read -ra pa <<< "$pw"
+    jp=$(printf '"%s",' "${pa[@]}"); jp="[${jp%,}]"
+    cat > "$ZIVPN_CONFIG_FILE" <<EOF
+{"listen":":5667","cert":"$ZIVPN_DIR/server.crt","key":"$ZIVPN_DIR/server.key","obfs":"zivpn","auth":{"mode":"passwords","config":$jp}}
+EOF
+    cat > "$ZIVPN_SERVICE_FILE" <<EOF
+[Unit]
+Description=ZiVPN
+After=network.target
+[Service]
+Type=simple
+ExecStart=$ZIVPN_BIN server -c $ZIVPN_CONFIG_FILE
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload; systemctl enable zivpn.service 2>/dev/null; systemctl start zivpn.service
+    echo "✅"; press_enter
+}
+uninstall_zivpn() { systemctl stop zivpn.service 2>/dev/null; systemctl disable zivpn.service 2>/dev/null; rm -f "$ZIVPN_SERVICE_FILE" "$ZIVPN_BIN"; rm -rf "$ZIVPN_DIR"; systemctl daemon-reload; echo "✅"; press_enter; }
+
+install_xui_panel() { clear; show_banner; bash <(curl -Ls https://raw.githubusercontent.com/alireza0/x-ui/master/install.sh); press_enter; }
+uninstall_xui_panel() { command -v x-ui &>/dev/null && x-ui uninstall; rm -f /usr/local/bin/x-ui; rm -rf /etc/x-ui /usr/local/x-ui; echo "✅"; press_enter; }
+
+# ========== WEB PANEL MENU (WIMA + CHANGE DOMAIN) ==========
 web_panel_menu() {
     while true; do
         clear; show_banner
@@ -1773,6 +1765,7 @@ web_panel_menu() {
         echo -e "  ${C_GREEN} 9)${C_RESET} 🔄 Restart API"
         echo -e "  ${C_GREEN}10)${C_RESET} 📝 Copy for Lovable AI"
         echo -e "  ${C_RED}11)${C_RESET} 🗑️  Remove Web Panel"
+        echo -e "  ${C_GREEN}12)${C_RESET} 🌐 Change API Domain"
         echo ""
         echo -e "  ${C_RED} 0)${C_RESET} Return"
         echo ""
@@ -1789,9 +1782,71 @@ web_panel_menu() {
             9) web_panel_restart_api ;;
             10) web_panel_copy_for_lovable ;;
             11) web_panel_remove ;;
+            12) web_panel_change_domain ;;
             0) return ;;
         esac
     done
+}
+
+# ========== CHANGE API DOMAIN ==========
+web_panel_change_domain() {
+    clear; show_banner
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_PURPLE}              🌐 CHANGE API DOMAIN${C_RESET}"
+    echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+    echo -e "  ${C_CYAN}Current domain${C_RESET} : ${C_YELLOW}$WEB_PANEL_API_DOMAIN${C_RESET}\n"
+    echo -e "  ${C_YELLOW}⚠️  Hii itabadilisha:${C_RESET}"
+    echo -e "     • API domain kwenye script"
+    echo -e "     • Nginx config"
+    echo -e "     • DNS record (deSEC)"
+    echo -e "     • SSL certificate (Let's Encrypt)"
+    echo ""
+    read -p "👉 New domain (or '0' cancel): " new_domain
+    [[ "$new_domain" == "0" || -z "$new_domain" ]] && return
+    [[ ! "$new_domain" =~ ^[a-zA-Z0-9.-]+$ ]] && { echo -e "${C_RED}❌ Invalid domain${C_RESET}"; press_enter; return; }
+
+    read -p "👉 Confirm change to '$new_domain'? (y/n): " confirm
+    [[ "$confirm" != "y" ]] && { echo "Cancelled"; press_enter; return; }
+
+    local old_domain="$WEB_PANEL_API_DOMAIN"
+    WEB_PANEL_API_DOMAIN="$new_domain"
+    sed -i "s|^WEB_PANEL_API_DOMAIN=.*|WEB_PANEL_API_DOMAIN=\"$new_domain\"|" /usr/local/bin/menu
+
+    if [ -f "$WEB_PANEL_NGINX_CONFIG" ]; then
+        sed -i "s|server_name $old_domain;|server_name $new_domain;|g" "$WEB_PANEL_NGINX_CONFIG"
+        echo -e "${C_GREEN}✅ Nginx config updated${C_RESET}"
+    fi
+
+    if [ -d "/etc/letsencrypt/live/$old_domain" ]; then
+        certbot delete --cert-name "$old_domain" --non-interactive 2>/dev/null
+        echo -e "${C_GREEN}✅ Old SSL removed${C_RESET}"
+    fi
+
+    local ip=$(curl -s -4 icanhazip.com 2>/dev/null)
+    local sub=$(echo "$new_domain" | cut -d. -f1)
+    local data="[{\"subname\":\"$sub\",\"type\":\"A\",\"ttl\":3600,\"records\":[\"$ip\"]}]"
+    local r=$(curl -s -w "%{http_code}" -X POST "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "$data" 2>/dev/null)
+    local hc=$(echo "$r" | tail -1)
+    if [[ "$hc" -eq 201 ]] || [[ "$hc" -eq 200 ]]; then
+        echo -e "${C_GREEN}✅ DNS created: $new_domain → $ip${C_RESET}"
+        sleep 5
+    elif [[ "$hc" -eq 409 ]]; then
+        curl -s -X PATCH "https://desec.io/api/v1/domains/$DESEC_DOMAIN/rrsets/$sub/A/" -H "Authorization: Token $DESEC_TOKEN" -H "Content-Type: application/json" --data "{\"records\":[\"$ip\"],\"ttl\":3600}" >/dev/null 2>&1
+        echo -e "${C_GREEN}✅ DNS updated${C_RESET}"
+    fi
+
+    nginx -t 2>&1 | grep -q successful && systemctl reload nginx
+    systemctl restart voltrontech-api 2>/dev/null
+
+    echo -e "\n${C_GREEN}═══════════════════════════════════════════════════════════════════${C_RESET}"
+    echo -e "${C_GREEN}           ✅ DOMAIN CHANGED!${C_RESET}"
+    echo -e "${C_GREEN}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
+    echo -e "  ${C_CYAN}New domain${C_RESET} : ${C_YELLOW}$new_domain${C_RESET}"
+    echo ""
+    echo -e "${C_YELLOW}📌 Hatua zinazofuata:${C_RESET}"
+    echo -e "  1) Setup SSL: Web Panel → 5"
+    echo -e "  2) Test: Web Panel → 6"
+    press_enter
 }
 
 web_panel_full_setup() {
@@ -1877,6 +1932,9 @@ DB_FILE = f'{DB_DIR}/users.db'
 SERVER_HOST = os.environ.get('SERVER_HOST', 'vpn.voltrontechtx.shop')
 DEFAULT_LIMIT = 999
 BANDWIDTH_DIR = f'{DB_DIR}/bandwidth'
+BANNER_DIR = f'{DB_DIR}/banners'
+BANNER_ENABLED = f'{DB_DIR}/banners_enabled'
+
 def require_api_key(f):
     @wraps(f)
     def d(*a, **k):
@@ -1884,21 +1942,26 @@ def require_api_key(f):
         if not key or key != API_KEY: return jsonify({'success': False, 'error': 'Invalid API key'}), 401
         return f(*a, **k)
     return d
+
 def run_safe(args, timeout=30):
     try:
         if isinstance(args, str): args = args.split()
         r = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
         return {'success': r.returncode == 0, 'stdout': r.stdout.strip() if r.stdout else '', 'stderr': r.stderr.strip() if r.stderr else ''}
     except Exception as e: return {'success': False, 'stdout': '', 'stderr': str(e)}
+
 def run_shell(cmd, timeout=30):
     try:
         r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
         return r.stdout.strip() if r.stdout else ''
     except Exception: return ''
+
 def service_active(name):
     if not shutil.which('systemctl'): return False
     return run_shell(f'systemctl is-active {name} 2>/dev/null').strip() == 'active'
+
 def ssh_active(): return service_active('ssh') or service_active('sshd')
+
 def read_users():
     users = []
     if not os.path.exists(DB_FILE): return users
@@ -1912,7 +1975,9 @@ def read_users():
                     users.append({'username': parts[0], 'password': parts[1], 'expiry': parts[2], 'limit': parts[3], 'bandwidth': parts[4] if len(parts) > 4 else '0'})
     except Exception: pass
     return users
+
 def user_exists(u): return run_safe(['id', u]).get('success', False)
+
 def get_status(u):
     if not user_exists(u): return 'not_found'
     r = run_safe(['passwd', '-S', u])
@@ -1924,15 +1989,81 @@ def get_status(u):
             if datetime.strptime(user['expiry'], '%Y-%m-%d') < datetime.now(): return 'expired'
         except Exception: pass
     return 'active'
+
 def get_online(u):
     out = run_shell(f'pgrep -c -u {u} sshd 2>/dev/null')
     try: return int(out or '0')
     except ValueError: return 0
+
 def get_server_ip():
     for cmd in ['curl -s -4 icanhazip.com', "hostname -I | awk '{print $1}'"]:
         ip = run_shell(cmd, timeout=5).strip()
         if ip and ip.count('.') == 3 and not ip.startswith('127.'): return ip
     return 'unknown'
+
+def create_banner_content(username, expiry, limit, bw):
+    bw_display = "Unlimited" if str(bw) == "0" else f"{bw} GB"
+    return f"""<br><br>
+<center><font color="#9B59B6">‎▬▬▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b> 🌍VOLTRON VPN🌍</b></font><font color="#9B59B6">‎۩ஜ▬▬▬▬▬</font></center><br>
+<br>
+<center><font color="#4D96FF" size="5"><b>📋 ACCOUNT DETAILS 📋</b></font></center><br>
+<br>
+<center><font color="#000000">👤 <b>Username      :</b> {username}</font></center><br>
+<center><font color="#000000">📅 <b>Expiration    :</b> {expiry}</font></center><br>
+<center><font color="#4D96FF">📊 <b>Bandwidth     :</b> {bw_display}</font></center><br>
+<center><font color="#000000">🔌 <b>Sessions      :</b> 0/{limit}</font></center><br>
+<center><font color="#6BCB77" size="4"><b>📌 Account Status : ✅ ACTIVE</b></font></center><br>
+<br>
+<center><font color="#6BCB77" size="4"><b>📢 JOIN OUR COMMUNITY 📢</b></font></center><br>
+<center><font color="#000000">📱 Telegram  : https://t.me/voltrontech</font></center><br>
+<center><font color="#000000">💬 WhatsApp  : https://chat.whatsapp.com/EZtAFt9dmS5DVKbNN5iSPz</font></center><br>
+<br>
+<center><font color="#9B59B6">‎▬▬▬▬▬ஜ۩</font><font color="#FF6B6B" size="8"><b>  🌍VOLTRON VPN🌍 </b></font><font color="#9B59B6">‎۩ஜ▬▬▬▬▬</font></center><br>"""
+
+def create_user_banner(username, expiry, limit, bw):
+    try:
+        os.makedirs(BANNER_DIR, exist_ok=True)
+        content = create_banner_content(username, expiry, limit, bw)
+        banner_file = f'{BANNER_DIR}/{username}.txt'
+        with open(banner_file, 'w') as f:
+            f.write(content)
+        os.chmod(banner_file, 0o644)
+        return True
+    except Exception:
+        return False
+
+def sync_all_banners():
+    try:
+        os.makedirs(BANNER_DIR, exist_ok=True)
+        for u in read_users():
+            banner_file = f'{BANNER_DIR}/{u["username"]}.txt'
+            if not os.path.exists(banner_file):
+                create_user_banner(u['username'], u['expiry'], u['limit'], u['bandwidth'])
+        return True
+    except Exception:
+        return False
+
+def setup_sshd_banner_config():
+    try:
+        os.makedirs('/etc/ssh/sshd_config.d', exist_ok=True)
+        with open('/etc/ssh/sshd_config.d/voltron-auto-banner.conf', 'w') as f:
+            f.write('# Voltron Tech - Dynamic Banner\n')
+            f.write('Banner /etc/voltrontech/banners/%u.txt\n')
+        os.chmod('/etc/ssh/sshd_config.d/voltron-auto-banner.conf', 0o644)
+        # Ensure Include
+        run_shell('grep -q "^Include /etc/ssh/sshd_config.d/" /etc/ssh/sshd_config || echo "Include /etc/ssh/sshd_config.d/*.conf" >> /etc/ssh/sshd_config')
+        # Test
+        test = run_shell('sshd -t 2>&1').strip()
+        if test:
+            try: os.remove('/etc/ssh/sshd_config.d/voltron-auto-banner.conf')
+            except: pass
+            return False, test
+        # Reload
+        run_shell('systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null')
+        return True, ''
+    except Exception as ex:
+        return False, str(ex)
+
 def get_protocols(username=None, password=None, limit=DEFAULT_LIMIT):
     p = {}
     sip = get_server_ip()
@@ -1958,9 +2089,12 @@ def get_protocols(username=None, password=None, limit=DEFAULT_LIMIT):
     if service_active('zivpn'): p['zivpn'] = {'id': 'zivpn', 'name': 'ZiVPN', 'icon': '🛡️', 'host': SERVER_HOST, 'ip': sip, 'port': 5667, 'username': username, 'password': password, 'limit': limit}
     if service_active('falconproxy'): p['falconproxy'] = {'id': 'falconproxy', 'name': 'Falcon', 'icon': '🦅', 'host': SERVER_HOST, 'ip': sip, 'port': 8080, 'username': username, 'password': password, 'limit': limit}
     return p
+
 def now_iso(): return datetime.now().isoformat()
+
 @app.route('/api/health')
 def health(): return jsonify({'success': True, 'status': 'ok', 'version': '11.0', 'protocols_active': len(get_protocols()), 'timestamp': now_iso()})
+
 @app.route('/api/trial/check', methods=['POST'])
 @require_api_key
 def tcheck():
@@ -1970,6 +2104,7 @@ def tcheck():
     if not u.replace('-', '').replace('_', '').isalnum(): return jsonify({'available': False, 'error': 'Invalid chars'}), 400
     if user_exists(u) or any(x['username'] == u for x in read_users()): return jsonify({'available': False, 'error': 'Taken'})
     return jsonify({'available': True, 'username': u, 'timestamp': now_iso()})
+
 @app.route('/api/trial/create', methods=['POST'])
 @require_api_key
 def tcreate():
@@ -1986,8 +2121,21 @@ def tcreate():
         e = (datetime.now() + timedelta(days=days)).strftime('%Y-%m-%d')
         run_safe(['chage', '-E', e, u])
         with open(DB_FILE, 'a') as f: f.write(f'{u}:{p}:{e}:{DEFAULT_LIMIT}:0:0:ACTIVE\n')
-        return jsonify({'success': True, 'account': {'username': u, 'password': p, 'expiry': e, 'days': days, 'limit': DEFAULT_LIMIT, 'bandwidth': 'Unlimited', 'server': SERVER_HOST, 'server_ip': get_server_ip()}, 'protocols': get_protocols(u, p, DEFAULT_LIMIT)})
+
+        # BANNER AUTOMATIC
+        banner_enabled = os.path.exists(BANNER_ENABLED)
+        banner_created = False
+        if banner_enabled:
+            banner_created = create_user_banner(u, e, DEFAULT_LIMIT, '0')
+
+        return jsonify({
+            'success': True,
+            'account': {'username': u, 'password': p, 'expiry': e, 'days': days, 'limit': DEFAULT_LIMIT, 'bandwidth': 'Unlimited', 'server': SERVER_HOST, 'server_ip': get_server_ip()},
+            'protocols': get_protocols(u, p, DEFAULT_LIMIT),
+            'banner': {'enabled': banner_enabled, 'created': banner_created}
+        })
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
+
 @app.route('/api/trial/status/<username>')
 @require_api_key
 def tstatus(username):
@@ -1997,6 +2145,7 @@ def tstatus(username):
         e = datetime.strptime(user['expiry'], '%Y-%m-%d'); dl = (e - datetime.now()).days
     except: dl = 0
     return jsonify({'success': True, 'account': {'username': username, 'status': get_status(username), 'expiry': user['expiry'], 'days_left': max(0, dl), 'online': get_online(username), 'limit': int(user['limit']), 'bandwidth': user['bandwidth']}})
+
 @app.route('/api/users/list')
 @require_api_key
 def ulist():
@@ -2009,6 +2158,7 @@ def ulist():
             except: ub = 0
         r.append({'username': u['username'], 'expiry': u['expiry'], 'limit': int(u['limit']), 'bandwidth_limit': float(u['bandwidth']), 'bandwidth_used_gb': round(ub / 1073741824, 2), 'status': get_status(u['username']), 'online': get_online(u['username'])})
     return jsonify({'success': True, 'users': r, 'total': len(r)})
+
 @app.route('/api/users/create', methods=['POST'])
 @require_api_key
 def ucreate():
@@ -2025,8 +2175,20 @@ def ucreate():
         e = (datetime.now() + timedelta(days=days)).strftime('%Y-%m-%d')
         run_safe(['chage', '-E', e, u])
         with open(DB_FILE, 'a') as f: f.write(f'{u}:{p}:{e}:{limit}:{bw}:0:ACTIVE\n')
-        return jsonify({'success': True, 'account': {'username': u, 'password': p, 'expiry': e, 'limit': limit, 'bandwidth': bw}})
+
+        # BANNER AUTOMATIC
+        banner_enabled = os.path.exists(BANNER_ENABLED)
+        banner_created = False
+        if banner_enabled:
+            banner_created = create_user_banner(u, e, limit, bw)
+
+        return jsonify({
+            'success': True,
+            'account': {'username': u, 'password': p, 'expiry': e, 'limit': limit, 'bandwidth': bw},
+            'banner': {'enabled': banner_enabled, 'created': banner_created}
+        })
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
+
 @app.route('/api/users/delete', methods=['POST'])
 @require_api_key
 def udelete():
@@ -2037,8 +2199,10 @@ def udelete():
     try:
         run_shell(f'killall -u {u} -9 2>/dev/null'); run_safe(['userdel', '-r', u])
         run_shell(f'rm -f {BANDWIDTH_DIR}/{u}.usage'); run_shell(f"sed -i '/^{u}:/d' {DB_FILE}")
+        run_shell(f'rm -f {BANNER_DIR}/{u}.txt')
         return jsonify({'success': True, 'message': f'User {u} deleted'})
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
+
 @app.route('/api/users/lock', methods=['POST'])
 @require_api_key
 def ulock():
@@ -2049,6 +2213,7 @@ def ulock():
         run_safe(['usermod', '-L', u]); run_shell(f'killall -u {u} -9 2>/dev/null')
         return jsonify({'success': True, 'message': f'{u} locked'})
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
+
 @app.route('/api/users/unlock', methods=['POST'])
 @require_api_key
 def uunlock():
@@ -2059,6 +2224,7 @@ def uunlock():
         run_safe(['usermod', '-U', u])
         return jsonify({'success': True, 'message': f'{u} unlocked'})
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
+
 @app.route('/api/users/edit', methods=['POST'])
 @require_api_key
 def uedit():
@@ -2077,6 +2243,7 @@ def uedit():
         run_shell(f"sed -i 's|^{u}:.*|{u}:{np}:{ce}:{nl}:{nb}:0:ACTIVE|' {DB_FILE}")
         return jsonify({'success': True, 'account': {'username': u, 'password': np, 'expiry': ce, 'limit': int(nl), 'bandwidth': float(nb)}})
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
+
 @app.route('/api/users/renew', methods=['POST'])
 @require_api_key
 def urenew():
@@ -2090,6 +2257,7 @@ def urenew():
         run_shell(f"sed -i 's|^{u}:.*|{u}:{parts[1]}:{ne}:{parts[3]}:{parts[4]}:0:ACTIVE|' {DB_FILE}")
         return jsonify({'success': True, 'expiry': ne})
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
+
 @app.route('/api/users/reset_bandwidth', methods=['POST'])
 @require_api_key
 def ursbw():
@@ -2100,6 +2268,7 @@ def ursbw():
         run_shell(f'echo "0" > {BANDWIDTH_DIR}/{u}.usage'); run_safe(['usermod', '-U', u])
         return jsonify({'success': True})
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
+
 @app.route('/api/cleanup/expired', methods=['POST'])
 @require_api_key
 def uclean():
@@ -2112,15 +2281,18 @@ def uclean():
                     u = x['username']
                     run_shell(f'killall -u {u} -9 2>/dev/null'); run_safe(['userdel', '-r', u])
                     run_shell(f'rm -f {BANDWIDTH_DIR}/{u}.usage'); run_shell(f"sed -i '/^{u}:/d' {DB_FILE}")
+                    run_shell(f'rm -f {BANNER_DIR}/{u}.txt')
                     deleted.append(u)
             except: pass
         return jsonify({'success': True, 'deleted': deleted, 'count': len(deleted)})
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
+
 @app.route('/api/protocols/status')
 @require_api_key
 def pstat():
     p = get_protocols()
     return jsonify({'success': True, 'protocols': p, 'count': len(p), 'active_list': list(p.keys())})
+
 @app.route('/api/dashboard/info')
 @require_api_key
 def dinfo():
@@ -2134,6 +2306,80 @@ def dinfo():
         online = sum(get_online(u['username']) for u in users)
         return jsonify({'success': True, 'info': {'ip': ip, 'uptime': us, 'users': {'total': len(users), 'online': online}, 'services': {'ssh': ssh_active(), 'dnstt': service_active('dnstt'), 'haproxy': service_active('haproxy'), 'badvpn': service_active('badvpn'), 'udp_custom': service_active('udp-custom'), 'zivpn': service_active('zivpn')}}})
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
+
+# ============ BANNER MANAGEMENT ============
+@app.route('/api/banner/status')
+@require_api_key
+def banner_status():
+    enabled = os.path.exists(BANNER_ENABLED)
+    total_users = len(read_users())
+    banner_count = 0
+    if os.path.exists(BANNER_DIR):
+        banner_count = len([f for f in os.listdir(BANNER_DIR) if f.endswith('.txt')])
+    return jsonify({
+        'success': True,
+        'enabled': enabled,
+        'total_users': total_users,
+        'banners_created': banner_count,
+        'timestamp': now_iso()
+    })
+
+@app.route('/api/banner/enable', methods=['POST'])
+@require_api_key
+def banner_enable():
+    try:
+        os.makedirs(BANNER_DIR, exist_ok=True)
+        # 1. Flag
+        with open(BANNER_ENABLED, 'w') as f:
+            f.write('enabled')
+        # 2. Unda banners zote
+        created = 0
+        for u in read_users():
+            banner_file = f'{BANNER_DIR}/{u["username"]}.txt'
+            if not os.path.exists(banner_file):
+                if create_user_banner(u['username'], u['expiry'], u['limit'], u['bandwidth']):
+                    created += 1
+        # 3. SSH config
+        ok, err = setup_sshd_banner_config()
+        if not ok:
+            return jsonify({'success': False, 'error': f'SSH config error: {err}'}), 500
+        # 4. Restart limiter
+        run_shell('systemctl restart voltrontech-limiter 2>/dev/null')
+        return jsonify({
+            'success': True,
+            'message': 'Dynamic banner enabled',
+            'users_total': len(read_users()),
+            'banners_created': created,
+            'timestamp': now_iso()
+        })
+    except Exception as ex:
+        return jsonify({'success': False, 'error': str(ex)}), 500
+
+@app.route('/api/banner/disable', methods=['POST'])
+@require_api_key
+def banner_disable():
+    try:
+        if os.path.exists(BANNER_ENABLED): os.remove(BANNER_ENABLED)
+        sshd_conf = '/etc/ssh/sshd_config.d/voltron-auto-banner.conf'
+        if os.path.exists(sshd_conf): os.remove(sshd_conf)
+        run_shell('systemctl reload sshd 2>/dev/null || systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null')
+        return jsonify({'success': True, 'message': 'Dynamic banner disabled', 'timestamp': now_iso()})
+    except Exception as ex:
+        return jsonify({'success': False, 'error': str(ex)}), 500
+
+@app.route('/api/banner/user/<username>', methods=['GET'])
+@require_api_key
+def banner_user(username):
+    try:
+        banner_file = f'{BANNER_DIR}/{username}.txt'
+        if not os.path.exists(banner_file):
+            return jsonify({'success': False, 'error': 'Banner not found'}), 404
+        with open(banner_file) as f:
+            content = f.read()
+        return jsonify({'success': True, 'username': username, 'banner': content, 'timestamp': now_iso()})
+    except Exception as ex:
+        return jsonify({'success': False, 'error': str(ex)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
 APIEOF
@@ -2237,6 +2483,7 @@ web_panel_view_api_info() {
     [ ! -f "$API_KEY_FILE" ] && { echo "❌ Not installed"; press_enter; return; }
     echo -e "  🌐 https://$WEB_PANEL_API_DOMAIN\n  🔑 $(cat "$API_KEY_FILE")\n"
     echo "Endpoints:"
+    echo "  GET  /api/health"
     echo "  POST /api/trial/check"
     echo "  POST /api/trial/create"
     echo "  GET  /api/trial/status/<user>"
@@ -2251,6 +2498,12 @@ web_panel_view_api_info() {
     echo "  POST /api/cleanup/expired"
     echo "  GET  /api/protocols/status"
     echo "  GET  /api/dashboard/info"
+    echo ""
+    echo -e "${C_CYAN}🆕 Banner endpoints:${C_RESET}"
+    echo "  GET  /api/banner/status          — Angalia hali"
+    echo "  POST /api/banner/enable          — Washa banner (kwa wote)"
+    echo "  POST /api/banner/disable         — Zima banner"
+    echo "  GET  /api/banner/user/<user>     — Angalia banner ya user"
     press_enter
 }
 
@@ -2261,6 +2514,11 @@ web_panel_copy_for_lovable() {
     [ ! -f "$API_KEY_FILE" ] && { echo "❌"; press_enter; return; }
     echo "API URL: https://$WEB_PANEL_API_DOMAIN"
     echo "API Key: $(cat "$API_KEY_FILE")"
+    echo ""
+    echo "Banner Endpoints:"
+    echo "  POST /api/banner/enable"
+    echo "  POST /api/banner/disable"
+    echo "  GET  /api/banner/status"
     press_enter
 }
 
