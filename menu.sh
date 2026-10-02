@@ -1,17 +1,19 @@
 #!/bin/bash
 # ================================================================
-# VOLTRON TECH ULTIMATE v10.17 FINAL
+# VOLTRON TECH ULTIMATE v10.18 FINAL
 # ================================================================
-# Changelog v10.17:
-#   + BANDWIDTH PROGRESS BAR with color-coded blocks
-#   + Green (0-59%) / Yellow (60-79%) / Orange (80-94%) / Red (95%+)
-#   + Shows: [████░░░░░░] 40.0% | 20.00/50 GB (30.00 GB left)
+# Changelog v10.18:
+#   + FIXED: Limiter now counts ALL user PIDs (sshd + bash + wget)
+#   + FIXED: Bandwidth progress bar with smart KB/MB/GB formatter
+#   + FIXED: Percentage and used bytes now match perfectly
+#   + FIXED: ONLINE counter no longer duplicates (0\n0)
+#   + FIXED: DB traffic field updates correctly
 #   + CRITICAL warning (data >= 95%)
-#   + EXPIRING SOON (3-7 days) / EXPIRING CRITICAL (1-2 days) / EXPIRES TODAY
-#   + Generator & Limiter produce IDENTICAL HTML (bc= + bc+=)
+#   + EXPIRING SOON / EXPIRING / EXPIRES TODAY warnings
+#   + Generator & Limiter produce IDENTICAL HTML
 #   + Custom API domain (configurable)
 #   + API Dynamic Banner endpoints
-#   + Speed Boosters: TCP Fast Open + BBR + fq (all 7 levels)
+#   + Speed Boosters: TCP Fast Open + BBR + fq
 # ================================================================
 
 C_RESET=$'\033[0m'; C_BOLD=$'\033[1m'; C_DIM=$'\033[2m'; C_UL=$'\033[4m'
@@ -98,7 +100,7 @@ show_banner() {
     refresh_banner_cache
     [[ -t 1 ]] && clear
     echo
-    echo -e "${C_PURPLE}   VOLTRON TECH ULTIMATE v10.17 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
+    echo -e "${C_PURPLE}   VOLTRON TECH ULTIMATE v10.18 ${C_RESET}${C_DIM}| Premium Edition${C_RESET}"
     echo -e "${C_BLUE}   ─────────────────────────────────────────────────────────${C_RESET}"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "OS" "$BANNER_CACHE_OS_NAME" "Uptime: $BANNER_CACHE_UP_TIME"
     printf "   ${C_GRAY}%-10s${C_RESET} %-20s ${C_GRAY}|${C_RESET} %s\n" "Memory" "${BANNER_CACHE_RAM_USAGE}% Used" "Online: ${C_WHITE}${BANNER_CACHE_ONLINE_USERS}${C_RESET}"
@@ -111,137 +113,136 @@ invalidate_banner_cache() { BANNER_CACHE_TS=0; }
 get_current_mtu() { [ -f "$MTU_CONFIG" ] && cat "$MTU_CONFIG" || echo "512"; }
 
 # ============================================================
-# BANDWIDTH PROGRESS BAR — HTML/CSS style (color-coded)
+# SMART SIZE FORMATTER — KB / MB / GB
+# ============================================================
+format_size() {
+    local bytes=$1
+    [[ "$bytes" =~ ^[0-9]+$ ]] || bytes=0
+    if (( bytes >= 1073741824 )); then
+        awk "BEGIN{printf \"%.2f GB\", $bytes/1073741824}"
+    elif (( bytes >= 1048576 )); then
+        awk "BEGIN{printf \"%.2f MB\", $bytes/1048576}"
+    elif (( bytes >= 1024 )); then
+        awk "BEGIN{printf \"%.2f KB\", $bytes/1024}"
+    else
+        echo "${bytes} B"
+    fi
+}
+
+# ============================================================
+# BANDWIDTH PROGRESS BAR — for generate_user_banner()
 # ============================================================
 build_bandwidth_bar() {
-    # Args: used_bytes limit_gb
     local used_bytes="$1"
     local limit_gb="$2"
 
-    # Handle unlimited
     if [[ "$limit_gb" == "0" || -z "$limit_gb" ]]; then
         echo '<font color="#6BCB77">Unlimited ∞</font>'
         return
     fi
 
-    # Calculate
-    local qb=$(awk "BEGIN{printf \"%.0f\", $limit_gb*1073741824}")
-    [[ "$qb" -le 0 ]] && qb=1
+    local limit_bytes=$(awk "BEGIN{printf \"%.0f\", $limit_gb*1073741824}")
+    [[ "$limit_bytes" -le 0 ]] && limit_bytes=1
 
-    local pct=$(awk "BEGIN{printf \"%.1f\", ($used_bytes/$qb)*100}")
-    local pct_int=$(awk "BEGIN{printf \"%d\", ($used_bytes/$qb)*100}")
+    local pct=$(awk "BEGIN{printf \"%.1f\", ($used_bytes/$limit_bytes)*100}")
+    local pct_int=$(awk "BEGIN{printf \"%d\", ($used_bytes/$limit_bytes)*100}")
     [[ "$pct_int" -gt 100 ]] && pct_int=100
     [[ "$pct_int" -lt 0 ]] && pct_int=0
 
-    local used_gb=$(awk "BEGIN{printf \"%.2f\", $used_bytes/1073741824}")
-    local remaining_gb=$(awk "BEGIN{r=$limit_gb - $used_gb; if(r<0)r=0; printf \"%.2f\", r}")
+    local remaining_bytes=$((limit_bytes - used_bytes))
+    [[ $remaining_bytes -lt 0 ]] && remaining_bytes=0
 
-    # Choose color based on percentage
-    local bar_color="#6BCB77"     # Green (0-59%)
+    local used_display=$(format_size "$used_bytes")
+    local limit_display=$(format_size "$limit_bytes")
+    local remaining_display=$(format_size "$remaining_bytes")
+
+    local bar_color="#6BCB77"
     local text_color="#6BCB77"
 
     if (( $(echo "$pct >= 95" | bc -l) )); then
-        bar_color="#FF6B6B"       # Red (95-100%+)
-        text_color="#FF6B6B"
+        bar_color="#FF6B6B"; text_color="#FF6B6B"
     elif (( $(echo "$pct >= 80" | bc -l) )); then
-        bar_color="#FF9F43"       # Orange (80-94%)
-        text_color="#FF9F43"
+        bar_color="#FF9F43"; text_color="#FF9F43"
     elif (( $(echo "$pct >= 60" | bc -l) )); then
-        bar_color="#FFD93D"       # Yellow (60-79%)
-        text_color="#FFD93D"
+        bar_color="#FFD93D"; text_color="#FFD93D"
     fi
 
-    # Build 10-block bar
     local total_blocks=10
-    local filled_blocks=$((pct_int * total_blocks / 100))
-    [[ $filled_blocks -gt $total_blocks ]] && filled_blocks=$total_blocks
-    [[ $filled_blocks -lt 0 ]] && filled_blocks=0
-    local empty_blocks=$((total_blocks - filled_blocks))
+    local filled=$((pct_int * total_blocks / 100))
+    [[ $filled -gt $total_blocks ]] && filled=$total_blocks
+    [[ $filled -lt 0 ]] && filled=0
+    local empty=$((total_blocks - filled))
 
     local bar=""
     local i
-    for ((i=0; i<filled_blocks; i++)); do bar+="█"; done
-    for ((i=0; i<empty_blocks; i++)); do bar+="░"; done
+    for ((i=0; i<filled; i++)); do bar+="█"; done
+    for ((i=0; i<empty; i++)); do bar+="░"; done
 
-    echo "<font color=\"$bar_color\">$bar</font> <font color=\"$text_color\"><b>${pct}%</b></font> <font color=\"#9B59B6\">|</font> <font color=\"#000000\">${used_gb}/${limit_gb} GB</font> <font color=\"#6BCB77\">(${remaining_gb} GB left)</font>"
+    echo "<font color=\"$bar_color\">$bar</font> <font color=\"$text_color\"><b>${pct}%</b></font> <font color=\"#9B59B6\">|</font> <font color=\"#000000\">${used_display}/${limit_display}</font> <font color=\"#6BCB77\">(${remaining_display} left)</font>"
 }
 
 # ============================================================
-# GENERATOR BANNER — LIVE DATA + PROGRESS BAR (v10.17)
+# GENERATOR BANNER — LIVE DATA + SMART FORMATTER
 # ============================================================
 generate_user_banner() {
     local username="$1" expiry="$2" limit="$3" bandwidth_gb="$4"
     mkdir -p "$BANNER_DIR"
 
-    # ============ BANDWIDTH INFO (with progress bar) ============
+    # ============ BANDWIDTH INFO ============
     local ub=0
     if [[ "$bandwidth_gb" != "0" && -n "$bandwidth_gb" ]]; then
-        [[ -f "$BANDWIDTH_DIR/${username}.usage" ]] && ub=$(cat "$BANDWIDTH_DIR/${username}.usage" 2>/dev/null)
-        [[ -z "$ub" ]] && ub=0
+        [[ -f "$BANDWIDTH_DIR/${username}.usage" ]] && ub=$(cat "$BANDWIDTH_DIR/${username}.usage" 2>/dev/null | tr -d '[:space:]')
+        [[ ! "$ub" =~ ^[0-9]+$ ]] && ub=0
     fi
     local bw_display=$(build_bandwidth_bar "$ub" "$bandwidth_gb")
 
     # ============ SESSIONS (live) ============
-    local sessions=$(pgrep -c -u "$username" sshd 2>/dev/null)
+    local sessions=$(pgrep -c -u "$username" 2>/dev/null)
     [[ -z "$sessions" || ! "$sessions" =~ ^[0-9]+$ ]] && sessions=0
 
-    # ============ ACCOUNT STATUS (live, with warnings) ============
+    # ============ ACCOUNT STATUS ============
     local acct_status="✅ ACTIVE"
     local status_color="#6BCB77"
 
-    # Check locked FIRST (highest priority)
     local passwd_flag=$(passwd -S "$username" 2>/dev/null | awk '{print $2}')
     if [[ "$passwd_flag" == "L" ]]; then
         acct_status="🔒 LOCKED"
         status_color="#FF6B6B"
     else
-        # ============ CHECK EXPIRY ============
         local expiry_ts=$(date -d "$expiry" +%s 2>/dev/null || echo 0)
         local now_ts=$(date +%s)
         local days_left=0
-        local skip_bandwidth=false
+        local skip_bw=false
 
         if [[ "$expiry_ts" -gt 0 ]]; then
             days_left=$(( (expiry_ts - now_ts) / 86400 ))
 
             if [[ "$days_left" -lt 0 ]]; then
-                acct_status="🗓️ EXPIRED"
-                status_color="#FF9F43"
-                skip_bandwidth=true
+                acct_status="🗓️ EXPIRED"; status_color="#FF9F43"; skip_bw=true
             elif [[ "$days_left" -eq 0 ]]; then
-                acct_status="⚠️ EXPIRES TODAY"
-                status_color="#FF6B6B"
-                skip_bandwidth=true
+                acct_status="⚠️ EXPIRES TODAY"; status_color="#FF6B6B"; skip_bw=true
             elif [[ "$days_left" -le 2 ]]; then
-                acct_status="🔴 EXPIRING - ${days_left} DAY$( [[ $days_left -eq 1 ]] && echo '' || echo 'S' ) LEFT"
-                status_color="#FF9F43"
-                skip_bandwidth=true
+                acct_status="🔴 EXPIRING - ${days_left} DAY$( [[ $days_left -eq 1 ]] && echo '' || echo 'S' ) LEFT"; status_color="#FF9F43"; skip_bw=true
             elif [[ "$days_left" -le 7 ]]; then
-                acct_status="⏰ EXPIRING SOON - ${days_left} DAYS LEFT"
-                status_color="#FFD93D"
-                skip_bandwidth=true
+                acct_status="⏰ EXPIRING SOON - ${days_left} DAYS LEFT"; status_color="#FFD93D"; skip_bw=true
             fi
         fi
 
-        # ============ CHECK BANDWIDTH (only if still ACTIVE) ============
-        if ! $skip_bandwidth; then
+        if ! $skip_bw; then
             if [[ "$bandwidth_gb" != "0" && -n "$bandwidth_gb" && "$ub" -gt 0 ]]; then
                 local qb=$(awk "BEGIN{printf \"%.0f\", $bandwidth_gb*1073741824}")
                 local pct=$(awk "BEGIN{printf \"%.1f\", ($ub/$qb)*100}")
-                local remaining=$(awk "BEGIN{printf \"%.2f\", $bandwidth_gb - ($ub/1073741824)}")
+                local rem=$(format_size $(awk "BEGIN{r=$qb - $ub; if(r<0)r=0; printf \"%.0f\", r}"))
 
                 if (( $(echo "$pct >= 100" | bc -l) )); then
-                    acct_status="⚠️ DATA EXHAUSTED"
-                    status_color="#FF6B6B"
+                    acct_status="⚠️ DATA EXHAUSTED"; status_color="#FF6B6B"
                 elif (( $(echo "$pct >= 95" | bc -l) )); then
-                    acct_status="🔴 CRITICAL - ${remaining} GB LEFT"
-                    status_color="#FF9F43"
+                    acct_status="🔴 CRITICAL - ${rem} LEFT"; status_color="#FF9F43"
                 fi
             fi
         fi
     fi
 
-    # ============ SYSTEM INFO ============
     local uptime_str=$(uptime -p | sed 's/up //')
     local load_str=$(awk '{print $1}' /proc/loadavg)
 
@@ -411,6 +412,9 @@ create_user() {
     echo "$username:$password" | chpasswd
     chage -E "$expire_date" "$username"
     echo "$username:$password:$expire_date:$limit:$bandwidth_gb:0:ACTIVE" >> "$DB_FILE"
+    # Ensure usage file exists
+    touch "$BANDWIDTH_DIR/${username}.usage"
+    echo "0" > "$BANDWIDTH_DIR/${username}.usage"
     local bw_display="Unlimited"; [[ "$bandwidth_gb" != "0" ]] && bw_display="${bandwidth_gb} GB"
     generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"
     [[ -f "$BANNER_ENABLED_FILE" ]] && update_ssh_banners_config
@@ -470,6 +474,7 @@ edit_user() {
                    generate_user_banner "$username" "$ce" "$cl" "$nb"
                    echo -e "${C_GREEN}✅ $nb${C_RESET}"; }; press_enter ;;
             5) echo "0" > "$BANDWIDTH_DIR/${username}.usage"; usermod -U "$username" &>/dev/null
+               rm -f "$BANDWIDTH_DIR/pidtrack/${username}__"*.last 2>/dev/null
                generate_user_banner "$username" "$ce" "$cl" "$cb"
                echo -e "${C_GREEN}✅ Reset${C_RESET}"; press_enter ;;
             0) return ;;
@@ -504,7 +509,7 @@ unlock_user() {
     press_enter
 }
 
-# ============ LIST USERS ============
+# ============ LIST USERS — FIXED (Smart formatter) ============
 list_users() {
     clear; show_banner
     [[ ! -s "$DB_FILE" ]] && { echo -e "\n${C_YELLOW}ℹ️ No users.${C_RESET}"; press_enter; return; }
@@ -512,16 +517,24 @@ list_users() {
     while IFS=: read -r user pass expiry limit bandwidth_gb _extra; do
         [[ -z "$user" ]] && continue
         bandwidth_gb=${bandwidth_gb:-0}
-        local oc=$(pgrep -c -u "$user" sshd 2>/dev/null || echo 0)
+        local oc=$(pgrep -c -u "$user" 2>/dev/null)
+        [[ -z "$oc" || ! "$oc" =~ ^[0-9]+$ ]] && oc=0
+        
         local bws="Unlimited"
         if [[ "$bandwidth_gb" != "0" ]]; then
             local ub=0
-            [[ -f "$BANDWIDTH_DIR/${user}.usage" ]] && ub=$(cat "$BANDWIDTH_DIR/${user}.usage" 2>/dev/null)
-            [[ -z "$ub" ]] && ub=0
-            local ug=$(awk "BEGIN {printf \"%.2f\", $ub / 1073741824}")
-            local rg=$(awk "BEGIN {r=$bandwidth_gb - $ug; if(r<0) r=0; printf \"%.2f\", r}")
-            local pct=$(awk "BEGIN {printf \"%.1f\", ($ub/($bandwidth_gb*1073741824))*100}")
-            bws="${ug}/${bandwidth_gb} GB (${pct}%) | ${rg} GB left"
+            [[ -f "$BANDWIDTH_DIR/${user}.usage" ]] && ub=$(cat "$BANDWIDTH_DIR/${user}.usage" 2>/dev/null | tr -d '[:space:]')
+            [[ ! "$ub" =~ ^[0-9]+$ ]] && ub=0
+            
+            local limit_bytes=$(awk "BEGIN {printf \"%.0f\", $bandwidth_gb*1073741824}")
+            local rem_bytes=$(awk "BEGIN {r=$limit_bytes - $ub; if(r<0) r=0; printf \"%.0f\", r}")
+            local pct=$(awk "BEGIN {printf \"%.1f\", ($ub/$limit_bytes)*100}")
+            
+            local used_display=$(format_size "$ub")
+            local limit_display=$(format_size "$limit_bytes")
+            local rem_display=$(format_size "$rem_bytes")
+            
+            bws="${used_display}/${limit_display} (${pct}%) | ${rem_display} left"
         fi
         local st=$(get_user_status "$user")
         local ps=$(echo -e "$st" | sed 's/\x1b\[[0-9;]*m//g')
@@ -591,6 +604,7 @@ bulk_create_users() {
         echo "$u:$p" | chpasswd
         chage -E "$ed" "$u"
         echo "$u:$p:$ed:$limit:$bandwidth_gb:0:ACTIVE" >> "$DB_FILE"
+        echo "0" > "$BANDWIDTH_DIR/${u}.usage"
         generate_user_banner "$u" "$ed" "$limit" "$bandwidth_gb"
         printf "  ${C_GREEN}%-20s${C_RESET} | ${C_YELLOW}%-15s${C_RESET} | ${C_CYAN}%-12s${C_RESET}\n" "$u" "$p" "$ed"
         ((created++))
@@ -610,19 +624,23 @@ view_user_bandwidth() {
     local bw=$(echo "$line"|cut -d: -f5)
     [[ -z "$bw" ]] && bw="0"
     local ub=0
-    [[ -f "$BANDWIDTH_DIR/${u}.usage" ]] && ub=$(cat "$BANDWIDTH_DIR/${u}.usage" 2>/dev/null)
-    [[ -z "$ub" ]] && ub=0
-    local ug=$(awk "BEGIN {printf \"%.3f\", $ub / 1073741824}")
-    echo -e "  Used: ${C_WHITE}${ug} GB${C_RESET}"
+    [[ -f "$BANDWIDTH_DIR/${u}.usage" ]] && ub=$(cat "$BANDWIDTH_DIR/${u}.usage" 2>/dev/null | tr -d '[:space:]')
+    [[ ! "$ub" =~ ^[0-9]+$ ]] && ub=0
+    
+    local used_display=$(format_size "$ub")
+    echo -e "  Used: ${C_WHITE}${used_display}${C_RESET}"
     if [[ "$bw" == "0" ]]; then
         echo -e "  Limit: ${C_GREEN}Unlimited${C_RESET}"
     else
-        local qb=$(awk "BEGIN {printf \"%.0f\", $bw * 1073741824}")
-        local pc=$(awk "BEGIN {printf \"%.1f\", ($ub / $qb) * 100}")
-        local rg=$(awk "BEGIN {r=$bw - $ug; if(r<0) r=0; printf \"%.3f\", r}")
-        echo -e "  Limit: ${C_YELLOW}${bw} GB${C_RESET}"
-        echo -e "  Remaining: ${C_WHITE}${rg} GB${C_RESET}"
-        echo -e "  Usage: ${C_WHITE}${pc}%${C_RESET}"
+        local limit_bytes=$(awk "BEGIN {printf \"%.0f\", $bw*1073741824}")
+        local rem_bytes=$(awk "BEGIN {r=$limit_bytes - $ub; if(r<0) r=0; printf \"%.0f\", r}")
+        local pct=$(awk "BEGIN {printf \"%.1f\", ($ub/$limit_bytes)*100}")
+        local limit_display=$(format_size "$limit_bytes")
+        local rem_display=$(format_size "$rem_bytes")
+        
+        echo -e "  Limit: ${C_YELLOW}${limit_display}${C_RESET}"
+        echo -e "  Remaining: ${C_WHITE}${rem_display}${C_RESET}"
+        echo -e "  Usage: ${C_WHITE}${pct}%${C_RESET}"
         echo ""
         echo -e "  ${C_BOLD}Banner Preview:${C_RESET}"
         echo -e "  $(build_bandwidth_bar "$ub" "$bw")"
@@ -640,7 +658,7 @@ killall -u "$username" -9 &>/dev/null
 userdel -r "$username" &>/dev/null
 sed -i "/^${username}:/d" /etc/voltrontech/users.db
 rm -f /etc/voltrontech/bandwidth/${username}.usage
-rm -rf /etc/voltrontech/bandwidth/pidtrack/${username}
+rm -rf /etc/voltrontech/bandwidth/pidtrack/${username}*
 rm -f /etc/voltrontech/banners/${username}.txt
 TREOF
     chmod +x "$TRIAL_CLEANUP_SCRIPT"
@@ -694,6 +712,7 @@ create_trial_account() {
     echo "$username:$password" | chpasswd
     chage -E "$expire_date" "$username"
     echo "$username:$password:$expire_date:$limit:$bandwidth_gb:0:ACTIVE" >> "$DB_FILE"
+    echo "0" > "$BANDWIDTH_DIR/${username}.usage"
     echo "$TRIAL_CLEANUP_SCRIPT $username" | at now + ${duration_hours} hours 2>/dev/null
     generate_user_banner "$username" "$expire_date" "$limit" "$bandwidth_gb"
     [[ -f "$BANNER_ENABLED_FILE" ]] && update_ssh_banners_config
@@ -847,7 +866,7 @@ dnstt_speed_menu() {
     while true; do
         clear; show_banner
         echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_PURPLE}                 ⚡ DNSTT SPEED BOOSTERS v10.17${C_RESET}"
+        echo -e "${C_PURPLE}                 ⚡ DNSTT SPEED BOOSTERS v10.18${C_RESET}"
         echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
         echo -e "  ${C_GREEN}[1]${C_RESET} Standard   (1000x)   ${C_DIM}→ buffer 512${C_RESET}"
         echo -e "  ${C_GREEN}[2]${C_RESET} Medium     (2000x)   ${C_DIM}→ buffer 5120${C_RESET}"
@@ -1234,15 +1253,13 @@ show_dnstt_full_details() {
 }
 
 # ============================================================
-# LIMITER — bc= + bc+= style (v10.17 with progress bar)
+# LIMITER v10.18 — FIXED: counts ALL user PIDs
 # ============================================================
 create_limiter_service() {
     # ============ BANNER BUILDER (bc= + bc+=) ============
     cat > "$BANNER_BUILDER" << 'BBEOF'
 #!/bin/bash
-# Voltron Banner Builder v10.17 — bc= + bc+= + progress bar
-# Args: username expiry bandwidth_gb sessions limit status_label status_color
-
+# Voltron Banner Builder v10.18 — Smart size formatter
 user="$1"
 expiry="$2"
 bandwidth_gb="$3"
@@ -1253,25 +1270,47 @@ status_color="$7"
 
 BANDWIDTH_DIR="/etc/voltrontech/bandwidth"
 
+# ============ SMART SIZE FORMATTER ============
+format_size() {
+    local bytes=$1
+    [[ "$bytes" =~ ^[0-9]+$ ]] || bytes=0
+    if (( bytes >= 1073741824 )); then
+        awk "BEGIN{printf \"%.2f GB\", $bytes/1073741824}"
+    elif (( bytes >= 1048576 )); then
+        awk "BEGIN{printf \"%.2f MB\", $bytes/1048576}"
+    elif (( bytes >= 1024 )); then
+        awk "BEGIN{printf \"%.2f KB\", $bytes/1024}"
+    else
+        echo "${bytes} B"
+    fi
+}
+
 # ============ BANDWIDTH PROGRESS BAR ============
 bw_info=""
 if [[ "$bandwidth_gb" == "0" || -z "$bandwidth_gb" ]]; then
     bw_info='<font color="#6BCB77">Unlimited ∞</font>'
 else
     ub=0
-    [[ -f "$BANDWIDTH_DIR/${user}.usage" ]] && ub=$(cat "$BANDWIDTH_DIR/${user}.usage" 2>/dev/null)
-    [[ -z "$ub" ]] && ub=0
+    usage_file="$BANDWIDTH_DIR/${user}.usage"
+    if [[ -f "$usage_file" ]]; then
+        ub=$(cat "$usage_file" 2>/dev/null | tr -d '[:space:]')
+        [[ ! "$ub" =~ ^[0-9]+$ ]] && ub=0
+    fi
 
-    qb=$(awk "BEGIN{printf \"%.0f\", $bandwidth_gb*1073741824}")
-    [[ "$qb" -le 0 ]] && qb=1
+    limit_bytes=$(awk "BEGIN{printf \"%.0f\", $bandwidth_gb*1073741824}")
+    [[ "$limit_bytes" -le 0 ]] && limit_bytes=1
 
-    pct=$(awk "BEGIN{printf \"%.1f\", ($ub/$qb)*100}")
-    pct_int=$(awk "BEGIN{printf \"%d\", ($ub/$qb)*100}")
+    pct=$(awk "BEGIN{printf \"%.1f\", ($ub/$limit_bytes)*100}")
+    pct_int=$(awk "BEGIN{printf \"%d\", ($ub/$limit_bytes)*100}")
     [[ "$pct_int" -gt 100 ]] && pct_int=100
     [[ "$pct_int" -lt 0 ]] && pct_int=0
 
-    ug=$(awk "BEGIN{printf \"%.2f\", $ub/1073741824}")
-    rg=$(awk "BEGIN{r=$bandwidth_gb - $ug; if(r<0)r=0; printf \"%.2f\", r}")
+    remaining_bytes=$((limit_bytes - ub))
+    [[ $remaining_bytes -lt 0 ]] && remaining_bytes=0
+
+    used_display=$(format_size "$ub")
+    limit_display=$(format_size "$limit_bytes")
+    remaining_display=$(format_size "$remaining_bytes")
 
     bar_color="#6BCB77"
     text_color="#6BCB77"
@@ -1294,14 +1333,14 @@ else
     for ((i=0; i<filled; i++)); do bar+="█"; done
     for ((i=0; i<empty; i++)); do bar+="░"; done
 
-    bw_info="<font color=\"$bar_color\">$bar</font> <font color=\"$text_color\"><b>${pct}%</b></font> <font color=\"#9B59B6\">|</font> <font color=\"#000000\">${ug}/${bandwidth_gb} GB</font> <font color=\"#6BCB77\">(${rg} GB left)</font>"
+    bw_info="<font color=\"$bar_color\">$bar</font> <font color=\"$text_color\"><b>${pct}%</b></font> <font color=\"#9B59B6\">|</font> <font color=\"#000000\">${used_display}/${limit_display}</font> <font color=\"#6BCB77\">(${remaining_display} left)</font>"
 fi
 
 # ============ SYSTEM INFO ============
 uptime_str=$(uptime -p | sed 's/up //')
 load_str=$(awk '{print $1}' /proc/loadavg)
 
-# ============ BUILD BANNER (bc= + bc+=) ============
+# ============ BUILD BANNER ============
 bc=""
 bc+="<br><br>"
 bc+="<center><font color=\"#9B59B6\">‎▬▬▬▬▬ஜ۩</font><font color=\"#FF6B6B\" size=\"8\"><b> 🌍VOLTRON VPN🌍</b></font><font color=\"#9B59B6\">‎۩ஜ▬▬▬▬▬</font></center><br>"
@@ -1332,9 +1371,12 @@ printf "%s" "$bc"
 BBEOF
     chmod +x "$BANNER_BUILDER"
 
-    # ============ LIMITER SCRIPT ============
+    # ============ LIMITER SCRIPT — FIXED ============
     cat > "$LIMITER_SCRIPT" << 'LIMEOF'
 #!/bin/bash
+# ============================================================
+# VOLTRON LIMITER v10.18 — counts ALL user PIDs (sshd+bash+wget)
+# ============================================================
 DB_FILE="/etc/voltrontech/users.db"
 BW_DIR="/etc/voltrontech/bandwidth"
 PID_DIR="$BW_DIR/pidtrack"
@@ -1342,6 +1384,7 @@ BANNER_DIR="/etc/voltrontech/banners"
 BANNER_ENABLED_FILE="/etc/voltrontech/banners_enabled"
 BANNER_BUILDER="/usr/local/bin/voltrontech-banner-build.sh"
 SCAN=15
+
 mkdir -p "$BW_DIR" "$PID_DIR" "$BANNER_DIR"
 shopt -s nullglob
 
@@ -1360,9 +1403,18 @@ while true; do
         [[ "$limit" =~ ^[0-9]+$ ]] || limit=999
         [[ "$bw" =~ ^[0-9]+\.?[0-9]*$ ]] || bw=0
 
-        oc=$(pgrep -c -u "$user" sshd 2>/dev/null || echo 0)
+        # ==================================================
+        # FIXED: Get ALL PIDs of user (sshd + bash + wget)
+        # ==================================================
+        declare -A upids=()
+        while read -r sp; do
+            [[ "$sp" =~ ^[0-9]+$ ]] && upids["$sp"]=1
+        done < <(pgrep -u "$user" 2>/dev/null)
+
+        oc=${#upids[@]}
         [[ "$oc" =~ ^[0-9]+$ ]] || oc=0
 
+        # ============ STATUS CHECKS ============
         locked=false; expired=false; ex=false
         [[ -n "${lk[$user]+x}" ]] && locked=true
 
@@ -1378,9 +1430,14 @@ while true; do
             fi
         fi
 
-        (( limit > 0 && oc > limit )) && ! $locked && { usermod -L "$user" &>/dev/null; killall -u "$user" -9 &>/dev/null; locked=true; }
+        (( limit > 0 && oc > limit )) && ! $locked && {
+            usermod -L "$user" &>/dev/null
+            killall -u "$user" -9 &>/dev/null
+            locked=true
+        }
 
-        uf="$BW_DIR/${user}.usage"; ad=0
+        uf="$BW_DIR/${user}.usage"
+        ad=0
         [[ -f "$uf" ]] && { read -r ad < "$uf"; [[ "$ad" =~ ^[0-9]+$ ]] || ad=0; }
 
         if [[ "$bw" != "0" && -n "$bw" ]]; then
@@ -1388,7 +1445,56 @@ while true; do
             (( qb > 0 && ad >= qb )) && { ex=true; ! $locked && { usermod -L "$user" &>/dev/null; locked=true; }; }
         fi
 
-        # ============ DYNAMIC BANNER ============
+        # ==================================================
+        # BANDWIDTH CALCULATION
+        # ==================================================
+        if [[ -z "$bw" || "$bw" == "0" ]]; then
+            : # unlimited — skip bandwidth tracking
+        elif (( oc == 0 )); then
+            # No sessions — reset pidtrack
+            rm -f "$PID_DIR/${user}__"*.last 2>/dev/null
+        else
+            # Calculate delta for each PID
+            dt=0
+            for pid in "${!upids[@]}"; do
+                io="/proc/$pid/io"
+                cur=0
+                if [[ -r "$io" ]]; then
+                    rc=0; wc=0
+                    while read -r k v; do
+                        case "$k" in
+                            rchar:) rc=${v:-0};;
+                            wchar:) wc=${v:-0};;
+                        esac
+                    done < "$io" 2>/dev/null
+                    cur=$((rc + wc))
+                fi
+                pf="$PID_DIR/${user}__${pid}.last"
+                if [[ -f "$pf" ]]; then
+                    read -r pv < "$pf"
+                    [[ "$pv" =~ ^[0-9]+$ ]] || pv=0
+                    if (( cur >= pv )); then
+                        d=$((cur - pv))
+                    else
+                        d=$cur
+                    fi
+                    dt=$((dt + d))
+                fi
+                printf "%s\n" "$cur" > "$pf"
+            done
+
+            if (( dt > 0 )); then
+                nt=$((ad + dt))
+                printf "%s\n" "$nt" > "$uf"
+                tg=$(awk "BEGIN{printf \"%.2f\", $nt/1073741824}" 2>/dev/null)
+                # Update DB traffic (field 6) — preserve bw (field 5)
+                awk -F: -v u="$user" -v tg="$tg" 'BEGIN{OFS=":"} $1==u{$6=tg}1' "$DB_FILE" > "$DB_FILE.tmp" && mv "$DB_FILE.tmp" "$DB_FILE"
+            fi
+        fi
+
+        # ==================================================
+        # DYNAMIC BANNER
+        # ==================================================
         if $dyn; then
             if $locked; then
                 acct_status="🔒 LOCKED"; status_color="#FF6B6B"
@@ -1412,8 +1518,8 @@ while true; do
                             qb=$(awk "BEGIN{printf \"%.0f\", $bw*1073741824}")
                             pct=$(awk "BEGIN{printf \"%.1f\", ($ad/$qb)*100}")
                             if (( $(echo "$pct >= 95" | bc -l) )); then
-                                remaining=$(awk "BEGIN{printf \"%.2f\", $bw - ($ad/1073741824)}")
-                                acct_status="🔴 CRITICAL - ${remaining} GB LEFT"; status_color="#FF9F43"
+                                rem_disp=$(awk "BEGIN{printf \"%.2f\", $bw - ($ad/1073741824)}")
+                                acct_status="🔴 CRITICAL - ${rem_disp} GB LEFT"; status_color="#FF9F43"
                             else
                                 acct_status="✅ ACTIVE"; status_color="#6BCB77"
                             fi
@@ -1425,48 +1531,17 @@ while true; do
             fi
 
             bf="$BANNER_DIR/${user}.txt"; tf="${bf}.tmp"
-            "$BANNER_BUILDER" "$user" "$expiry" "$bw" "$oc" "$limit" "$acct_status" "$status_color" > "$tf"
+            "$BANNER_BUILDER" "$user" "$expiry" "$bw" "$oc" "$limit" "$acct_status" "$status_color" > "$tf" 2>/dev/null
             if ! cmp -s "$tf" "$bf" 2>/dev/null; then mv "$tf" "$bf"; else rm -f "$tf"; fi
             chmod 644 "$bf" 2>/dev/null
         fi
-
-        [[ -z "$bw" || "$bw" == "0" ]] && continue
-        acc=$ad
-        (( oc == 0 )) && { rm -f "$PID_DIR/${user}__"*.last 2>/dev/null; continue; }
-
-        declare -A upids=()
-        while read -r sp; do [[ "$sp" =~ ^[0-9]+$ ]] && upids["$sp"]=1; done < <(pgrep -u "$user" sshd 2>/dev/null)
-
-        dt=0
-        for pid in "${!upids[@]}"; do
-            io="/proc/$pid/io"; cur=0
-            [[ -r "$io" ]] && {
-                rc=0; wc=0
-                while read -r k v; do
-                    case "$k" in rchar:) rc=${v:-0};; wchar:) wc=${v:-0};; esac
-                done < "$io"
-                cur=$((rc+wc))
-            }
-            pf="$PID_DIR/${user}__${pid}.last"
-            [[ -f "$pf" ]] && {
-                read -r pv < "$pf"
-                [[ "$pv" =~ ^[0-9]+$ ]] || pv=0
-                (( cur >= pv )) && d=$((cur-pv)) || d=$cur
-                dt=$((dt+d))
-            }
-            printf "%s\n" "$cur" > "$pf"
-        done
-
-        nt=$((acc+dt))
-        printf "%s\n" "$nt" > "$uf"
-        tg=$(awk "BEGIN{printf \"%.2f\", $nt/1073741824}" 2>/dev/null)
-        [[ -n "$tg" ]] && sed -i "s/^$user:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*/$user:$pass:$expiry:$limit:$bw:$tg:$status/" "$DB_FILE" 2>/dev/null
     done < "$DB_FILE"
     sleep $SCAN
 done
 LIMEOF
     chmod +x "$LIMITER_SCRIPT"
 
+    # ============ LIMITER SERVICE ============
     cat > "$LIMITER_SERVICE" <<EOF
 [Unit]
 Description=Voltron Limiter
@@ -1615,7 +1690,7 @@ web_panel_menu() {
         local ban_st=""; [[ -f "$BANNER_ENABLED_FILE" ]] && ban_st="${C_GREEN}● ENABLED${C_RESET}" || ban_st="${C_RED}● DISABLED${C_RESET}"
 
         echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}"
-        echo -e "${C_PURPLE}                 🌐 WEB PANEL v10.17${C_RESET}"
+        echo -e "${C_PURPLE}                 🌐 WEB PANEL v10.18${C_RESET}"
         echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
         echo -e "  ${C_CYAN}Domain${C_RESET} : ${C_YELLOW}$WEB_PANEL_API_DOMAIN${C_RESET}"
         echo -e "  ${C_CYAN}VPS IP${C_RESET} : $ip\n"
@@ -1666,7 +1741,6 @@ change_api_domain() {
     echo -e "${C_PURPLE}═══════════════════════════════════════════════════════════════════${C_RESET}\n"
     echo -e "  ${C_CYAN}Current Domain${C_RESET} : ${C_YELLOW}$WEB_PANEL_API_DOMAIN${C_RESET}"
     echo -e "  ${C_CYAN}deSEC Base${C_RESET}    : ${C_YELLOW}$DESEC_DOMAIN${C_RESET}\n"
-    echo -e "  ${C_DIM}Note: Kama domain ipo under $DESEC_DOMAIN, DNS itaundwa automatically.${C_RESET}\n"
     read -p "👉 New API domain (or '0' cancel): " nd
     [[ "$nd" == "0" || -z "$nd" ]] && return
 
@@ -1692,12 +1766,6 @@ change_api_domain() {
         echo -e "  ${C_GREEN}✅ Nginx updated${C_RESET}"
     fi
 
-    if [ -d "/etc/letsencrypt/live/$old_domain" ] && [[ "$old_domain" != "$nd" ]]; then
-        echo -e "  ${C_YELLOW}⚠️  SSL ya zamani ipo ($old_domain)${C_RESET}"
-        read -p "  Delete old SSL? (y/n): " ss
-        [[ "$ss" == "y" ]] && certbot delete --cert-name "$old_domain" --non-interactive 2>/dev/null
-    fi
-
     if [[ "$nd" == *".$DESEC_DOMAIN" ]]; then
         echo -e "\n  ${C_BLUE}🌐 Updating DNS record...${C_RESET}"
         local ip=$(curl -s -4 icanhazip.com)
@@ -1714,12 +1782,9 @@ change_api_domain() {
         else
             echo -e "  ${C_YELLOW}⚠️  DNS auto-update failed (HTTP ${r: -3})${C_RESET}"
         fi
-    else
-        echo -e "\n  ${C_YELLOW}⚠️  Domain sio under $DESEC_DOMAIN — set DNS manually${C_RESET}"
     fi
 
     echo -e "\n${C_GREEN}✅ API domain: $old_domain → $nd${C_RESET}"
-    echo -e "${C_DIM}  Next: install SSL kwa menu '5) SSL Only'${C_RESET}"
     press_enter
 }
 
@@ -1761,7 +1826,7 @@ web_panel_full_setup() {
     while [[ "$(dig +short $WEB_PANEL_API_DOMAIN 2>/dev/null | tail -1)" != "$ip" ]]; do
         ((tries++))
         if [[ $tries -gt 30 ]]; then
-            echo -e "${C_YELLOW}⏳ DNS bado haijapropagate — unaweza ku-install SSL baadae${C_RESET}"
+            echo -e "${C_YELLOW}⏳ DNS bado haijapropagate${C_RESET}"
             break
         fi
         echo "  ⏳ Waiting... ($tries/30)"
@@ -1785,7 +1850,6 @@ web_panel_install_api() {
     local API_KEY
     if [ -f "$API_KEY_FILE" ]; then
         API_KEY=$(cat "$API_KEY_FILE")
-        echo -e "${C_DIM}ℹ️  Using existing API key${C_RESET}"
     else
         API_KEY="voltron_$(head /dev/urandom | tr -dc 'a-zA-Z0-9' | head -c 32)"
         mkdir -p "$DB_DIR"
@@ -1842,12 +1906,9 @@ EOF
             echo -e "\n${C_GREEN}✅ API: http://$sip:$API_PORT${C_RESET}"
             echo -e "${C_GREEN}🔑 Key: $API_KEY${C_RESET}"
             press_enter; return 0
-        else
-            echo -e "${C_YELLOW}⚠️ Health fail${C_RESET}"; tail -20 /var/log/voltrontech-api.log
         fi
-    else
-        echo -e "${C_RED}❌ Failed${C_RESET}"; journalctl -u voltrontech-api -n 20 --no-pager
     fi
+    echo -e "${C_RED}❌ Failed${C_RESET}"; journalctl -u voltrontech-api -n 20 --no-pager
     press_enter; return 1
 }
 
@@ -1949,28 +2010,22 @@ def get_expiry_status(expiry_date_str):
 def get_bandwidth_status(bandwidth_gb, used_bytes):
     try:
         bw = float(bandwidth_gb)
-        if bw <= 0: return {'status': 'unlimited', 'level': 'success', 'pct': 0, 'bar_color': '#6BCB77'}
+        if bw <= 0: return {'status': 'unlimited', 'level': 'success', 'pct': 0, 'bar_color': '#6BCB77', 'remaining_gb': 0}
         qb = bw * 1073741824
         pct = (used_bytes / qb) * 100
         remaining = bw - (used_bytes / 1073741824)
-
-        # Determine color
         if pct >= 95: bc = '#FF6B6B'; level = 'danger'
         elif pct >= 80: bc = '#FF9F43'; level = 'warning'
         elif pct >= 60: bc = '#FFD93D'; level = 'warning'
         else: bc = '#6BCB77'; level = 'success'
-
-        if pct >= 100:
-            return {'status': 'exhausted', 'level': 'danger', 'pct': round(pct, 1), 'remaining_gb': 0, 'bar_color': bc}
-        elif pct >= 95:
-            return {'status': 'critical', 'level': level, 'pct': round(pct, 1), 'remaining_gb': round(remaining, 2), 'bar_color': bc}
-        else:
-            return {'status': 'active', 'level': level, 'pct': round(pct, 1), 'remaining_gb': round(remaining, 2), 'bar_color': bc}
+        if pct >= 100: return {'status': 'exhausted', 'level': 'danger', 'pct': round(pct, 1), 'remaining_gb': 0, 'bar_color': bc}
+        elif pct >= 95: return {'status': 'critical', 'level': level, 'pct': round(pct, 1), 'remaining_gb': round(remaining, 2), 'bar_color': bc}
+        else: return {'status': 'active', 'level': level, 'pct': round(pct, 1), 'remaining_gb': round(remaining, 2), 'bar_color': bc}
     except Exception:
-        return {'status': 'unknown', 'level': 'default', 'pct': 0, 'bar_color': '#6BCB77'}
+        return {'status': 'unknown', 'level': 'default', 'pct': 0, 'bar_color': '#6BCB77', 'remaining_gb': 0}
 
 def get_online(u):
-    out = run_shell(f'pgrep -c -u {u} sshd 2>/dev/null')
+    out = run_shell(f'pgrep -c -u {u} 2>/dev/null')
     try: return int(out or '0')
     except ValueError: return 0
 
@@ -2005,10 +2060,8 @@ def get_protocols(username=None, password=None, limit=DEFAULT_LIMIT):
                 with open(f'{DB_DIR}/config/mtu') as f: mtu = int(f.read().strip())
             except: mtu = 512
         p['dnstt'] = {'id': 'dnstt', 'name': 'DNSTT', 'icon': '📡', 'domain': d, 'pubkey': pk, 'mtu': mtu, 'dns': '8.8.8.8', 'username': username, 'password': password, 'limit': limit}
-    if service_active('udp-custom'): p['udp_custom'] = {'id': 'udp_custom', 'name': 'UDP', 'icon': '🚀', 'host': SERVER_HOST, 'ip': sip, 'port_range': '1-65535', 'exclude': '53,5300', 'username': username, 'password': password, 'limit': limit}
     if service_active('badvpn'): p['badvpn'] = {'id': 'badvpn', 'name': 'BadVPN', 'icon': '⚡', 'host': SERVER_HOST, 'ip': sip, 'port': 7300, 'username': username, 'password': password, 'limit': limit}
     if service_active('zivpn'): p['zivpn'] = {'id': 'zivpn', 'name': 'ZiVPN', 'icon': '🛡️', 'host': SERVER_HOST, 'ip': sip, 'port': 5667, 'username': username, 'password': password, 'limit': limit}
-    if service_active('falconproxy'): p['falconproxy'] = {'id': 'falconproxy', 'name': 'Falcon', 'icon': '🦅', 'host': SERVER_HOST, 'ip': sip, 'port': 8080, 'username': username, 'password': password, 'limit': limit}
     return p
 
 def now_iso(): return datetime.now().isoformat()
@@ -2017,8 +2070,7 @@ def is_banner_enabled():
     return os.path.exists(BANNER_ENABLED_FILE)
 
 def refresh_ssh_banners():
-    if not is_banner_enabled():
-        return {'success': False, 'error': 'Banner not enabled'}
+    if not is_banner_enabled(): return {'success': False, 'error': 'Banner not enabled'}
     try:
         lines = ["# Voltron Tech - Dynamic Banners (auto-generated)"]
         count = 0
@@ -2044,7 +2096,7 @@ def refresh_ssh_banners():
         return {'success': False, 'error': str(ex)}
 
 @app.route('/api/health')
-def health(): return jsonify({'success': True, 'status': 'ok', 'version': '13.0', 'api_domain': API_DOMAIN, 'protocols_active': len(get_protocols()), 'timestamp': now_iso()})
+def health(): return jsonify({'success': True, 'status': 'ok', 'version': '14.0', 'api_domain': API_DOMAIN, 'protocols_active': len(get_protocols()), 'timestamp': now_iso()})
 
 @app.route('/api/trial/check', methods=['POST'])
 @require_api_key
@@ -2071,6 +2123,7 @@ def tcreate():
         e = (datetime.now() + timedelta(days=days)).strftime('%Y-%m-%d')
         run_safe(['chage', '-E', e, u])
         with open(DB_FILE, 'a') as f: f.write(f'{u}:{p}:{e}:{DEFAULT_LIMIT}:0:0:ACTIVE\n')
+        run_shell(f'echo "0" > {BANDWIDTH_DIR}/{u}.usage')
         return jsonify({'success': True, 'account': {'username': u, 'password': p, 'expiry': e, 'days': days, 'limit': DEFAULT_LIMIT, 'bandwidth': 'Unlimited', 'server': SERVER_HOST, 'server_ip': get_server_ip()}, 'protocols': get_protocols(u, p, DEFAULT_LIMIT)})
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
 
@@ -2102,7 +2155,7 @@ def ulist():
             'expiry_status': expiry_info['status'],
             'limit': int(u['limit']),
             'bandwidth_limit': float(u['bandwidth']),
-            'bandwidth_used_gb': round(ub / 1073741824, 2),
+            'bandwidth_used_gb': round(ub / 1073741824, 4),
             'bandwidth_pct': bw_info['pct'],
             'bandwidth_remaining_gb': bw_info.get('remaining_gb', 0),
             'bandwidth_status': bw_info['status'],
@@ -2128,6 +2181,7 @@ def ucreate():
         e = (datetime.now() + timedelta(days=days)).strftime('%Y-%m-%d')
         run_safe(['chage', '-E', e, u])
         with open(DB_FILE, 'a') as f: f.write(f'{u}:{p}:{e}:{limit}:{bw}:0:ACTIVE\n')
+        run_shell(f'echo "0" > {BANDWIDTH_DIR}/{u}.usage')
         return jsonify({'success': True, 'account': {'username': u, 'password': p, 'expiry': e, 'limit': limit, 'bandwidth': bw}})
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
 
@@ -2137,7 +2191,6 @@ def udelete():
     d = request.get_json() or {}
     u = d.get('username', '').strip()
     if not is_valid_username(u): return jsonify({'success': False, 'error': 'Invalid'}), 400
-    if not user_exists(u) and not any(x['username'] == u for x in read_users()): return jsonify({'success': False, 'error': 'Not found'}), 404
     try:
         run_shell(f'killall -u {u} -9 2>/dev/null'); run_safe(['userdel', '-r', u])
         run_shell(f'rm -f {BANDWIDTH_DIR}/{u}.usage'); run_shell(f"sed -i '/^{u}:/d' {DB_FILE}")
@@ -2164,34 +2217,6 @@ def uunlock():
     try:
         run_safe(['usermod', '-U', u])
         return jsonify({'success': True, 'message': f'{u} unlocked'})
-    except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
-
-@app.route('/api/users/edit', methods=['POST'])
-@require_api_key
-def uedit():
-    d = request.get_json() or {}
-    u = d.get('username', '').strip()
-    if not is_valid_username(u) or not user_exists(u): return jsonify({'success': False, 'error': 'Not found'}), 404
-    try:
-        all_users = read_users()
-        target = next((x for x in all_users if x['username'] == u), None)
-        if not target: return jsonify({'success': False, 'error': 'Not found'}), 404
-        np = d.get('password', target['password']); days = d.get('days')
-        nl = d.get('limit', target['limit']); nb = d.get('bandwidth', target['bandwidth'])
-        ce = target['expiry']
-        if np and np != target['password']:
-            if not is_valid_password(np): return jsonify({'success': False, 'error': 'Invalid password'}), 400
-            subprocess.run(['chpasswd'], input=f'{u}:{np}', text=True, capture_output=True)
-        if days:
-            ce = (datetime.now() + timedelta(days=int(days))).strftime('%Y-%m-%d'); run_safe(['chage', '-E', ce, u])
-        new_lines = []
-        for x in all_users:
-            if x['username'] == u:
-                new_lines.append(f"{u}:{np}:{ce}:{nl}:{nb}:{x.get('traffic','0')}:ACTIVE")
-            else:
-                new_lines.append(f"{x['username']}:{x['password']}:{x['expiry']}:{x['limit']}:{x['bandwidth']}:{x.get('traffic','0')}:{x.get('status','ACTIVE')}")
-        with open(DB_FILE, 'w') as f: f.write('\n'.join(new_lines) + '\n')
-        return jsonify({'success': True, 'account': {'username': u, 'password': np, 'expiry': ce, 'limit': int(nl), 'bandwidth': float(nb)}})
     except Exception as ex: return jsonify({'success': False, 'error': str(ex)}), 500
 
 @app.route('/api/users/renew', methods=['POST'])
@@ -2428,7 +2453,6 @@ web_panel_view_api_info() {
     echo "  POST /api/users/delete      { username }"
     echo "  POST /api/users/lock        { username }"
     echo "  POST /api/users/unlock      { username }"
-    echo "  POST /api/users/edit        { username, ... }"
     echo "  POST /api/users/renew       { username, days }"
     echo "  POST /api/users/reset_bandwidth { username }"
     echo "  POST /api/cleanup/expired"
@@ -2440,9 +2464,6 @@ web_panel_view_api_info() {
     echo "  POST /api/banner/enable"
     echo "  POST /api/banner/disable"
     echo "  POST /api/banner/refresh"
-    echo ""
-    echo -e "${C_BOLD}${C_YELLOW}Config:${C_RESET}"
-    echo "  GET  /api/config/domain"
     press_enter
 }
 
@@ -2499,7 +2520,6 @@ POST /api/users/create           { username, password, days, limit, bandwidth }
 POST /api/users/delete           { username }
 POST /api/users/lock             { username }
 POST /api/users/unlock           { username }
-POST /api/users/edit             { username, password?, days?, limit?, bandwidth? }
 POST /api/users/renew            { username, days }
 POST /api/users/reset_bandwidth  { username }
 POST /api/cleanup/expired
@@ -2845,11 +2865,11 @@ show_vpn_data_usage() {
     [[ ! -s "$DB_FILE" ]] && { echo "No users"; press_enter; return; }
     while IFS=: read -r u p e l b _x; do
         [[ -z "$u" ]] && continue
-        ub=0; [[ -f "$BANDWIDTH_DIR/${u}.usage" ]] && ub=$(cat "$BANDWIDTH_DIR/${u}.usage")
-        [[ -z "$ub" ]] && ub=0
-        ug=$(awk "BEGIN{printf \"%.2f\", $ub/1073741824}")
+        ub=0; [[ -f "$BANDWIDTH_DIR/${u}.usage" ]] && ub=$(cat "$BANDWIDTH_DIR/${u}.usage" | tr -d '[:space:]')
+        [[ ! "$ub" =~ ^[0-9]+$ ]] && ub=0
+        local used_display=$(format_size "$ub")
         st=$(get_user_status "$u" | sed 's/\x1b\[[0-9;]*m//g')
-        printf "${C_GREEN}%-15s${C_RESET} | ${C_YELLOW}%-10s GB${C_RESET} | %s\n" "$u" "$ug" "$st"
+        printf "${C_GREEN}%-15s${C_RESET} | ${C_YELLOW}%-15s${C_RESET} | %s\n" "$u" "$used_display" "$st"
     done < "$DB_FILE"
     press_enter
 }
